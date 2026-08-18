@@ -6,7 +6,15 @@ final class PRSTUDIO_UC_Migration_V3 {
     private static function state():array{$s=function_exists('get_option')?get_option('prstudio_uc_migration_v3',array()):array();return is_array($s)?$s:array();}
     private static function write_state(array $s):void{if(function_exists('update_option'))update_option('prstudio_uc_migration_v3',$s,false);}
     private static function copy_atomic(string $src,string $dst):bool{
-        if(!is_readable($src)||is_file($dst))return true;$dir=dirname($dst);if(!is_dir($dir)){function_exists('wp_mkdir_p')?wp_mkdir_p($dir):@mkdir($dir,0750,true);} $raw=@file_get_contents($src);if(false===$raw)return false;
+        if(!is_readable($src))return true;
+        // A destination that merely EXISTS used to count as done. After an
+        // interrupted migration that skips a half-written or stale file and then
+        // lets the run mark itself complete, so the bad copy is never revisited.
+        // Only an identical file is actually copied; anything else is redone.
+        if(is_file($dst)){
+            if(@filesize($dst)===@filesize($src)&&@hash_file('sha256',$dst)===@hash_file('sha256',$src))return true;
+        }
+        $dir=dirname($dst);if(!is_dir($dir)){function_exists('wp_mkdir_p')?wp_mkdir_p($dir):@mkdir($dir,0750,true);} $raw=@file_get_contents($src);if(false===$raw)return false;
         try{$suffix=bin2hex(random_bytes(6));}catch(Throwable $e){$suffix=uniqid('',true);} $tmp=$dst.'.'.$suffix.'.tmp';if(false===@file_put_contents($tmp,$raw,LOCK_EX))return false;@chmod($tmp,0640);if(!@rename($tmp,$dst)){@unlink($tmp);return false;}return true;
     }
     public static function migrate_memory():array{

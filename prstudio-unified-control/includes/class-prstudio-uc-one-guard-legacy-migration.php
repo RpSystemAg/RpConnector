@@ -17,16 +17,28 @@ final class PRSTUDIO_UC_One_Guard_Legacy_Migration {
         $tasks = $wpdb->prefix . 'prstudio_uc_tasks';
         $jobs  = $wpdb->prefix . 'prstudio_uc_jobs';
 
+        // Every UPDATE below used to run with its return value discarded, and
+        // the version marker at the end was written unconditionally. One failed
+        // statement therefore produced a half-migrated database that could never
+        // be retried, because the migration recorded itself as done. Collect the
+        // failures and let them decide whether the marker is earned.
+        $sql_failures = array();
+        $run = static function ( string $sql ) use ( $wpdb, &$sql_failures ): void {
+            // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- one-off schema/state migration on identifiers built from $wpdb->prefix.
+            $result = $wpdb->query( $sql );
+            if ( false === $result ) { $sql_failures[] = array( 'error' => (string) $wpdb->last_error, 'sql' => substr( preg_replace( '/\s+/', ' ', $sql ), 0, 180 ) ); }
+        };
+
         if ( self::table_exists( $tasks ) ) {
             // Old human-park states re-enter the executable queue; no manual resume survives.
-            $wpdb->query( "UPDATE `{$tasks}` SET status='queued', lease_token=NULL, lease_expires_gmt=NULL, updated_gmt='{$now}' WHERE LOWER(status) IN ('human_takeover','resuming')" );
+            $run( "UPDATE `{$tasks}` SET status='queued', lease_token=NULL, lease_expires_gmt=NULL, updated_gmt='{$now}' WHERE LOWER(status) IN ('human_takeover','resuming')" );
             self::drop_column_if_present( $tasks, 'takeover_reason' );
         }
         if ( self::table_exists( $jobs ) ) {
             // Approval/review parking becomes executable; legacy safe-failure states become technical terminals.
-            $wpdb->query( "UPDATE `{$jobs}` SET status='READY', lease_token=NULL, lease_expires_gmt=NULL, available_gmt='{$now}', updated_gmt='{$now}' WHERE UPPER(status) IN ('WAITING_FOR_APPROVAL')" );
-            $wpdb->query( "UPDATE `{$jobs}` SET status='COMPLETED', lease_token=NULL, lease_expires_gmt=NULL, completed_gmt=COALESCE(completed_gmt,'{$now}'), updated_gmt='{$now}' WHERE UPPER(status) IN ('VERIFYING','ROLLED_BACK')" );
-            $wpdb->query( "UPDATE `{$jobs}` SET status='TECHNICAL_ERROR', lease_token=NULL, lease_expires_gmt=NULL, completed_gmt=COALESCE(completed_gmt,'{$now}'), updated_gmt='{$now}' WHERE UPPER(status) IN ('FAILED_SAFE','ROLLING_BACK')" );
+            $run( "UPDATE `{$jobs}` SET status='READY', lease_token=NULL, lease_expires_gmt=NULL, available_gmt='{$now}', updated_gmt='{$now}' WHERE UPPER(status) IN ('WAITING_FOR_APPROVAL')" );
+            $run( "UPDATE `{$jobs}` SET status='COMPLETED', lease_token=NULL, lease_expires_gmt=NULL, completed_gmt=COALESCE(completed_gmt,'{$now}'), updated_gmt='{$now}' WHERE UPPER(status) IN ('VERIFYING','ROLLED_BACK')" );
+            $run( "UPDATE `{$jobs}` SET status='TECHNICAL_ERROR', lease_token=NULL, lease_expires_gmt=NULL, completed_gmt=COALESCE(completed_gmt,'{$now}'), updated_gmt='{$now}' WHERE UPPER(status) IN ('FAILED_SAFE','ROLLING_BACK')" );
         }
 
         $legacy_migration_state = get_option( 'prstudio_uc_migration_pending', array() );
@@ -85,6 +97,14 @@ final class PRSTUDIO_UC_One_Guard_Legacy_Migration {
             unset( $editorial['envelopes'], $editorial['usage'] );
             update_option( 'prstudio_uc_editorial_autonomy_v2', $editorial, false );
         }
+        // Only claim the migration is done when every statement actually
+        // succeeded. A partially applied migration that is allowed to retry is
+        // recoverable; one marked complete is not.
+        if ( $sql_failures ) {
+            update_option( self::OPTION . '_last_error', array( 'gmt' => gmdate( 'c' ), 'failures' => $sql_failures ), false );
+            return;
+        }
+        delete_option( self::OPTION . '_last_error' );
         update_option( self::OPTION, self::VERSION, false );
     }
 

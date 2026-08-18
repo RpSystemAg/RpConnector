@@ -22,13 +22,31 @@ final class PRSTUDIO_UC_Product_Audit {
         return array('checks'=>$checks,'title'=>$title,'description_hash'=>hash('sha256',strtolower(preg_replace('/\s+/',' ',$desc))),'title_hash'=>hash('sha256',strtolower($title)));
     }
     public static function execute(array $args){
-        if(!function_exists('wc_get_product'))return new WP_Error('prstudio_woocommerce_unavailable','WooCommerce unavailable.',array('status'=>503));$force=!empty($args['force_reanalysis']);$items=array();$hashes=array();$reused=0;$fresh=0;
+        if(!function_exists('wc_get_product'))return new WP_Error('prstudio_woocommerce_unavailable','WooCommerce unavailable.',array('status'=>503));// The MCP tool exposes `force`; this executor only ever read
+        // `force_reanalysis`, so force:true was silently ignored and the audit
+        // kept serving remembered results while reporting memory_reused:true.
+        // Accept both: the published contract name is the one callers use.
+        $force=!empty($args['force'])||!empty($args['force_reanalysis']);$items=array();$hashes=array();$reused=0;$fresh=0;
         $base=class_exists('PRSTUDIO_UC_SEO_Intelligence')?PRSTUDIO_UC_SEO_Intelligence::audit_product_seo($args):array('items'=>array(),'frontend_samples'=>array());if(is_wp_error($base))return $base;$front=array();foreach((array)($base['frontend_samples']??array()) as $s)$front[(int)($s['id']??0)]=(array)($s['result']??array());
         foreach(self::ids($args) as $id){$p=wc_get_product($id);if(!$p)continue;$fp=self::fingerprint($id,$p);if(!$force&&class_exists('PRSTUDIO_UC_Memory')&&PRSTUDIO_UC_Memory::can_reuse('product_audit_v3',(string)$id,$fp)){$c=PRSTUDIO_UC_Memory::lookup('product_audit_v3',(string)$id);$item=(array)($c['summary']['item']??array());if($item){$item['memory_reused']=true;$items[]=$item;$reused++;$hashes[$id]=array('title'=>$item['duplicate_content']['title_hash']??'','description'=>$item['duplicate_content']['description_hash']??'');continue;}}
             $c=self::checks($id,$p,$front[$id]??null);$issues=array();foreach($c['checks'] as $name=>$check){if(false===($check['ok']??null))$issues[]=$name;}$item=array('id'=>$id,'sku'=>(string)$p->get_sku(),'url'=>function_exists('get_permalink')?(string)get_permalink($id):'','checks'=>$c['checks'],'issues'=>$issues,'issue_count'=>count($issues),'duplicate_content'=>array('title_hash'=>$c['title_hash'],'description_hash'=>$c['description_hash'],'duplicate_title'=>false,'duplicate_description'=>false),'memory_reused'=>false,'verified_from'=>'woocommerce+wordpress+bounded_public_html');$items[]=$item;$hashes[$id]=array('title'=>$c['title_hash'],'description'=>$c['description_hash']);$fresh++;if(class_exists('PRSTUDIO_UC_Memory'))PRSTUDIO_UC_Memory::remember('product_audit_v3',(string)$id,$fp,array('item'=>$item,'status'=>'verified'),21600);
         }
         $titleGroups=array();$descGroups=array();foreach($hashes as $id=>$h){if($h['title'])$titleGroups[$h['title']][]=$id;if($h['description'])$descGroups[$h['description']][]=$id;}foreach($items as &$item){$id=(int)$item['id'];$th=$item['duplicate_content']['title_hash']??'';$dh=$item['duplicate_content']['description_hash']??'';$item['duplicate_content']['duplicate_title']=isset($titleGroups[$th])&&count($titleGroups[$th])>1;$item['duplicate_content']['duplicate_description']=isset($descGroups[$dh])&&count($descGroups[$dh])>1;$item['duplicate_content']['scope']='audited_products_only';}unset($item);
-        return array('provider'=>'prstudio_product_audit_orchestrator_v4','read_only'=>true,'products'=>count($items),'items'=>$items,'memory'=>array('reused_count'=>$reused,'fresh_count'=>$fresh),'completeness'=>array('frontend_sampled'=>count($front),'browser_required'=>false,'ocr_required'=>false),'verified'=>true,'evidence_only'=>true);
+        return array('provider'=>'prstudio_product_audit_orchestrator_v4','read_only'=>true,'products'=>count($items),'items'=>$items,'memory'=>array('reused_count'=>$reused,'fresh_count'=>$fresh),'completeness'=>array(
+            'frontend_sampled'=>count($front),
+            // browser_required was hard-coded false while the tool advertised a
+            // browser_verify flag this executor never read, so a caller asking
+            // for browser verification was told none was needed and given the
+            // same server-side evidence. Report the request and what actually
+            // produced the evidence, instead of a constant that cannot be wrong.
+            'browser_required'=>false,
+            'browser_verify_requested'=>!empty($args['browser_verify']),
+            'browser_verify_honoured'=>false,
+            'browser_verify_note'=>!empty($args['browser_verify'])
+                ? 'This audit path is server-side only: evidence comes from WooCommerce, WordPress and bounded public HTML. For live rendered verification run browser_open plus browser_screenshot on the product URL.'
+                : '',
+            'ocr_required'=>false,
+        ),'verified'=>true,'evidence_only'=>true);
     }
     public static function schema_audit(array $args){$r=self::execute($args);if(is_wp_error($r))return $r;$items=array();foreach((array)$r['items'] as $i)$items[]=array('id'=>$i['id'],'url'=>$i['url'],'schema'=>$i['checks']['schema'],'canonical'=>$i['checks']['canonical'],'frontend'=>$i['checks']['frontend']);return array('provider'=>'prstudio_product_schema_audit_v4','items'=>$items,'count'=>count($items),'verified'=>true,'memory'=>$r['memory']);}
 }

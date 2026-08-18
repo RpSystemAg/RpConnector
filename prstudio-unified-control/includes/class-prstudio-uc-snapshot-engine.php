@@ -19,9 +19,38 @@ final class PRSTUDIO_UC_Snapshot_Engine {
         if('commerce.product.update'===$cid||'commerce.inventory.update'===$cid){
             $id=(int)($before['id']??0);if(!$id)return new WP_Error('prstudio_snapshot_incomplete','Product snapshot incomplete.',array('status'=>500));
             $changes=array('name'=>$before['name']??'','slug'=>$before['slug']??'','description'=>$before['description']??'','short_description'=>$before['short_description']??'','status'=>$before['status']??'','regular_price'=>$before['regular_price']??'','sale_price'=>$before['sale_price']??'','sku'=>$before['sku']??'','seo'=>$before['seo']??array());
+            // Restore the four flags product_update() can change. Only send the
+            // ones the snapshot actually captured: an older snapshot predating
+            // this fix has no value for them, and inventing a default would
+            // overwrite the live setting with a guess.
+            foreach(array('catalog_visibility','featured','virtual','downloadable') as $flag){
+                if(array_key_exists($flag,$before))$changes[$flag]=$before[$flag];
+            }
+            $incomplete=array_values(array_diff(array('catalog_visibility','featured','virtual','downloadable'),array_keys($before)));
             $r=PRSTUDIO_UC_Commerce_Engine::product_update(array('id'=>$id,'changes'=>$changes)); if(is_wp_error($r))return $r;
-            if(array_key_exists('stock_quantity',$before)||array_key_exists('stock_status',$before)){$inv=array('id'=>$id);if(array_key_exists('stock_quantity',$before))$inv['stock_quantity']=$before['stock_quantity'];if(array_key_exists('stock_status',$before))$inv['stock_status']=$before['stock_status'];PRSTUDIO_UC_Commerce_Engine::inventory_update($inv);}
-            return array('ok'=>true,'job_id'=>$job,'capability'=>$cid,'rollback'=>'semantic_product_restore','result'=>$r,'verified'=>true);
+            if(array_key_exists('stock_quantity',$before)||array_key_exists('stock_status',$before)){$inv=array('id'=>$id);if(array_key_exists('stock_quantity',$before))$inv['stock_quantity']=$before['stock_quantity'];if(array_key_exists('stock_status',$before))$inv['stock_status']=$before['stock_status'];
+                // The result of this restore used to be discarded while the
+                // caller was still told verified:true. A rollback that partly
+                // failed and reports success is worse than one that fails
+                // loudly: the operator stops looking.
+                $inventory_result=PRSTUDIO_UC_Commerce_Engine::inventory_update($inv);
+                if(is_wp_error($inventory_result))return new WP_Error(
+                    'prstudio_rollback_inventory_failed',
+                    'Product fields were restored but stock was not: '.$inventory_result->get_error_message(),
+                    array('status'=>500,'capability'=>$cid,'job_id'=>$job,'fields_restored'=>true,'stock_restored'=>false,'partial'=>true)
+                );
+            }
+            // Verified means the pre-change state was fully reinstated. A
+            // snapshot missing mutable fields cannot support that claim, so say
+            // so rather than asserting a restoration that did not happen.
+            $fully_restored=empty($incomplete);
+            return array(
+                'ok'=>true,'job_id'=>$job,'capability'=>$cid,'rollback'=>'semantic_product_restore','result'=>$r,
+                'verified'=>$fully_restored,
+                'fields_not_in_snapshot'=>$incomplete,
+                'degraded'=>!$fully_restored,
+                'degraded_reason'=>$fully_restored?'':'The snapshot predates full field coverage, so these fields keep their current values.',
+            );
         }
         return new WP_Error('prstudio_rollback_not_supported','Semantic rollback is not available for this snapshot type.',array('status'=>409,'capability'=>$cid));
     }

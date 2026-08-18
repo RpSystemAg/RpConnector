@@ -156,7 +156,15 @@ final class PRSTUDIO_UC_Publish_Transaction {
         $url = $persisted instanceof WP_Post ? (string) get_permalink( $post_id ) : '';
         $public = ( 'publish' === $effective_status && $url ) ? self::public_verify( $url, (string) ( $args['verify_contains'] ?? $title ) ) : array( 'verified'=>true, 'skipped'=>'not_public_status' );
         $sitemap = ( 'publish' === $effective_status && $url ) ? self::sitemap_verify( $post_id, $url ) : array( 'verified'=>true, 'skipped'=>'not_public_status' );
-        $verified = $db_verified && ! empty( $public['verified'] );
+        // The sitemap check was computed and then left out of the verdict, so a
+        // page could report verified:true while its own sitemap observation said
+        // false. Either it is evidence that counts or it should not be run --
+        // it counts. It is deliberately not a blocking gate: the publish already
+        // happened, and a sitemap that has not caught up yet is incomplete
+        // evidence, not a failed publish. So it lowers `verified` and is
+        // reported as degraded, never rolled back.
+        $sitemap_ok = ! empty( $sitemap['verified'] );
+        $verified = $db_verified && ! empty( $public['verified'] ) && $sitemap_ok;
         $degraded = ! $verified || ! empty( $claim_warnings ) || ! empty( $technical_errors );
 
         $receipt = array(

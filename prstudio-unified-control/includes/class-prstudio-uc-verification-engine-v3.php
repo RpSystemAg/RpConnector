@@ -8,7 +8,37 @@ final class PRSTUDIO_UC_Verification_Engine_V3 {
         if(in_array($id,array('commerce.product.update','commerce.inventory.update'),true)&&class_exists('PRSTUDIO_UC_Commerce_Engine')){
             $after=PRSTUDIO_UC_Commerce_Engine::product_read(array('id'=>(int)($args['id']??0)));if(is_wp_error($after))return array('ok'=>false,'verifier'=>'woocommerce_readback','source'=>'woocommerce_crud','independent'=>true,'verified_at'=>gmdate('c'));
             $ok=true;if('commerce.inventory.update'===$id){if(array_key_exists('stock_quantity',$args)&&$after['stock_quantity']!==(int)$args['stock_quantity'])$ok=false;if(array_key_exists('stock_status',$args)&&(string)$after['stock_status']!==(string)$args['stock_status'])$ok=false;}
-            if('commerce.product.update'===$id){foreach((array)($args['changes']??array()) as $k=>$v){if('seo'===$k)continue;if(array_key_exists($k,$after)&&(string)$after[$k]!== (string)$v)$ok=false;}}
+            if('commerce.product.update'===$id){
+                // A requested field absent from the read-back used to be skipped
+                // silently, so the verifier returned ok:true for changes it had
+                // never actually observed. product_read() now carries the four
+                // flags, and anything still unreadable is reported as
+                // unverified rather than assumed good -- an independent verifier
+                // that quietly skips what it cannot see is not independent.
+                $unverifiable=array();
+                foreach((array)($args['changes']??array()) as $k=>$v){
+                    if('seo'===$k){
+                        // SEO lands in post meta, not the product object; read it
+                        // back from there instead of exempting the whole block.
+                        if(!is_array($v)||!function_exists('get_post_meta'))continue;
+                        $seo_after=is_array($after['seo']??null)?$after['seo']:array();
+                        foreach($v as $sk=>$sv){
+                            if(!array_key_exists($sk,$seo_after)){$unverifiable[]='seo.'.$sk;continue;}
+                            if((string)$seo_after[$sk]!==(string)$sv)$ok=false;
+                        }
+                        continue;
+                    }
+                    if(!array_key_exists($k,$after)){$unverifiable[]=$k;continue;}
+                    if(is_bool($v)||is_bool($after[$k]??null)){
+                        // Booleans round-trip as '1'/'' through string casting,
+                        // which would compare unequal against a real false.
+                        if((bool)$after[$k]!==(bool)$v)$ok=false;
+                        continue;
+                    }
+                    if((string)$after[$k]!==(string)$v)$ok=false;
+                }
+                if($unverifiable)$ok=false;
+            }
             return array('ok'=>$ok,'verifier'=>'woocommerce_independent_readback','source'=>'woocommerce_crud_plus_wordpress_meta','independent'=>true,'evidence_hash'=>hash('sha256',json_encode($after)),'verified_at'=>gmdate('c'));
         }
         if('content.transaction.patch'===$id){
@@ -33,8 +63,22 @@ final class PRSTUDIO_UC_Verification_Engine_V3 {
         if('seo.gsc.request_indexing'===$id){
             $payload=is_array($result['result']??null)?$result['result']:$result;
             $indexing=is_array($payload['indexingRequest']??null)?$payload['indexingRequest']:(is_array($payload['result']['indexingRequest']??null)?$payload['result']['indexingRequest']:array());
-            $ok=!empty($payload['verified'])||!empty($indexing['verified'])||!empty($result['_control_outcome']['verified']);
-            return array('ok'=>$ok,'verifier'=>'gsc_visible_request_confirmation','source'=>'browser_agent_search_console_ui','independent'=>true,'verified_at'=>gmdate('c'));
+            // The generic verified flags used to satisfy this on their own, but
+            // request_indexing is dispatched as a URL inspection -- so those
+            // flags can be set by the inspection succeeding while the indexing
+            // request itself was never confirmed. Only the indexing
+            // confirmation proves the effect the caller asked for. Fixing the
+            // executor was not enough: an independent verifier that accepts
+            // weaker evidence keeps attesting an effect nobody observed.
+            $ok=!empty($indexing['verified']);
+            return array(
+                'ok'=>$ok,
+                'verifier'=>'gsc_visible_request_confirmation',
+                'source'=>'browser_agent_search_console_ui',
+                'independent'=>true,
+                'reason'=>$ok?'':'gsc_indexing_confirmation_not_observed',
+                'verified_at'=>gmdate('c')
+            );
         }
         if(str_starts_with($id,'database.')){$ok=!empty($result['verified'])||!empty($result['_control_outcome']['verified']);return array('ok'=>$ok,'verifier'=>'database_backend_receipt','source'=>'database_backend','independent'=>false,'verified_at'=>gmdate('c'));
         }
