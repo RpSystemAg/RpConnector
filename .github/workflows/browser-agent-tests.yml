@@ -21,6 +21,46 @@ jobs:
       - run: node --check manifest.json 2>nul || node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8'))"
       - run: node --test tests/*.test.mjs
 
+  # The queue dispatcher shipped broken because nothing in CI ever executed a
+  # query. `php -l` passes on a valid string containing invalid SQL, and the
+  # PHP smoke tests stub the wpdb object, so a malformed statement was
+  # unobservable until it reached a real server. This job is the missing half:
+  # a real database, the real schema, the real claim path.
+  sql-and-queue:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mariadb:11
+        env:
+          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: 'yes'
+          MARIADB_DATABASE: prstudio_queue_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: mysqli, mbstring
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install SQL parser
+        run: python -m pip install --quiet sqlglot
+      - name: Every SQL statement the plugin builds must parse as MySQL
+        run: python tests/validate-sql-syntax.py
+      - name: Task queue dispatches against a real database
+        env:
+          PRSTUDIO_TEST_DB_HOST: 127.0.0.1
+          PRSTUDIO_TEST_DB_PORT: '3306'
+          PRSTUDIO_TEST_DB_USER: root
+          PRSTUDIO_TEST_DB_PASS: ''
+          PRSTUDIO_TEST_DB_NAME: prstudio_queue_test
+        run: php tests/php-task-queue-integration.php
+
   wordpress-plugin:
     runs-on: ubuntu-latest
     steps:
@@ -33,6 +73,13 @@ jobs:
         run: |
           cd prstudio-unified-control
           find . -name '*.php' -print0 | xargs -0 -n1 -P4 php -l
+      - name: PHP smoke suites
+        run: |
+          php tests/php-agent-model-constitution.php
+          php tests/php-mcp-catalog-runtime-smoke.php
+          php tests/php-new-capabilities-smoke.php
+      - name: One-guard constitution (anti-crash must stay the only mutation guard)
+        run: python3 tests/one_guard_constitution.py
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
