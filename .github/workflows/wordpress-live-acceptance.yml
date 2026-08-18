@@ -189,6 +189,14 @@ jobs:
           test "$status" = '404'
           jq -e '.error.code == -32601' /tmp/mcp-initialize-response.json
 
+      - name: Deterministic authenticated MCP HTTP fuzz
+        env:
+          RP_MCP_URL: http://127.0.0.1:8080/?rest_route=/prstudio-unified/v1/mcp
+        run: |
+          export RP_MCP_TOKEN="$(cat /tmp/rpconnector-access-token)"
+          python3 tests/mcp-http-fuzz.py
+          unset RP_MCP_TOKEN
+
       - name: Remove ephemeral token material
         if: always()
         run: rm -f /tmp/rpconnector-access-token
