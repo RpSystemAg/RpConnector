@@ -17,7 +17,7 @@ PR STUDIO Unified Control 1.0.0 is the WordPress/WooCommerce source of truth and
 7. Optional: Tools > PR STUDIO > "Esecuzione e manutenzione" sets the autonomy mode, the long-poll channel and database retention. Defaults are safe.
 
 == Execution agency ==
-The 17.0 runtime persists owned jobs, leases, schedules, checkpoints, Browser-task correlation and dead letters in SQL. Operational Twin, Social Intelligence, Opportunity Engine and Site Sentinel add evidence-backed continuous analysis without inventing provider access.
+The runtime persists owned jobs, leases, schedules, checkpoints, Browser-task correlation and dead letters in SQL. Operational Twin, Social Intelligence, Opportunity Engine and Site Sentinel add evidence-backed continuous analysis without inventing provider access.
 
 == Browser-first execution ==
 The Browser Agent uses only owned tabs and native DevTools pointer/keyboard input for visible applications such as Canva. Sensitive observations are redacted before transmission. The existing anti-crash gate is the single blocking pre-mutation guardian; crash-uncertain mutations are never replayed automatically.

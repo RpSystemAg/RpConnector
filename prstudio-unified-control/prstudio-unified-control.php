@@ -2,7 +2,7 @@
 /**
  * Plugin Name: PR STUDIO Unified Control Plane
  * Plugin URI:  https://prstudio.ai/
- * Description: PR STUDIO 17.0 execution agency: Codex-style turn contract, long-poll agent channel, interventions ledger, durable missions, H24 sentinel, operational twin, OAuth MCP and an owned-tab native-input Browser Agent.
+ * Description: PR STUDIO execution agency: Codex-style turn contract, long-poll agent channel, interventions ledger, durable missions, H24 sentinel, operational twin, OAuth MCP and an owned-tab native-input Browser Agent.
  * Version:     1.0.0
  * Author:      PR STUDIO
  * License:     GPL-2.0-or-later
