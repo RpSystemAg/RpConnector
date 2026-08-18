@@ -1,6 +1,15 @@
 <?php
 if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
 final class PRSTUDIO_UC_Execution_Gateway {
+    /**
+     * Capabilities that would hand a caller-supplied script to the browser
+     * executor. The dedicated `browser_javascript_exec` MCP tool was removed
+     * for the same reason: the product declares `browser_arbitrary_js_exposed:
+     * false`, so no route into this gateway may make that declaration false,
+     * regardless of how many legacy capability ids alias the same underlying
+     * `playwright_evaluate` browser-agent step.
+     */
+    private const ARBITRARY_SCRIPT_CAPABILITIES = array( 'legacy.browser.frontend-manage.playwright-evaluate' );
     private static function error(string $code,string $message,int $status=400,array $details=array(),bool $retryable=false):WP_Error{return new WP_Error($code,$message,array('status'=>$status,'retryable'=>$retryable,'details'=>$details));}
     private static function invoke(array $cap,array $args){
         $executor=(string)($cap['executor']??'');if(!str_contains($executor,'::'))return self::error('capability_executor_invalid','Capability executor is invalid.',500,array('capability'=>$cap['id']??''));
@@ -69,6 +78,7 @@ final class PRSTUDIO_UC_Execution_Gateway {
     public static function execute(array $request){
         $started=microtime(true);$cap_id=strtolower(trim((string)($request['capability']??'')));$args=is_array($request['arguments']??null)?$request['arguments']:array();$request_id=sanitize_text_field((string)($request['request_id']??''));$request_id=$request_id?:wp_generate_uuid4();$dry=!empty($request['dry_run']);$owner_client=sanitize_text_field((string)($request['_owner_client_id']??''));$lane_token=(string)($request['lane_token']??'');
         $cap=PRSTUDIO_UC_Capability_Registry::get($cap_id);if(!$cap)return self::error('capability_not_found','Capability not found.',404,array('capability'=>$cap_id));
+        if(in_array($cap_id,self::ARBITRARY_SCRIPT_CAPABILITIES,true))return self::error('capability_arbitrary_script_disabled','This capability would execute caller-supplied script in the browser; it is disabled to keep browser_arbitrary_js_exposed=false.',403,array('capability'=>$cap_id));
         $schema_errors=PRSTUDIO_UC_Schema_Validator::validate($args,(array)$cap['input_schema']);if(!empty($schema_errors))return self::error('schema_validation_failed','Capability arguments are invalid.',400,array('errors'=>$schema_errors));
         $is_write=empty($cap['read_only']);$lane=null;if(''!==$lane_token&&class_exists('PRSTUDIO_UC_Execution_Lanes')){$resource=PRSTUDIO_UC_Execution_Lanes::resource_key($cap_id,$args);$lane_candidate=PRSTUDIO_UC_Execution_Lanes::guard($lane_token,$owner_client,$resource,false);if(!is_wp_error($lane_candidate)){$lane=$lane_candidate;if(empty($request['mission_id']))$request['mission_id']=(string)($lane['mission_id']??'');}}
         if(class_exists('PRSTUDIO_UC_Execution_Router')){$cap=PRSTUDIO_UC_Execution_Router::annotate_capability($cap);$mode=sanitize_key((string)($request['execution_mode']??'sync'));$complex=in_array($mode,array('agentic','deferred','async','durable','queue'),true)||!empty($request['force_agentic']);if(!$complex&&PRSTUDIO_UC_Execution_Router::can_inline_capability($cap)){return self::execute_inline_cap($cap,$args,$request,is_array($lane)?$lane:array(),$started);}}

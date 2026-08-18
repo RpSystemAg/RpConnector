@@ -108,6 +108,13 @@ final class WPAIB_REST {
 		if ( '' === $source ) { $source = 'internal'; }
 		if ( $source_meta && ! isset( $arguments['_source_meta'] ) ) { $arguments['_source_meta'] = $source_meta; }
 		$route = '/' . trim( $route, '/' );
+		// Same guarantee as PRSTUDIO_UC_Execution_Gateway's arbitrary-script
+		// denylist: no route into the system -- MCP capability gateway, GPT
+		// Actions legacy REST, or a direct internal call -- may execute
+		// caller-supplied script in the browser. Keeps browser_arbitrary_js_exposed=false true regardless of entry point.
+		if ( '/frontend-manage' === $route && 'playwright_evaluate' === $action ) {
+			return new WP_Error( 'wpaib_arbitrary_script_disabled', 'This action would execute caller-supplied script in the browser; it is disabled.', array( 'status' => 403, 'route' => $route, 'action' => $action ) );
+		}
 		$meta = PRSTUDIO_Agency::control_action_by_route( $route, $action );
 		if ( ! is_array( $meta ) ) { return new WP_Error( 'wpaib_control_action_invalid', 'Azione non dichiarata per questa route.', array( 'status' => 400, 'route' => $route, 'action' => $action ) ); }
 		$execution_contract = class_exists( 'PRSTUDIO_UC_Execution_Router' )
