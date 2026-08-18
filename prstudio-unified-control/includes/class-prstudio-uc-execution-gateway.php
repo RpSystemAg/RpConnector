@@ -73,6 +73,7 @@ final class PRSTUDIO_UC_Execution_Gateway {
         $receipt=array('route'=>'fast_inline','execution_class'=>(string)($cap['execution_class']??''),'preferred_executor'=>(string)($cap['preferred_executor']??''),'total_ms'=>$total_ms,'executor_ms'=>$invoke_ms,'sql_ms'=>$sql_ms,'php_ms'=>null===$sql_ms?$total_ms:max(0,round($total_ms-$sql_ms,3)),'query_count'=>max(0,self::qcount()-$q0),'queue_ms'=>0,'tool_calls'=>1,'model_roundtrips'=>1);
         $response=array('ok'=>true,'status'=>'completed','fast_path'=>true,'result'=>$result,'verification'=>$verification,'execution'=>$receipt);
         if(!$verification['ok'])$response['verification_warning']=$verification['warning'];
+        if(class_exists('PRSTUDIO_UC_Procedural_Skills')){try{$known=PRSTUDIO_UC_Procedural_Skills::best_match('capability',$cap_id,$args);if(is_array($known)){PRSTUDIO_UC_Procedural_Skills::mark_reused((string)$known['id']);$response['known_verified_skill']=array('id'=>$known['id'],'confidence'=>$known['confidence']??0,'success_count'=>$known['success_count']??0,'last_verified_gmt'=>$known['last_verified_gmt']??'');}}catch(Throwable $ignored){}}
         return $response;
     }
     public static function execute(array $request){
@@ -116,8 +117,11 @@ final class PRSTUDIO_UC_Execution_Gateway {
         if(!$verified){$completion['verification_warning']=array('code'=>'execution_unverified','message'=>'Execution completed; post-execution verification did not confirm the effect.');}
         PRSTUDIO_UC_Store::set_job_state($job_id,'COMPLETED',$completion);
         self::mission_event($mission_id,'job.completed',array('job_id'=>$job_id,'capability'=>$cap_id,'status'=>'running','completed_steps'=>array($cap_id),'resume_point'=>'after:'.$cap_id,'evidence'=>array(array('capability'=>$cap_id,'hash'=>(string)($evidence['evidence_hash']??''),'verifier'=>(string)($verification['verifier']??''),'verified'=>$verified,'gmt'=>gmdate('c')))));
-        $procedural_skill=array('ok'=>true,'learned'=>false,'reason'=>$verified?'skill_store_unavailable':'execution_unverified');
-        if($verified&&class_exists('PRSTUDIO_UC_Procedural_Skills')){try{$procedural_skill=PRSTUDIO_UC_Procedural_Skills::learn_verified_capability($cap_id,$args,is_array($result)?$result:array('result'=>$result),$verification,$job_id);}catch(Throwable $ignored){$procedural_skill=array('ok'=>false,'learned'=>false,'reason'=>'skill_store_exception');}}
+        $procedural_skill=array('ok'=>true,'learned'=>false,'reason'=>$verified?'skill_store_unavailable':'execution_unverified');$known_skill=null;
+        if(class_exists('PRSTUDIO_UC_Procedural_Skills')){
+            try{$known_skill=PRSTUDIO_UC_Procedural_Skills::best_match('capability',$cap_id,$args);if(is_array($known_skill))PRSTUDIO_UC_Procedural_Skills::mark_reused((string)$known_skill['id']);}catch(Throwable $ignored){$known_skill=null;}
+            if($verified){try{$procedural_skill=PRSTUDIO_UC_Procedural_Skills::learn_verified_capability($cap_id,$args,is_array($result)?$result:array('result'=>$result),$verification,$job_id);}catch(Throwable $ignored){$procedural_skill=array('ok'=>false,'learned'=>false,'reason'=>'skill_store_exception');}}
+        }
         PRSTUDIO_UC_Memory::movement('capability.executed',array('mission_id'=>(string)($request['mission_id']??''),'request_id'=>$request_id,'trace_id'=>(string)($request['trace_id']??''),'site_id'=>PRSTUDIO_UC_Memory::site_identity()['key'],'capability'=>$cap_id,'resource'=>$args['url']??$args['id']??'','action'=>$dry?'dry_run':'execute','outcome'=>$verified?'verified_completed':'completed_unverified','verification'=>$verification['verifier']??'','evidence'=>$evidence['evidence_hash']??'','fingerprint'=>hash('sha256',PRSTUDIO_UC_Idempotency::canonical_json($args)),'memory_reused'=>(bool)($result['memory_reused']??false),'duration_ms'=>(int)round((microtime(true)-$started)*1000)),$job_id);
         return array('ok'=>true,'job'=>PRSTUDIO_UC_Store::get_job($job_id),'result'=>$result,'verification'=>$verification,'evidence'=>$evidence,'snapshot'=>$snapshot,'procedural_skill'=>$procedural_skill);
     }

@@ -112,6 +112,7 @@ final class PRSTUDIO_UC_Autoload {
             'PRSTUDIO_UC_Performance_Budget' => 'includes/class-prstudio-uc-performance-budget.php',
             'PRSTUDIO_UC_Planner_V3' => 'includes/class-prstudio-uc-planner-v3.php',
             'PRSTUDIO_UC_Playbook_Engine' => 'includes/class-prstudio-uc-playbook-engine.php',
+            'PRSTUDIO_UC_Agent_Model' => 'includes/class-prstudio-uc-agent-model.php',
             'PRSTUDIO_UC_Procedural_Skills' => 'includes/class-prstudio-uc-procedural-skills.php',
             'PRSTUDIO_UC_Product_Audit' => 'includes/class-prstudio-uc-product-audit.php',
             'PRSTUDIO_UC_Public_Crawl' => 'includes/class-prstudio-uc-public-crawl.php',

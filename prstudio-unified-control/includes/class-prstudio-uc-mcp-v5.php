@@ -323,12 +323,29 @@ HTML;
     }
 
     /**
-     * Compact model-facing operating contract. MCP explicitly permits server
-     * instructions to be used by clients as an LLM hint/system-prompt input;
-     * keep this dense and deterministic instead of duplicating the 250 KB tool
-     * catalogue in prose.
+     * Compact model-facing operating contract.
+     *
+     * The text itself lives in PRSTUDIO_UC_Agent_Model, which is the single
+     * source of truth for the suite's self-model: the constitution, the intent
+     * routing table and the live runtime block are compiled there so the MCP
+     * handshake, AGENTS.md and the per-tool help cannot drift apart. This
+     * method only supplies the runtime tool count and keeps a static fallback
+     * for the case where the model class is unavailable.
      */
     private static function operator_instructions(): string {
+        if ( class_exists( 'PRSTUDIO_UC_Agent_Model' ) ) {
+            try {
+                $tool_count = 0;
+                try { $tool_count = count( self::tools() ); } catch ( Throwable $ignored ) { $tool_count = 0; }
+                $compiled = PRSTUDIO_UC_Agent_Model::instructions( $tool_count );
+                if ( '' !== $compiled ) { return $compiled; }
+            } catch ( Throwable $ignored ) { /* fall through to the static contract below */ }
+        }
+        return self::operator_instructions_fallback();
+    }
+
+    /** Static contract used only when the compiled self-model is unavailable. */
+    private static function operator_instructions_fallback(): string {
         // Written as an operating procedure, not a list of prohibitions.
         // The 15.x text was ten "do not" clauses in ten lines, and a model
         // adopts the posture of its own system prompt: given a document about
