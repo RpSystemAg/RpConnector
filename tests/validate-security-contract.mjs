@@ -490,7 +490,6 @@ await check("MCP tool catalog preserves the 81-tool 10.0 baseline and allows add
   for (const name of baseline.tools) assert.ok(unique.has(name), `removed MCP 10.0 baseline tool: ${name}`);
   assert.ok(names.length >= baseline.baseline_count, `MCP surface shrank: ${names.length} < ${baseline.baseline_count}`);
   for (const name of [
-    "serp_watch_create_all",
     "sequential_thinking",
     "procedural_skill_search",
     "procedural_skill_curate",

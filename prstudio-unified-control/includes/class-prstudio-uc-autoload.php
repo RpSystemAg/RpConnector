@@ -132,7 +132,6 @@ final class PRSTUDIO_UC_Autoload {
             'PRSTUDIO_UC_SEO_Autopilot' => 'includes/class-prstudio-uc-seo-autopilot.php',
             'PRSTUDIO_UC_SEO_Intelligence' => 'includes/class-prstudio-uc-seo-intelligence.php',
             'PRSTUDIO_UC_Sequential_Thinking' => 'includes/class-prstudio-uc-sequential-thinking.php',
-            'PRSTUDIO_UC_Serp_Watch' => 'includes/class-prstudio-uc-serp-watch.php',
             'PRSTUDIO_UC_Site_Context' => 'includes/class-prstudio-uc-site-context.php',
             'PRSTUDIO_UC_Site_Sentinel' => 'includes/class-prstudio-uc-site-sentinel.php',
             'PRSTUDIO_UC_Snapshot_Engine' => 'includes/class-prstudio-uc-snapshot-engine.php',

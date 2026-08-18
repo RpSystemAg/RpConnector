@@ -53,13 +53,11 @@ final class PRSTUDIO_UC_Idempotency {
 }
 
 $GLOBALS['SERP_KEYWORDS']=array_map(static fn($i)=>'keyword-'.$i,range(1,501));
-$GLOBALS['SERP_POSITION']=7;
 $GLOBALS['SERP_HTTP_CALLS']=[];
 function wp_safe_remote_request(string $url,array $opts=array()){
     $GLOBALS['SERP_HTTP_CALLS'][]=['url'=>$url,'method'=>$opts['method']??'GET'];
     $parts=parse_url($url);$path=$parts['path']??'';
     if('/api/keywords'===$path){
-        $keywords=[];foreach($GLOBALS['SERP_KEYWORDS'] as $i=>$kw){$keywords[]=['ID'=>$i+1,'keyword'=>$kw,'position'=>$GLOBALS['SERP_POSITION'],'url'=>'https://example.test/p/'.$i,'device'=>'desktop','country'=>'IT','lastUpdated'=>gmdate('c'),'updating'=>false,'lastUpdateError'=>''];}
         return ['response'=>['code'=>200],'body'=>json_encode(['keywords'=>$keywords])];
     }
     if('/api/cron'===$path) return ['response'=>['code'=>200],'body'=>json_encode(['ok'=>true])];
@@ -69,7 +67,6 @@ function wp_remote_retrieve_response_code(array $r): int { return (int)($r['resp
 function wp_remote_retrieve_body(array $r): string { return (string)($r['body']??''); }
 
 $inc=dirname(__DIR__).'/prstudio-unified-control/includes/';
-require_once $inc.'class-prstudio-uc-serp-watch.php';
 require_once $inc.'class-prstudio-uc-sequential-thinking.php';
 require_once $inc.'class-prstudio-uc-procedural-skills.php';
 
@@ -79,29 +76,9 @@ function cleanup(string $root): void {
 }
 
 try {
-    $configured=PRSTUDIO_UC_Serp_Watch::configure(['base_url'=>'https://serpbear.example.test','api_key'=>'12345678-secret','domain'=>'example.test','site_url'=>'https://example.test/']);
-    ok(!is_wp_error($configured) && !empty($configured['ok']),'SerpBear configure');
-    $status=PRSTUDIO_UC_Serp_Watch::status();
-    ok(!empty($status['configured']) && !empty($status['api_key_present']),'SerpBear secure config status');
 
-    $group=PRSTUDIO_UC_Serp_Watch::watch_create_all(['target_position'=>1,'first_page_position'=>10,'required_consecutive'=>2,'interval_hours'=>24]);
-    ok(!is_wp_error($group) && !empty($group['ok']),'all-keyword watch creation');
-    ok(501===(int)$group['keyword_count'] && 2===(int)$group['watch_count'],'all-keyword watcher shards 501 keywords into two bounded watches');
-    $watchId=(string)$group['watch_ids'][0];
 
-    $GLOBALS['SERP_POSITION']=1;
-    $run1=PRSTUDIO_UC_Serp_Watch::watch_run(['watch_id'=>$watchId]);
-    ok(!is_wp_error($run1) && empty($run1['completed']),'first #1 observation does not prematurely complete a two-confirmation watch');
-    ok(500===(int)$run1['snapshot']['first_page_count'],'first-page milestone counts every keyword in shard');
-    $run2=PRSTUDIO_UC_Serp_Watch::watch_run(['watch_id'=>$watchId]);
-    ok(!is_wp_error($run2) && !empty($run2['completed']),'second consecutive #1 observation completes shard');
-    ok('serpbear_exact_position'===$run2['completion_authority'],'SerpBear exact position remains completion authority');
-    ok('supporting_first_party_evidence'===$run2['gsc_role'],'GSC remains supporting evidence');
-    ok('completed'===($run2['watch']['last_gsc_status']['status']??''),'daily GSC evidence captured alongside SERP rank');
 
-    $refresh=PRSTUDIO_UC_Serp_Watch::refresh(['refresh_all'=>true]);
-    ok(!is_wp_error($refresh) && !empty($refresh['ok']),'documented SerpBear /api/cron refresh route');
-    ok((bool)array_filter($GLOBALS['SERP_HTTP_CALLS'],static fn($x)=>str_contains($x['url'],'/api/cron')),'SerpBear cron endpoint actually invoked');
 
     $seq=PRSTUDIO_UC_Sequential_Thinking::think(['thought'=>'Explicit test plan note','nextThoughtNeeded'=>true,'thoughtNumber'=>1,'totalThoughts'=>2]);
     ok(!is_wp_error($seq) && !empty($seq['ok']) && false===$seq['hidden_chain_of_thought_stored'],'Sequential Thinking native durable session');

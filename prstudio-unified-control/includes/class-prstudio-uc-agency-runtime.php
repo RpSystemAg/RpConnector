@@ -121,7 +121,7 @@ final class PRSTUDIO_UC_Agency_Runtime {
 	}
 
 	public static function cli_run( array $args, array $assoc_args ): void {
-		PRSTUDIO_UC_Site_Sentinel::record_external_heartbeat('wp_cli');if(class_exists('PRSTUDIO_UC_Serp_Watch')){try{PRSTUDIO_UC_Serp_Watch::tick(5);}catch(Throwable $ignored){}}if(class_exists('PRSTUDIO_UC_Procedural_Skills')){try{PRSTUDIO_UC_Procedural_Skills::curate(array('apply'=>true));}catch(Throwable $ignored){}}$limit=max(1,min(100,(int)($assoc_args['limit']??20)));$job=(string)($assoc_args['job']??'');$result=''!==$job?self::run_one($job,'wp-cli',30.0):self::run_batch($limit,'wp-cli',30.0);
+		PRSTUDIO_UC_Site_Sentinel::record_external_heartbeat('wp_cli');if(class_exists('PRSTUDIO_UC_Procedural_Skills')){try{PRSTUDIO_UC_Procedural_Skills::curate(array('apply'=>true));}catch(Throwable $ignored){}}$limit=max(1,min(100,(int)($assoc_args['limit']??20)));$job=(string)($assoc_args['job']??'');$result=''!==$job?self::run_one($job,'wp-cli',30.0):self::run_batch($limit,'wp-cli',30.0);
 		if(class_exists('WP_CLI'))WP_CLI::log((string)wp_json_encode($result,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE));
 	}
 
@@ -205,7 +205,7 @@ final class PRSTUDIO_UC_Agency_Runtime {
 
 	public static function fast_tick(): void { if(!PRSTUDIO_UC_Store::schema_ready())return;self::run_batch(5,'fast-scheduler',4.0); }
 
-	public static function cron_tick(): void { if(!PRSTUDIO_UC_Store::schema_ready())return;self::process_schedules(10);if(class_exists('PRSTUDIO_UC_Serp_Watch')){try{PRSTUDIO_UC_Serp_Watch::tick(1);}catch(Throwable $ignored){}}if(class_exists('PRSTUDIO_UC_Procedural_Skills')){try{PRSTUDIO_UC_Procedural_Skills::curate(array('apply'=>true));}catch(Throwable $ignored){}}self::run_batch(5,'scheduler',4.0); }
+	public static function cron_tick(): void { if(!PRSTUDIO_UC_Store::schema_ready())return;self::process_schedules(10);if(class_exists('PRSTUDIO_UC_Procedural_Skills')){try{PRSTUDIO_UC_Procedural_Skills::curate(array('apply'=>true));}catch(Throwable $ignored){}}self::run_batch(5,'scheduler',4.0); }
 
 	public static function control( string $job_uuid, string $action, array $args = array() ) {
 		$job=PRSTUDIO_UC_Store::get_job($job_uuid);if(!$job)return new WP_Error('agency_job_missing','Mission job not found.',array('status'=>404));$action=sanitize_key($action);$checkpoint=(array)($job['checkpoint']??array());

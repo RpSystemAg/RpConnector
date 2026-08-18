@@ -20,7 +20,6 @@ require_once $control . 'class-prstudio-uc-social-intelligence.php';
 require_once $control . 'class-prstudio-uc-opportunity-engine.php';
 require_once $control . 'class-prstudio-uc-agency-capabilities.php';
 require_once $control . 'class-prstudio-uc-capability-registry.php';
-require_once $control . 'class-prstudio-uc-serp-watch.php';
 require_once $control . 'class-prstudio-uc-sequential-thinking.php';
 require_once $control . 'class-prstudio-uc-procedural-skills.php';
 
@@ -87,7 +86,6 @@ try {
 
     $registry_counts = PRSTUDIO_UC_Capability_Registry::counts();
     assert_true(1323 <= (int)($registry_counts['capabilities'] ?? 0), 'registry preserves the 10.0 capability baseline and allows additive capabilities');
-    assert_true(PRSTUDIO_UC_Capability_Registry::is_executable('serp.watch.create_all'), 'SerpBear all-keyword watcher capability is callable');
     assert_true(PRSTUDIO_UC_Capability_Registry::is_executable('sequential.thinking'), 'Sequential Thinking capability is callable');
     assert_true(PRSTUDIO_UC_Capability_Registry::is_executable('skills.search'), 'procedural skill search capability is callable');
     assert_true(PRSTUDIO_UC_Capability_Registry::is_executable('social.insights'), 'overlay executor is callable');

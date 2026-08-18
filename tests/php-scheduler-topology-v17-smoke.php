@@ -47,7 +47,6 @@ final class PRSTUDIO_UC_Store {
     public static function due_schedules($limit): array { return []; }
     public static function claim_next_job($worker) { return null; }
 }
-final class PRSTUDIO_UC_Serp_Watch { public static int $last_limit=0; public static function tick(int $limit=1): array { self::$last_limit=$limit; return ['ok'=>true,'processed'=>0]; } }
 final class PRSTUDIO_UC_Playbook_Engine { public const VERSION='1.0.0'; public static function describe(): array { return []; } }
 final class PRSTUDIO_UC_Site_Sentinel { public static function status(): array { return []; } }
 
@@ -71,8 +70,6 @@ check_v17(count($fastCallbacks)===1 && is_array($fastCallbacks[0]) && $fastCallb
 PRSTUDIO_Agency::init();
 check_v17(!wp_next_scheduled('prstudio_agency_cron_tick'),'disabled legacy Agency removes its old five-minute cron instead of rescheduling it');
 PRSTUDIO_UC_Agency_Runtime::cron_tick();
-check_v17(PRSTUDIO_UC_Serp_Watch::$last_limit===1,'scheduler maintenance dispatches at most one SERP watch per recurring tick');
-$serpSource=(string)file_get_contents(dirname(__DIR__) . '/prstudio-unified-control/includes/class-prstudio-uc-serp-watch.php');
 check_v17(str_contains($serpSource,"'http_timeout'=>2") && str_contains($serpSource,"'gsc_sync_wait_seconds'=>0"),'scheduler SERP path uses short upstream timeout and non-blocking GSC evidence collection');
 
 fwrite(STDOUT,"PHP scheduler topology v17 smoke: 8 assertions passed\n");

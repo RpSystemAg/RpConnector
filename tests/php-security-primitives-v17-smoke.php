@@ -42,8 +42,6 @@ $editorial = file_get_contents( $root . '/prstudio-unified-control/includes/clas
 $executor = file_get_contents( $root . '/prstudio-unified-control/includes/class-prstudio-uc-complete-action-executor.php' );
 check17( false !== strpos( $editorial, 'wp_safe_remote_get( $url' ) && false === strpos( $editorial, 'wp_remote_get( $url' ), 'watcher arbitrary URL uses wp_safe_remote_get' );
 check17( false !== strpos( $executor, "wp_safe_remote_head(\$link['href']" ) && false === strpos( $executor, "wp_remote_head(\$link['href']" ), 'external-link audit uses wp_safe_remote_head' );
-$serp = file_get_contents( $root . '/prstudio-unified-control/includes/class-prstudio-uc-serp-watch.php' );
-check17( false !== strpos( $serp, "elseif(function_exists('wp_safe_remote_request'))" ) && false === strpos( $serp, "elseif(function_exists('wp_remote_request'))\$response=wp_remote_request" ), 'SerpBear public-host path cannot fall back to unsafe HTTP request' );
 
 echo "1..{$checks}\n";
 if ( $pass !== $checks ) { fwrite( STDERR, "FAIL {$pass}/{$checks}\n" ); exit(1); }

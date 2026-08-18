@@ -87,9 +87,6 @@ final class PRSTUDIO_UC_Do {
 
             // Commerce, SEO, ranking.
             'product_audit' => array( 'tool' => 'commerce_product_audit' ),
-            'keywords'    => array( 'tool' => 'serp_keywords' ),
-            'rank_status' => array( 'tool' => 'serp_status' ),
-            'watch_keyword' => array( 'tool' => 'serp_watch_create' ),
 
             // Orientation and durable work.
             'backlog'     => array( 'tool' => 'prstudio_backlog' ),
