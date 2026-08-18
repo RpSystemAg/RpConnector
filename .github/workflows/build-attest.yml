@@ -1,0 +1,36 @@
+name: Build and attest provenance
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Package build artifacts
+        run: |
+          mkdir -p dist
+          sha=$(git rev-parse --short HEAD)
+          zip -rq "dist/prstudio-unified-browser-agent-${sha}.zip" prstudio-unified-browser-agent -x '*.claude*'
+          zip -rq "dist/prstudio-unified-control-${sha}.zip" prstudio-unified-control
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: 'dist/*.zip'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prstudio-build-${{ github.sha }}
+          path: dist/*.zip
+          retention-days: 30
