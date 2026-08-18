@@ -9,6 +9,8 @@ final class PRSTUDIO_UC_Procedural_Skills {
     private const LOCK='.procedural-skills-v1.lock';
     private const MAX_SKILLS=2000;
     private const MAX_FAILURES_PER_SKILL=20;
+    /** How long an archived skill stays in the index before it is dropped. */
+    private const ARCHIVE_RETENTION_SECONDS=2592000; // 30 days.
 
     private static function dir(): string {
         $d=PRSTUDIO_UC_Memory::site_dir().'/skills';
@@ -85,13 +87,46 @@ final class PRSTUDIO_UC_Procedural_Skills {
             }
             $merge=array();foreach($groups as $group=>$ids){if(count($ids)<2)continue;usort($ids,static function($a,$b)use($state){$sa=$state['skills'][$a]??array();$sb=$state['skills'][$b]??array();$c=(float)($sb['confidence']??0)<=>(float)($sa['confidence']??0);return 0!==$c?$c:strcmp((string)($sb['last_verified_gmt']??''),(string)($sa['last_verified_gmt']??''));});$merge[]=array('group'=>$group,'preferred'=>$ids[0],'variants'=>$ids,'automatic_merge'=>false);}
             $exact_duplicates=array();foreach($fingerprints as $fp=>$ids){if(count($ids)>1)$exact_duplicates[]=array('fingerprint'=>$fp,'ids'=>$ids);}
-            $archived=array();if($apply){foreach(array_values(array_unique(array_merge($stale,$failed_only))) as $id){if(!isset($state['skills'][$id])||!is_array($state['skills'][$id]))continue;$state['skills'][$id]['curated_state']='archived';$state['skills'][$id]['curated_gmt']=gmdate('c',$now);$state['skills'][$id]['invalidated_reason']=$state['skills'][$id]['invalidated_reason']??'skill_curator_stale_or_failed_only';$state['skills'][$id]['expires_gmt']=gmdate('c',$now-1);$archived[]=$id;}$state['metrics']['last_curated_gmt']=gmdate('c',$now);$state['metrics']['curated_runs']=(int)($state['metrics']['curated_runs']??0)+1;$state['metrics']['curated_archived']=(int)($state['metrics']['curated_archived']??0)+count($archived);}
-            return array('ok'=>true,'skipped'=>false,'apply'=>$apply,'analyzed'=>count((array)($state['skills']??array())),'stale_ids'=>$stale,'failed_only_ids'=>$failed_only,'archived_ids'=>$archived,'merge_candidates'=>$merge,'exact_duplicate_candidates'=>$exact_duplicates,'history_deleted'=>false,'automatic_merge'=>false,'version'=>self::VERSION,'component'=>'procedural_skills','component_version'=>self::VERSION,'suite_version'=>defined('PRSTUDIO_UC_VERSION')?PRSTUDIO_UC_VERSION:'');
+            $archived=array();$pruned=array();
+            if($apply){
+                foreach(array_values(array_unique(array_merge($stale,$failed_only))) as $id){if(!isset($state['skills'][$id])||!is_array($state['skills'][$id]))continue;if('archived'===(string)($state['skills'][$id]['curated_state']??''))continue;$state['skills'][$id]['curated_state']='archived';$state['skills'][$id]['curated_gmt']=gmdate('c',$now);$state['skills'][$id]['invalidated_reason']=$state['skills'][$id]['invalidated_reason']??'skill_curator_stale_or_failed_only';$state['skills'][$id]['expires_gmt']=gmdate('c',$now-1);$archived[]=$id;}
+                // Archiving alone never reclaimed anything: an archived entry
+                // stayed in the index permanently, so the file only grew and the
+                // stale count with it. Drop archived entries after a retention
+                // window, keeping the aggregate metrics so the history of what
+                // was learned and discarded is not lost -- only the per-entry
+                // detail nobody can act on any more.
+                $retention=max(7*86400,min(365*86400,(int)($args['archive_retention_seconds']??self::ARCHIVE_RETENTION_SECONDS)));
+                foreach((array)$state['skills'] as $id=>$skill){
+                    if(!is_array($skill)||'archived'!==(string)($skill['curated_state']??''))continue;
+                    $curated=strtotime((string)($skill['curated_gmt']??''));
+                    if($curated>0&&($now-$curated)<$retention)continue;
+                    unset($state['skills'][$id]);$pruned[]=(string)$id;
+                }
+                $state['metrics']['last_curated_gmt']=gmdate('c',$now);$state['metrics']['curated_runs']=(int)($state['metrics']['curated_runs']??0)+1;$state['metrics']['curated_archived']=(int)($state['metrics']['curated_archived']??0)+count($archived);$state['metrics']['curated_pruned']=(int)($state['metrics']['curated_pruned']??0)+count($pruned);
+            }
+            return array('ok'=>true,'skipped'=>false,'apply'=>$apply,'analyzed'=>count((array)($state['skills']??array())),'stale_ids'=>$stale,'failed_only_ids'=>$failed_only,'archived_ids'=>$archived,'pruned_ids'=>$pruned,'pruned'=>count($pruned),'merge_candidates'=>$merge,'exact_duplicate_candidates'=>$exact_duplicates,'history_deleted'=>false,'automatic_merge'=>false,'version'=>self::VERSION,'component'=>'procedural_skills','component_version'=>self::VERSION,'suite_version'=>defined('PRSTUDIO_UC_VERSION')?PRSTUDIO_UC_VERSION:'');
         };
         if(!$apply){$state=self::state_unlocked();return$analyze($state);}
         return self::mutate($analyze);
     }
 
-    /** Report the health and size of the procedural skill subsystem. */
-    public static function status(array $args=array()):array{$state=self::state_unlocked();$valid=0;$stale=0;foreach((array)$state['skills'] as $skill){if(strtotime((string)($skill['expires_gmt']??''))>time())$valid++;else$stale++;}return array('ok'=>true,'version'=>self::VERSION,'component'=>'procedural_skills','component_version'=>self::VERSION,'suite_version'=>defined('PRSTUDIO_UC_VERSION')?PRSTUDIO_UC_VERSION:'','skills'=>count((array)$state['skills']),'valid'=>$valid,'stale'=>$stale,'metrics'=>$state['metrics'],'storage'=>'site_private_agent_skills','format'=>'SKILL.md+JSON-index','hidden_chain_of_thought_stored'=>false);}
+    /**
+     * Report the health and size of the procedural skill subsystem.
+     *
+     * `stale` used to fold two different things together: entries that expired
+     * and have not been looked at, and entries the curator already reviewed and
+     * archived. Since archiving sets expires_gmt in the past, every archived
+     * skill kept counting as stale forever and the number only ever grew --
+     * reading as a backlog that needed attention when the work was already done.
+     * They are reported separately now, so `stale` means what it says.
+     */
+    public static function status(array $args=array()):array{
+        $state=self::state_unlocked();$valid=0;$stale=0;$archived=0;$now=time();
+        foreach((array)$state['skills'] as $skill){
+            if('archived'===(string)($skill['curated_state']??'')){$archived++;continue;}
+            if(strtotime((string)($skill['expires_gmt']??''))>$now)$valid++;else$stale++;
+        }
+        return array('ok'=>true,'version'=>self::VERSION,'component'=>'procedural_skills','component_version'=>self::VERSION,'suite_version'=>defined('PRSTUDIO_UC_VERSION')?PRSTUDIO_UC_VERSION:'','skills'=>count((array)$state['skills']),'valid'=>$valid,'stale'=>$stale,'archived'=>$archived,'awaiting_curation'=>$stale,'metrics'=>$state['metrics'],'storage'=>'site_private_agent_skills','format'=>'SKILL.md+JSON-index','hidden_chain_of_thought_stored'=>false);
+    }
 }

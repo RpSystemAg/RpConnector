@@ -205,7 +205,14 @@ final class PRSTUDIO_UC_Agency_Runtime {
 
 	public static function fast_tick(): void { if(!PRSTUDIO_UC_Store::schema_ready())return;self::run_batch(5,'fast-scheduler',4.0); }
 
-	public static function cron_tick(): void { if(!PRSTUDIO_UC_Store::schema_ready())return;self::process_schedules(10);if(class_exists('PRSTUDIO_UC_Procedural_Skills')){try{PRSTUDIO_UC_Procedural_Skills::curate(array('apply'=>true));}catch(Throwable $ignored){}}self::run_batch(5,'scheduler',4.0); }
+	public static function cron_tick(): void { if(!PRSTUDIO_UC_Store::schema_ready())return;
+		// Record which lane actually fired. Only the WP-CLI path used to write a
+		// heartbeat, so a site whose Action Scheduler was running perfectly still
+		// reported external_runner_heartbeat:[] and read as dead. That is the
+		// wrong signal: "no external runner configured" and "nothing is executing"
+		// are different conditions and only the second is an outage.
+		if(class_exists('PRSTUDIO_UC_Site_Sentinel'))PRSTUDIO_UC_Site_Sentinel::record_execution_heartbeat(self::scheduler_mode());
+		self::process_schedules(10);if(class_exists('PRSTUDIO_UC_Procedural_Skills')){try{PRSTUDIO_UC_Procedural_Skills::curate(array('apply'=>true));}catch(Throwable $ignored){}}self::run_batch(5,'scheduler',4.0); }
 
 	public static function control( string $job_uuid, string $action, array $args = array() ) {
 		$job=PRSTUDIO_UC_Store::get_job($job_uuid);if(!$job)return new WP_Error('agency_job_missing','Mission job not found.',array('status'=>404));$action=sanitize_key($action);$checkpoint=(array)($job['checkpoint']??array());
