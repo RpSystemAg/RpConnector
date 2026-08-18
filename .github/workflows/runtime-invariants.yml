@@ -6,6 +6,7 @@ on:
       - master
       - 'hardening/**'
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -20,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Exhaustively prove finite runtime model invariants
         run: python3 tests/runtime-state-model-check.py
 
@@ -29,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Runtime invariant audit
         run: python3 tests/runtime-invariants-audit.py
 
@@ -38,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - run: php -l tests/php-runtime-recovery-prepare-smoke.php
       - name: Strict wpdb prepare arity
         run: php tests/php-runtime-recovery-prepare-smoke.php
@@ -48,7 +49,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - run: php -l tests/php-agency-verification-monotonicity-smoke.php
       - name: Weak child evidence cannot become verified mission evidence
         run: php tests/php-agency-verification-monotonicity-smoke.php
@@ -58,6 +59,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Existing parent reconciliation smoke
         run: php tests/php-browser-parent-reconciliation-smoke.php
