@@ -196,7 +196,7 @@ final class PRSTUDIO_Agency {
 				! empty( $meta['idempotent'] )
 			);
 			$tool['outputSchema'] = is_array( $meta['output_schema'] ?? null ) ? $meta['output_schema'] : array( 'type' => 'object', 'additionalProperties' => true );
-			$tool['_meta']['idealmarket'] = array( 'route' => $meta['route'], 'action' => $meta['action'], 'operationId' => $meta['operation_id'] ?? '', 'registryHash' => self::control_registry_info()['registry_hash'], 'provider' => 'wordpress_native_and_semantic_executor_with_explicit_plan_compiler', 'externalWorkerRequired' => false, 'createsPendingJob' => false );
+			$tool['_meta']['rpconnector'] = array( 'route' => $meta['route'], 'action' => $meta['action'], 'operationId' => $meta['operation_id'] ?? '', 'registryHash' => self::control_registry_info()['registry_hash'], 'provider' => 'wordpress_native_and_semantic_executor_with_explicit_plan_compiler', 'externalWorkerRequired' => false, 'createsPendingJob' => false );
 			$tools[] = $tool;
 		}
 		return $tools;

@@ -20,7 +20,7 @@ const CONTROL_FOLDER = 'prstudio-unified-control';
 const AGENT_FOLDER = 'prstudio-unified-browser-agent';
 const CONTROL_ZIP = `${CONTROL_FOLDER}-${RELEASE_VERSION}.zip`;
 const AGENT_ZIP = `${AGENT_FOLDER}-${RELEASE_VERSION}.zip`;
-const RESOLVED_MCP_URL = 'https://idealmarket1987.com/wp-json/prstudio-unified/v1/mcp';
+const RESOLVED_MCP_URL = 'https://example.com/wp-json/prstudio-unified/v1/mcp';
 const MCP_URL_TEMPLATE = 'https://<site>/wp-json/prstudio-unified/v1/mcp';
 const OAUTH_OPTION_KEYS = [
   'prstudio_mcp_v5_clients',

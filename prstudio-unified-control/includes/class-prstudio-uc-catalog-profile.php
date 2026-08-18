@@ -26,9 +26,9 @@ final class PRSTUDIO_UC_Catalog_Profile {
 		'prstudio_anti_crash_submit',
 		'prstudio_work_finalize',
 		'prstudio_work_abort',
-		'idealmarket_capability_search',
-		'idealmarket_route_index',
-		'idealmarket_action_call',
+		'rpconnector_capability_search',
+		'rpconnector_route_index',
+		'rpconnector_action_call',
 	);
 
 	private const COMPACT_CORE_TOOLS = array(
@@ -184,7 +184,7 @@ final class PRSTUDIO_UC_Catalog_Profile {
 			foreach ( (array) ( PRSTUDIO_UC_Contract::data()['domains'] ?? array() ) as $domain ) {
 				foreach ( (array) ( $domain['routes'] ?? array() ) as $route ) {
 					$slug = str_replace( '-', '_', trim( (string) $route, '/' ) );
-					if ( '' !== $slug ) { $names[] = 'idealmarket_' . sanitize_key( $slug ); }
+					if ( '' !== $slug ) { $names[] = 'rpconnector_' . sanitize_key( $slug ); }
 				}
 			}
 		}

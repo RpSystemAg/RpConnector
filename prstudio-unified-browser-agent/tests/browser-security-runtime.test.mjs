@@ -21,15 +21,15 @@ const enterpriseRuntime = await import(new URL("../lib/enterprise-runtime.js", i
 
 test("agent-created tabs keep provisional ownership across about:blank and pendingUrl", () => {
   const initial = tabOwnership.provisionalOwnershipState(
-    { id: 25, url: "about:blank", pendingUrl: "https://idealmarket1987.com/checkout/" },
-    { url: "https://idealmarket1987.com/checkout/", provisional: true },
+    { id: 25, url: "about:blank", pendingUrl: "https://example.com/checkout/" },
+    { url: "https://example.com/checkout/", provisional: true },
   );
-  assert.equal(initial.candidateUrl, "https://idealmarket1987.com/checkout/");
+  assert.equal(initial.candidateUrl, "https://example.com/checkout/");
   assert.equal(initial.provisional, true);
   assert.equal(initial.candidateHttp, true);
   const committed = tabOwnership.provisionalOwnershipState(
-    { id: 25, url: "https://idealmarket1987.com/checkout/", pendingUrl: "" },
-    { url: "https://idealmarket1987.com/checkout/", provisional: true },
+    { id: 25, url: "https://example.com/checkout/", pendingUrl: "" },
+    { url: "https://example.com/checkout/", provisional: true },
   );
   assert.equal(committed.committedHttp, true);
   assert.equal(committed.provisional, false);
@@ -273,11 +273,11 @@ test("legacy interaction pacer and execution circuit are physically absent", asy
 
 test("GSC property identity distinguishes Domain and URL-prefix properties", async () => {
   const gsc = await import(new URL("../lib/gsc-session.js", import.meta.url));
-  assert.equal(gsc.normalizeGscProperty("sc-domain:IdealMarket1987.com"), "sc-domain:idealmarket1987.com");
-  assert.equal(gsc.normalizeGscProperty("https://IdealMarket1987.com/"), "https://idealmarket1987.com/");
-  assert.equal(gsc.gscPropertyMatches("https://idealmarket1987.com/", "sc-domain:idealmarket1987.com"), false);
-  assert.equal(gsc.gscPropertyMatches("sc-domain:IDEALMARKET1987.COM", "sc-domain:idealmarket1987.com"), true);
-  assert.ok(gsc.gscPropertyLabels("sc-domain:idealmarket1987.com").includes("idealmarket1987.com"));
+  assert.equal(gsc.normalizeGscProperty("sc-domain:Example.Com"), "sc-domain:example.com");
+  assert.equal(gsc.normalizeGscProperty("https://Example.Com/"), "https://example.com/");
+  assert.equal(gsc.gscPropertyMatches("https://example.com/", "sc-domain:example.com"), false);
+  assert.equal(gsc.gscPropertyMatches("sc-domain:EXAMPLE.COM", "sc-domain:example.com"), true);
+  assert.ok(gsc.gscPropertyLabels("sc-domain:example.com").includes("example.com"));
 });
 
 test("fill is native-first and bad postconditions remain nonblocking evidence", async () => {

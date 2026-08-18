@@ -195,7 +195,7 @@ $inspect=PRSTUDIO_UC_Capability_Registry::get('legacy.extensions-themes.themes-m
 check(is_array($inspect)&&$inspect['read_only']===true&&$inspect['write']===false&&$inspect['risk_level']==='low'&&$inspect['destructive']===false,'inspect-theme-assets is read-only, low risk and confirmation-free at runtime');
 $inspectDescription=PRSTUDIO_UC_Capability_Registry::describe('legacy.extensions-themes.themes-manage.inspect-theme-assets');
 check(is_array($inspectDescription)&&(!array_key_exists('confirmation',$inspectDescription)||$inspectDescription['confirmation']===false),'inspect-theme-assets capability description requires no confirmation');
-$inspectTool=array_values(array_filter(WPAIB_MCP::all_tools(),static fn($tool)=>'idealmarket_themes_manage_inspect_theme_assets'===(string)($tool['name']??'')))[0]??null;
+$inspectTool=array_values(array_filter(WPAIB_MCP::all_tools(),static fn($tool)=>'rpconnector_themes_manage_inspect_theme_assets'===(string)($tool['name']??'')))[0]??null;
 check(is_array($inspectTool)&&($inspectTool['annotations']['readOnlyHint']??false)===true&&($inspectTool['annotations']['destructiveHint']??true)===false,'inspect-theme-assets canonical WPAIB_MCP tool is read-only and non-destructive');
 
 // Read semantics must be corrected at the canonical PHP authority even while

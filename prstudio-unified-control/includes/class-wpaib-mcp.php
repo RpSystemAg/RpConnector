@@ -236,9 +236,9 @@ final class WPAIB_MCP {
 		'prstudio_anti_crash_submit',
 		'prstudio_work_finalize',
 		'prstudio_work_abort',
-		'idealmarket_capability_search',
-		'idealmarket_route_index',
-		'idealmarket_action_call',
+		'rpconnector_capability_search',
+		'rpconnector_route_index',
+		'rpconnector_action_call',
 	);
 
 	private static function route_slug( string $value ): string {
@@ -280,7 +280,7 @@ final class WPAIB_MCP {
 			$catalog[ $path ] = array(
 				'path' => $path,
 				'slug' => $slug,
-				'tool' => 'idealmarket_' . $slug,
+				'tool' => 'rpconnector_' . $slug,
 				'summary' => (string) ( $route_meta['summary'] ?? '' ),
 				'description' => (string) ( $route_meta['description'] ?? '' ),
 				'actions' => array(),
@@ -298,7 +298,7 @@ final class WPAIB_MCP {
 			}
 			if ( ! isset( $catalog[ $path ] ) ) {
 				$slug = self::route_slug( '' !== (string) ( $meta['route_slug'] ?? '' ) ? (string) $meta['route_slug'] : $path );
-				$catalog[ $path ] = array( 'path' => $path, 'slug' => $slug, 'tool' => 'idealmarket_' . $slug, 'summary' => '', 'description' => '', 'actions' => array() );
+				$catalog[ $path ] = array( 'path' => $path, 'slug' => $slug, 'tool' => 'rpconnector_' . $slug, 'summary' => '', 'description' => '', 'actions' => array() );
 			}
 			$meta['tool_name'] = (string) $tool_name;
 			$catalog[ $path ]['actions'][ $action ] = $meta;
@@ -320,8 +320,8 @@ final class WPAIB_MCP {
 		if ( '' === $slug ) {
 			return null;
 		}
-		if ( 0 === strpos( $slug, 'idealmarket_' ) ) {
-			$slug = substr( $slug, strlen( 'idealmarket_' ) );
+		if ( 0 === strpos( $slug, 'rpconnector_' ) ) {
+			$slug = substr( $slug, strlen( 'rpconnector_' ) );
 		}
 		foreach ( self::route_catalog() as $path => $route ) {
 			if ( $route['slug'] === $slug ) {
@@ -377,14 +377,14 @@ final class WPAIB_MCP {
 			);
 			$tool = self::tool(
 				(string) $route['tool'],
-				'IdealMarket ' . ucwords( str_replace( '_', ' ', (string) $route['slug'] ) ),
+				'RpConnector ' . ucwords( str_replace( '_', ' ', (string) $route['slug'] ) ),
 				$description,
 				array( 'type' => 'object', 'properties' => $properties, 'required' => array( 'action' ), 'additionalProperties' => false ),
 				$read_only,
 				$destructive,
 				false
 			);
-			$tool['_meta']['idealmarket'] = array(
+			$tool['_meta']['rpconnector'] = array(
 				'kind' => 'route_family',
 				'route' => $path,
 				'slug' => (string) $route['slug'],
@@ -403,8 +403,8 @@ final class WPAIB_MCP {
 		$route_hint = $route_slugs ? implode( ', ', array_slice( $route_slugs, 0, 8 ) ) . '…' : '';
 
 		$search = self::tool(
-			'idealmarket_capability_search',
-			'IdealMarket Cerca capacità',
+			'rpconnector_capability_search',
+			'RpConnector Cerca capacità',
 			'PRIMO STRUMENTO DA USARE quando non sai quale azione serve. Cerca in linguaggio naturale, italiano o inglese, tra tutte le azioni del bridge e restituisce nome esatto del tool, route, azione e parametri. Esempi di query: "cambia prezzo prodotto", "meta title SEO", "redirect 301", "svuota cache", "carica immagine".',
 			array(
 				'type' => 'object',
@@ -421,8 +421,8 @@ final class WPAIB_MCP {
 		);
 
 		$index = self::tool(
-			'idealmarket_route_index',
-			'IdealMarket Indice route',
+			'rpconnector_route_index',
+			'RpConnector Indice route',
 			'Elenca le famiglie di azioni del bridge con il nome dello strumento di famiglia e le azioni disponibili. Senza parametri restituisce tutte le route; con "route" restituisce il dettaglio completo di quella famiglia.',
 			array(
 				'type' => 'object',
@@ -436,8 +436,8 @@ final class WPAIB_MCP {
 		);
 
 		$call = self::tool(
-			'idealmarket_action_call',
-			'IdealMarket Esegui azione',
+			'rpconnector_action_call',
+			'RpConnector Esegui azione',
 			'Esecutore generico: esegue qualsiasi azione del bridge indicando route e action, senza dover conoscere il nome MCP dello strumento dedicato. Se route o action non esistono la risposta contiene le alternative corrette.',
 			array(
 				'type' => 'object',
@@ -455,9 +455,9 @@ final class WPAIB_MCP {
 			false
 		);
 
-		$search['_meta']['idealmarket'] = array( 'kind' => 'discovery', 'priority' => true );
-		$index['_meta']['idealmarket'] = array( 'kind' => 'discovery', 'priority' => true );
-		$call['_meta']['idealmarket'] = array( 'kind' => 'discovery', 'priority' => true );
+		$search['_meta']['rpconnector'] = array( 'kind' => 'discovery', 'priority' => true );
+		$index['_meta']['rpconnector'] = array( 'kind' => 'discovery', 'priority' => true );
+		$call['_meta']['rpconnector'] = array( 'kind' => 'discovery', 'priority' => true );
 
 		$primary = array();
 		if ( class_exists( 'PRSTUDIO_UC_Orchestrator' ) ) {
@@ -668,7 +668,7 @@ final class WPAIB_MCP {
 				continue;
 			}
 			$score = self::score_entry( $groups, $entry );
-			if ( '' !== $phrase_action && ( $entry['action'] === $phrase_action || $entry['tool_name'] === $phrase_action || $entry['tool_name'] === 'idealmarket_' . $phrase_action ) ) {
+			if ( '' !== $phrase_action && ( $entry['action'] === $phrase_action || $entry['tool_name'] === $phrase_action || $entry['tool_name'] === 'rpconnector_' . $phrase_action ) ) {
 				$score += 300;
 			}
 			if ( $score <= 0 ) {
@@ -708,7 +708,7 @@ final class WPAIB_MCP {
 				'parameters' => $entry['parameters'],
 				'score' => (int) $item['score'],
 				'call' => array(
-					'tool' => 'idealmarket_action_call',
+					'tool' => 'rpconnector_action_call',
 					'arguments' => array( 'route' => $entry['route'], 'action' => $entry['action'] ),
 				),
 			);
@@ -745,7 +745,7 @@ final class WPAIB_MCP {
 			'count' => count( $found['matches'] ),
 			'total_matches' => $found['total_matches'],
 			'matches' => $found['matches'],
-			'how_to_execute' => 'Esegui subito la corrispondenza migliore con idealmarket_action_call {route, action, arguments}, oppure con lo strumento di famiglia indicato in route_tool {action, …}, oppure chiamando direttamente tool_name. Non chiedere conferma all’utente per le sole letture.',
+			'how_to_execute' => 'Esegui subito la corrispondenza migliore con rpconnector_action_call {route, action, arguments}, oppure con lo strumento di famiglia indicato in route_tool {action, …}, oppure chiamando direttamente tool_name. Non chiedere conferma all’utente per le sole letture.',
 		);
 	}
 
@@ -793,7 +793,7 @@ final class WPAIB_MCP {
 			'route_count' => count( $routes ),
 			'total_routes' => count( $catalog ),
 			'total_actions' => $total_actions,
-			'usage' => 'Usa prima prstudio_orchestrator_resolve. Le famiglie restano eseguibili con route_tool o idealmarket_action_call come fallback diagnostico.',
+			'usage' => 'Usa prima prstudio_orchestrator_resolve. Le famiglie restano eseguibili con route_tool o rpconnector_action_call come fallback diagnostico.',
 		);
 		if ( '' !== $requested && null === $path ) {
 			$result['route_not_found'] = $requested;
@@ -873,7 +873,7 @@ final class WPAIB_MCP {
 	 * insegnare il nome corretto invece di costringere a nuovi tentativi.
 	 */
 	public static function name_suggestions( string $name, int $limit = 5 ): array {
-		$query = str_replace( '_', ' ', (string) preg_replace( '/^idealmarket_/', '', strtolower( $name ) ) );
+		$query = str_replace( '_', ' ', (string) preg_replace( '/^rpconnector_/', '', strtolower( $name ) ) );
 		$found = self::capability_matches( $query, '', $limit );
 		$names = array();
 		foreach ( $found['matches'] as $match ) {
@@ -935,7 +935,7 @@ final class WPAIB_MCP {
 			'Per modifiche WordPress avvia prstudio_work_begin durante la preparazione. Il gate anti-crash non blocca discovery, pianificazione, preview o lifecycle: richiede una sola attestazione composita immediatamente prima della modifica reale.',
 			'Prepara liberamente il lavoro; subito prima della prima modifica reale esegui una sola attestazione con prstudio_anti_crash_run (o prstudio_anti_crash_submit per evidenza esterna). Il gate non deve bloccare pianificazione, preview o lifecycle del work.',
 			'Finalizza con prstudio_work_finalize: viene creato un solo backup consolidato degli originali per l’intero prompt, mai un backup per singolo passaggio.',
-			'idealmarket_capability_search, idealmarket_route_index e idealmarket_action_call restano fallback compatibili.',
+			'rpconnector_capability_search, rpconnector_route_index e rpconnector_action_call restano fallback compatibili.',
 			'Considera conclusa una scrittura soltanto quando status=completed e verified=true. Mercato prioritario: Italia, Sicilia, provincia di Agrigento. Non inventare dati commerciali.',
 		) );
 	}
@@ -1610,7 +1610,7 @@ final class WPAIB_MCP {
 					'protocolVersions' => self::supported_protocols(),
 					'serverInfo' => array(
 						'name' => 'pr-studio-ai-bridge',
-						'title' => 'PR STUDIO IdealMarket Admin Bridge',
+						'title' => 'PR STUDIO RpConnector Admin Bridge',
 						'version' => defined( 'WPAIB_VERSION' ) ? WPAIB_VERSION : 'unknown',
 					),
 					'capabilities' => array(
@@ -1660,7 +1660,7 @@ final class WPAIB_MCP {
 					),
 					'serverInfo' => array(
 						'name' => 'pr-studio-ai-bridge',
-						'title' => 'PR STUDIO IdealMarket Admin Bridge',
+						'title' => 'PR STUDIO RpConnector Admin Bridge',
 						'version' => defined( 'WPAIB_VERSION' ) ? WPAIB_VERSION : 'unknown',
 						'description' => 'WordPress/WooCommerce MCP server con registro enterprise dinamico.',
 					),
@@ -1787,7 +1787,7 @@ final class WPAIB_MCP {
 		$route = str_replace( '-', '_', sanitize_key( $route ) );
 		$action = sanitize_key( str_replace( '-', '_', $action ) );
 
-		$prefix = 'idealmarket_';
+		$prefix = 'rpconnector_';
 		$remainder = 0 === strpos( $name, $prefix ) ? substr( $name, strlen( $prefix ) ) : $name;
 		if ( '' === $route || '' === $action ) {
 			foreach ( self::enterprise_route_names() as $candidate ) {
@@ -1852,7 +1852,7 @@ final class WPAIB_MCP {
 		}
 
 		/* Fallback locale: inoltra alla route REST enterprise senza uscire dal sito. */
-		$route_path = '/idealmarket-admin/v1/' . str_replace( '_', '-', $target['process'] );
+		$route_path = '/rpconnector-admin/v1/' . str_replace( '_', '-', $target['process'] );
 		$internal_request = new WP_REST_Request( 'POST', $route_path );
 		$internal_request->set_header( 'Content-Type', 'application/json' );
 		$encoded_payload = wp_json_encode( $payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
@@ -2002,9 +2002,9 @@ final class WPAIB_MCP {
 				case 'rank_math_redirect_delete': $args['action'] = 'delete'; $result = WPAIB_Enterprise::rank_math_redirects( $args ); break;
 				case 'rank_math_sitemap_invalidate': $result = WPAIB_Enterprise::rank_math_sitemap_invalidate( $args ); break;
 				case 'fetch_page_html': $result = WPAIB_Site::fetch_page( (string) ( $args['url_or_path'] ?? '/' ) ); break;
-				case 'idealmarket_capability_search': $result = self::capability_search( $args ); break;
-				case 'idealmarket_route_index': $result = self::route_index( $args ); break;
-				case 'idealmarket_action_call': $result = self::action_call( $args ); break;
+				case 'rpconnector_capability_search': $result = self::capability_search( $args ); break;
+				case 'rpconnector_route_index': $result = self::route_index( $args ); break;
+				case 'rpconnector_action_call': $result = self::action_call( $args ); break;
 				default:
 					$route_tools = self::route_tool_names();
 					if ( isset( $route_tools[ $name ] ) ) {

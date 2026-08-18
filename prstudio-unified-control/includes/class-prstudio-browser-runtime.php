@@ -123,7 +123,7 @@ final class PRSTUDIO_Browser_Runtime {
 				}
 				$hook = sanitize_key( (string) ( $meta['adapter_hook'] ?? '' ) );
 				if ( '' === $hook ) {
-					$hook = 'idealmarket_admin_execute_frontend_manage_' . $action;
+					$hook = 'rpconnector_admin_execute_frontend_manage_' . $action;
 				}
 				if ( isset( $registered[ $hook ] ) ) {
 					continue;
@@ -134,7 +134,7 @@ final class PRSTUDIO_Browser_Runtime {
 		}
 
 		foreach ( array( 'screenshot', 'create_visual_baseline', 'visual_diff', 'accessibility_tree', 'network_log', 'console_log' ) as $action ) {
-			$hook = 'idealmarket_admin_execute_frontend_manage_' . $action;
+			$hook = 'rpconnector_admin_execute_frontend_manage_' . $action;
 			if ( ! isset( $registered[ $hook ] ) ) {
 				add_filter( $hook, array( $this, 'dispatch_adapter' ), 10, 3 );
 			}

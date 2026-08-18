@@ -174,8 +174,8 @@ final class PRSTUDIO_UC_Anti_Crash {
 		$mutation = is_array( $args['mutation'] ?? null ) ? $args['mutation'] : array();
 		if ( 'preview' === sanitize_key( (string) ( $mutation['mode'] ?? '' ) ) ) { return true; }
 
-		if ( 'idealmarket_seo_manage_build_keyword_map' === $name ) { return true; }
-		if ( 'idealmarket_action_call' === $name ) {
+		if ( 'rpconnector_seo_manage_build_keyword_map' === $name ) { return true; }
+		if ( 'rpconnector_action_call' === $name ) {
 			$action = sanitize_key( (string) ( $args['action'] ?? '' ) );
 			if ( $action && class_exists( 'PRSTUDIO_Agency' ) ) {
 				$meta = PRSTUDIO_Agency::control_action_by_tool( $action );
@@ -304,7 +304,7 @@ final class PRSTUDIO_UC_Pre_Mutation_Safety {
     public static function scope_for_direct_tool( string $name, array $args = array() ): string {
         $name = sanitize_key( $name );
         if ( '' === $name ) { return 'none'; }
-        if ( str_starts_with( $name, 'idealmarket_' ) || 'idealmarket_action_call' === $name ) { return 'deferred'; }
+        if ( str_starts_with( $name, 'rpconnector_' ) || 'rpconnector_action_call' === $name ) { return 'deferred'; }
         if ( in_array( $name, array( 'wordpress_content_transaction', 'prstudio_execute', 'prstudio_do' ), true ) ) { return 'deferred'; }
         if ( in_array( $name, array( 'write_file', 'append_file', 'truncate_file', 'delete_file', 'restore_file', 'patch_file' ), true ) ) { return 'filesystem'; }
         if ( 'set_plugin_state' === $name ) { return 'plugin'; }

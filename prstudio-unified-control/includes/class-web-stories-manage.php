@@ -13,7 +13,7 @@
  *   falls back to WordPress capability checks for logged-in editors.
  *
  * Target plugin: Google Web Stories 1.42.0+
- * REST route:   /idealmarket-admin/v1/web-stories-manage
+ * REST route:   /rpconnector-admin/v1/web-stories-manage
  * Native proxy: /web-stories/v1/* only
  *
  * @package PRStudio_AI_Bridge
@@ -25,7 +25,7 @@ defined( 'ABSPATH' ) || exit;
 if ( ! class_exists( 'PRSTUDIO_Web_Stories_Manage', false ) ) {
 	final class PRSTUDIO_Web_Stories_Manage {
 		private const VERSION          = '1.1.0';
-		private const NAMESPACE        = 'idealmarket-admin/v1';
+		private const NAMESPACE        = 'rpconnector-admin/v1';
 		private const ROUTE            = '/web-stories-manage';
 		private const PROVIDER         = 'wordpress_native';
 		private const NATIVE_NAMESPACE = '/web-stories/v1';
@@ -73,7 +73,7 @@ if ( ! class_exists( 'PRSTUDIO_Web_Stories_Manage', false ) ) {
 		];
 
 		/** Hook consumed by WPAIB_REST::execute_control_action() for this route family. */
-		public const ADAPTER_HOOK = 'idealmarket_admin_execute_web_stories';
+		public const ADAPTER_HOOK = 'rpconnector_admin_execute_web_stories';
 
 		public static function boot(): void {
 			add_action( 'rest_api_init', [ __CLASS__, 'register_route' ], 120 );
@@ -1049,7 +1049,7 @@ if ( ! class_exists( 'PRSTUDIO_Web_Stories_Manage', false ) ) {
 			return new WP_REST_Response( [
 				'route' => self::ROUTE,
 				'action' => $action,
-				'tool_name' => 'idealmarket_web_stories_manage_' . $action,
+				'tool_name' => 'rpconnector_web_stories_manage_' . $action,
 				'execution' => self::PROVIDER,
 				'provider' => self::PROVIDER,
 				'status' => 'completed',
@@ -1065,7 +1065,7 @@ if ( ! class_exists( 'PRSTUDIO_Web_Stories_Manage', false ) ) {
 			return new WP_REST_Response( [
 				'route' => self::ROUTE,
 				'action' => $action,
-				'tool_name' => 'idealmarket_web_stories_manage_' . $action,
+				'tool_name' => 'rpconnector_web_stories_manage_' . $action,
 				'execution' => self::PROVIDER,
 				'provider' => self::PROVIDER,
 				'status' => 'technical_error',

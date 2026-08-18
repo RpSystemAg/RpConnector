@@ -10,7 +10,7 @@
   "archetype": "wordpress_control_plane_plus_owned_chrome_executor",
   "description": "Connettore MCP remoto per WordPress, WooCommerce, Browser Agent e automazioni PR STUDIO.",
   "server_url_template": "https://<site>/wp-json/prstudio-unified/v1/mcp",
-  "resolved_server_url": "https://idealmarket1987.com/wp-json/prstudio-unified/v1/mcp",
+  "resolved_server_url": "https://example.com/wp-json/prstudio-unified/v1/mcp",
   "transport": "streamable_http_json_rpc",
   "authentication": "oauth_2_1_authorization_code_pkce_s256",
   "oauth": {

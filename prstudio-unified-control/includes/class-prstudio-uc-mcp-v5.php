@@ -205,8 +205,8 @@ final class PRSTUDIO_UC_MCP_V5 {
             $uri=(string)($params['uri']??'');
             $ui_meta=array('ui'=>array(
                 'prefersBorder'=>true,
-                'domain'=>'https://idealmarket1987.com',
-                'csp'=>array('connectDomains'=>array('https://idealmarket1987.com'),'resourceDomains'=>array('https://idealmarket1987.com')),
+                'domain'=>'https://example.com',
+                'csp'=>array('connectDomains'=>array('https://example.com'),'resourceDomains'=>array('https://example.com')),
             ));
             if($uri===self::BROWSER_VIEWER_URI)return self::rpc_result($id,array('contents'=>array(array('uri'=>self::BROWSER_VIEWER_URI,'mimeType'=>'text/html;profile=mcp-app','text'=>self::browser_viewer_html(),'_meta'=>$ui_meta))));
             if($uri===self::BROWSER_LIVE_URI)return self::rpc_result($id,array('contents'=>array(array('uri'=>self::BROWSER_LIVE_URI,'mimeType'=>'text/html;profile=mcp-app','text'=>self::browser_live_html(),'_meta'=>$ui_meta))));

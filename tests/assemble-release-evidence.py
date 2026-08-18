@@ -142,7 +142,7 @@ def main() -> int:
         "archetype": "wordpress_control_plane_plus_owned_chrome_executor",
         "description": "Connettore MCP remoto per WordPress, WooCommerce, Browser Agent e automazioni PR STUDIO.",
         "server_url_template": "https://<site>/wp-json/prstudio-unified/v1/mcp",
-        "resolved_server_url": "https://idealmarket1987.com/wp-json/prstudio-unified/v1/mcp",
+        "resolved_server_url": "https://example.com/wp-json/prstudio-unified/v1/mcp",
         "transport": "streamable_http_json_rpc",
         "authentication": "oauth_2_1_authorization_code_pkce_s256",
         "oauth": {
@@ -341,7 +341,7 @@ Ricarica come estensione unpacked la cartella `prstudio-unified-browser-agent`. 
 
 In ChatGPT **Developer mode**, crea o aggiorna il connettore chiamato **RP Studio Connector** usando:
 
-`https://idealmarket1987.com/wp-json/prstudio-unified/v1/mcp`
+`https://example.com/wp-json/prstudio-unified/v1/mcp`
 
 L'autenticazione resta OAuth 2.1 Authorization Code + PKCE S256. Un aggiornamento non deve eliminare `prstudio_mcp_v5_clients`, `prstudio_mcp_v5_tokens` o `prstudio_mcp_v5_generation`.
 

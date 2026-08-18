@@ -3,7 +3,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 /** Security defaults for the unified control plane. */
 final class WPAIB_Security_Hardening {
-    private const ADMIN_NS = '/idealmarket-admin/v1';
+    private const ADMIN_NS = '/rpconnector-admin/v1';
     private const LOGIN_WINDOW = 900;
     private const LOGIN_MAX = 8;
     private const LOGIN_BLOCK = 600;

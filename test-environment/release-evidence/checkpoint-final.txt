@@ -1,1 +1,0 @@
-PASS exhaustive checkpoint: 5018 items, 250 questions/item, matrix_cells=1254500, applicable_rule_cells=107615, na_cells=1146885, hard_failures=0

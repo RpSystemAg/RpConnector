@@ -50,15 +50,15 @@ final class PRSTUDIO_UC_Orchestrator {
 		$action = '';
 		$action_contract_match = true;
 
-		if ( 'idealmarket_action_call' === $tool_name ) {
+		if ( 'rpconnector_action_call' === $tool_name ) {
 			$route = (string) ( $args['route'] ?? '' );
 			$action = (string) ( $args['action'] ?? '' );
 			if ( ! empty( $args['tool_name'] ) ) { $meta = class_exists( 'PRSTUDIO_UC_Action_Index' ) ? PRSTUDIO_UC_Action_Index::by_tool( (string) $args['tool_name'] ) : PRSTUDIO_UC_Contract::by_tool( (string) $args['tool_name'] ); }
 			if ( ! $meta && '' !== $route && '' !== $action ) { $meta = class_exists( 'PRSTUDIO_UC_Action_Index' ) ? PRSTUDIO_UC_Action_Index::by_action( $route, $action ) : PRSTUDIO_UC_Contract::by_action( $route, $action ); }
 			if ( ! $meta && '' !== $route && '' !== $action ) { $meta = class_exists( 'PRSTUDIO_UC_Action_Index' ) ? PRSTUDIO_UC_Action_Index::by_tool( $tool_name ) : PRSTUDIO_UC_Contract::by_tool( $tool_name ); $action_contract_match = false; }
 			if ( ! $meta && '' === $route && '' === $action ) { $meta = class_exists( 'PRSTUDIO_UC_Action_Index' ) ? PRSTUDIO_UC_Action_Index::by_tool( $tool_name ) : PRSTUDIO_UC_Contract::by_tool( $tool_name ); }
-		} elseif ( 0 === strpos( $tool_name, 'idealmarket_' ) && isset( $args['action'] ) ) {
-			$slug = substr( $tool_name, strlen( 'idealmarket_' ) );
+		} elseif ( 0 === strpos( $tool_name, 'rpconnector_' ) && isset( $args['action'] ) ) {
+			$slug = substr( $tool_name, strlen( 'rpconnector_' ) );
 			$route = '/' . str_replace( '_', '-', $slug );
 			$action = (string) $args['action'];
 			$meta = class_exists( 'PRSTUDIO_UC_Action_Index' ) ? PRSTUDIO_UC_Action_Index::by_action( $route, $action ) : PRSTUDIO_UC_Contract::by_action( $route, $action );

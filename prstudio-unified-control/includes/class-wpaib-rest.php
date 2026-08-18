@@ -3,7 +3,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 final class WPAIB_REST {
 	private const NS = 'wp-ai-bridge/v1';
-	private const OPENAPI_NS = 'idealmarket-admin/v1';
+	private const OPENAPI_NS = 'rpconnector-admin/v1';
 
 	public static function maybe_serve_well_known(): void {
 		$uri = untrailingslashit( (string) wp_parse_url( (string) ( $_SERVER['REQUEST_URI'] ?? '' ), PHP_URL_PATH ) );
@@ -131,7 +131,7 @@ final class WPAIB_REST {
 			$gate_args['route'] = $route;
 			$gate_args['action'] = $action;
 			$scope = PRSTUDIO_UC_Pre_Mutation_Safety::scope_for_legacy_route( $route, $action, $meta );
-			$gate = PRSTUDIO_UC_Pre_Mutation_Safety::before_commit( $scope, (string) ( $meta['tool_name'] ?? 'idealmarket_action_call' ), $gate_args );
+			$gate = PRSTUDIO_UC_Pre_Mutation_Safety::before_commit( $scope, (string) ( $meta['tool_name'] ?? 'rpconnector_action_call' ), $gate_args );
 			if ( is_wp_error( $gate ) ) { return $gate; }
 		}
 		$provider = class_exists( 'PRSTUDIO_UC_Backend_Executability' ) ? PRSTUDIO_UC_Backend_Executability::provider_for( $route, $action, $meta ) : 'wordpress_native';
@@ -168,7 +168,7 @@ final class WPAIB_REST {
 		}
 		if ( null === $result ) {
 			$result = ( '' !== $hook && ! $hook_used ) ? apply_filters( $hook, null, $arguments, $meta ) : null;
-			if ( null === $result ) { $result = apply_filters( 'idealmarket_admin_execute_action', null, $route, $action, $arguments, $meta ); }
+			if ( null === $result ) { $result = apply_filters( 'rpconnector_admin_execute_action', null, $route, $action, $arguments, $meta ); }
 			if ( null !== $result ) { $provider = 'wordpress_extension_hook'; }
 		}
 		if ( null === $result ) {
@@ -357,7 +357,7 @@ final class WPAIB_REST {
 		$method = strtoupper( sanitize_text_field( $method ) );
 		$route = '/' . ltrim( $route, '/' );
 		if ( ! in_array( $method, array( 'GET', 'POST', 'PUT', 'PATCH', 'DELETE' ), true ) ) { return new WP_Error( 'wpaib_proxy_method_invalid', 'Metodo proxy non valido.', array( 'status' => 400 ) ); }
-		if ( 0 === strpos( $route, '/wp-ai-bridge/v1/oauth' ) || 0 === strpos( $route, '/idealmarket-admin/v1' ) || 0 === strpos( $route, '/wp-ai-bridge/v1/mcp' ) ) { return new WP_Error( 'wpaib_proxy_route_forbidden', 'Route proxy non consentita per il trasporto.', array( 'status' => 403 ) ); }
+		if ( 0 === strpos( $route, '/wp-ai-bridge/v1/oauth' ) || 0 === strpos( $route, '/rpconnector-admin/v1' ) || 0 === strpos( $route, '/wp-ai-bridge/v1/mcp' ) ) { return new WP_Error( 'wpaib_proxy_route_forbidden', 'Route proxy non consentita per il trasporto.', array( 'status' => 403 ) ); }
 		$previous = get_current_user_id();
 		$user = self::bridge_user();
 		if ( $user ) { wp_set_current_user( $user ); }

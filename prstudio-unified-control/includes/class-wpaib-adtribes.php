@@ -469,7 +469,7 @@ final class WPAIB_AdTribes {
 
 		$file_name = $existing_id && ! empty( $feed->file_name )
 			? $feed->file_name
-			: sanitize_file_name( 'idealmarket-it-' . sanitize_title( $item['name'] ) . '-' . substr( md5( $channel_key ), 0, 8 ) );
+			: sanitize_file_name( 'rpconnector-it-' . sanitize_title( $item['name'] ) . '-' . substr( md5( $channel_key ), 0, 8 ) );
 
 		$mappings = 'google_shopping' === ( $channel['taxonomy'] ?? '' )
 			? self::google_category_mappings()
@@ -630,7 +630,7 @@ final class WPAIB_AdTribes {
 		}
 
 		if ( str_contains( $feed_name, 'age_restriction' ) ) {
-			$mapfrom = 'idealmarket_age_restriction';
+			$mapfrom = 'rpconnector_age_restriction';
 			$static  = false;
 		}
 
@@ -643,7 +643,7 @@ final class WPAIB_AdTribes {
 		}
 
 		if ( str_contains( $feed_name, 'custom_label_2' ) ) {
-			$mapfrom = 'idealmarket_regulation';
+			$mapfrom = 'rpconnector_regulation';
 		}
 
 		$row = array(
@@ -684,11 +684,11 @@ final class WPAIB_AdTribes {
 		}
 
 		if ( str_contains( $haystack, 'return_deadline' ) ) {
-			return 'idealmarket_return_deadline';
+			return 'rpconnector_return_deadline';
 		}
 
 		if ( str_contains( $haystack, 'return_policy' ) ) {
-			return 'idealmarket_return_policy_url';
+			return 'rpconnector_return_policy_url';
 		}
 
 		$map = array(
@@ -949,11 +949,11 @@ final class WPAIB_AdTribes {
 			return array();
 		}
 
-		$data['idealmarket_alcohol']           = $is_alcohol ? 'yes' : 'no';
-		$data['idealmarket_age_restriction']   = $is_alcohol ? '18+' : '';
-		$data['idealmarket_regulation']        = $is_alcohol ? 'alcohol_18_plus' : 'standard';
-		$data['idealmarket_return_deadline']   = '14';
-		$data['idealmarket_return_policy_url'] = self::policy_url( 'return' );
+		$data['rpconnector_alcohol']           = $is_alcohol ? 'yes' : 'no';
+		$data['rpconnector_age_restriction']   = $is_alcohol ? '18+' : '';
+		$data['rpconnector_regulation']        = $is_alcohol ? 'alcohol_18_plus' : 'standard';
+		$data['rpconnector_return_deadline']   = '14';
+		$data['rpconnector_return_policy_url'] = self::policy_url( 'return' );
 
 		$channel = self::native_channel( (string) ( $feed->channel_hash ?? '' ) );
 		if ( $is_alcohol && 'google_shopping' === ( $channel['taxonomy'] ?? '' ) ) {

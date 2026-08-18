@@ -26,7 +26,7 @@ final class PRSTUDIO_UC_Bridge {
 			}
 			$hook = sanitize_key( (string) ( $meta['adapter_hook'] ?? '' ) );
 			if ( '' === $hook ) {
-				$hook = 'idealmarket_admin_execute_frontend_manage_' . $action;
+				$hook = 'rpconnector_admin_execute_frontend_manage_' . $action;
 			}
 			if ( isset( self::$registered[ $hook ] ) ) {
 				continue;
@@ -39,7 +39,7 @@ final class PRSTUDIO_UC_Bridge {
 				$action = sanitize_key( (string) ( $meta['action'] ?? '' ) );
 				if ( ! self::is_browser_action( $action ) ) { continue; }
 				$hook = sanitize_key( (string) ( $meta['adapter_hook'] ?? '' ) );
-				if ( '' === $hook ) { $hook = 'idealmarket_admin_execute_frontend_manage_' . $action; }
+				if ( '' === $hook ) { $hook = 'rpconnector_admin_execute_frontend_manage_' . $action; }
 				if ( isset( self::$registered[ $hook ] ) ) { continue; }
 				add_filter( $hook, array( __CLASS__, 'dispatch' ), 5, 3 );
 				self::$registered[ $hook ] = true;

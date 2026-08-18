@@ -11,7 +11,7 @@ Per aggiornare il Browser Agent, **non caricare una nuova estensione e non cambi
 
 In ChatGPT **Developer mode**, crea o aggiorna il connettore chiamato **RP Studio Connector** usando:
 
-`https://idealmarket1987.com/wp-json/prstudio-unified/v1/mcp`
+`https://example.com/wp-json/prstudio-unified/v1/mcp`
 
 L'autenticazione resta OAuth 2.1 Authorization Code + PKCE S256. Un aggiornamento non deve eliminare `prstudio_mcp_v5_clients`, `prstudio_mcp_v5_tokens` o `prstudio_mcp_v5_generation`.
 
