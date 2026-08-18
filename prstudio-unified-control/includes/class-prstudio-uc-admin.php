@@ -119,16 +119,59 @@ final class PRSTUDIO_UC_Admin {
 		$stale_count = count( array_filter( $devices, static fn( $device ) => 'stale' === (string) ( $device['connection_status'] ?? '' ) ) );
 		$authorization_count = (int) ( $mcp_status['active_authorizations'] ?? 0 );
 		$runner_ready = ! empty( $agency['h24']['external_runner_fresh'] );
+
+		// Old revoked devices (often dozens, spanning every past extension
+		// version) drown out the handful of connections that actually matter
+		// today. Split the list instead of dumping everything into one table;
+		// the history stays fully available, just collapsed by default.
+		$active_devices = array_values( array_filter( $devices, static fn( $device ) => 'revoked' !== (string) ( $device['connection_status'] ?? '' ) ) );
+		$revoked_devices = array_values( array_filter( $devices, static fn( $device ) => 'revoked' === (string) ( $device['connection_status'] ?? '' ) ) );
+		$task_status_counts = array( 'completed'=>0, 'running'=>0, 'failed'=>0, 'other'=>0 );
+		foreach ( $tasks as $task ) {
+			$status = strtolower( (string) ( $task['status'] ?? '' ) );
+			if ( in_array( $status, array( 'completed' ), true ) ) { $task_status_counts['completed']++; }
+			elseif ( in_array( $status, array( 'running', 'queued' ), true ) ) { $task_status_counts['running']++; }
+			elseif ( in_array( $status, array( 'failed', 'failed_nonreplayable', 'expired' ), true ) ) { $task_status_counts['failed']++; }
+			else { $task_status_counts['other']++; }
+		}
 		?>
 		<div class="wrap prstudio-dashboard">
 			<style>
-				.prstudio-dashboard{max-width:1180px}.prstudio-dashboard .prstudio-lead{font-size:16px;max-width:820px;color:#3c434a}
+				.prstudio-dashboard{max-width:1180px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+				.prstudio-dashboard h1{font-size:23px;font-weight:600}
+				.prstudio-dashboard .prstudio-lead{font-size:15px;max-width:820px;color:#50575e;line-height:1.5}
 				.prstudio-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin:20px 0}
-				.prstudio-card,.prstudio-panel,.prstudio-details{background:#fff;border:1px solid #dcdcde;border-radius:10px;padding:18px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
-				.prstudio-card strong{display:block;font-size:14px;color:#50575e;margin-bottom:8px}.prstudio-card b{font-size:23px;line-height:1.2}.prstudio-ok{color:#137333}.prstudio-warn{color:#9a6700}.prstudio-muted{color:#646970}
-				.prstudio-setup{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin:20px 0}.prstudio-panel h2{margin-top:0}.prstudio-url{display:block;overflow-wrap:anywhere;background:#f6f7f7;border-radius:6px;padding:10px;margin:10px 0}
-				.prstudio-table td,.prstudio-table th{vertical-align:middle}.prstudio-pill{display:inline-block;border-radius:999px;padding:3px 9px;background:#f0f0f1;font-weight:600}.prstudio-pill.online{background:#e8f5e9;color:#137333}.prstudio-pill.stale{background:#fff3cd;color:#7a5200}.prstudio-pill.revoked{background:#fce8e6;color:#a50e0e}
-				.prstudio-details{margin:18px 0}.prstudio-details>summary{cursor:pointer;font-size:15px}.prstudio-empty{padding:28px;text-align:center;color:#646970}
+				.prstudio-card,.prstudio-panel,.prstudio-section{background:#fff;border:1px solid #e2e4e7;border-radius:12px;padding:18px 20px;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+				.prstudio-card strong{display:block;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;margin-bottom:10px}
+				.prstudio-card b{font-size:23px;line-height:1.2;font-weight:600;font-variant-numeric:tabular-nums}
+				.prstudio-card p{margin:6px 0 0;font-size:13px;color:#6b7280;line-height:1.4}
+				.prstudio-ok{color:#0a7a3f}.prstudio-warn{color:#a35a00}.prstudio-muted{color:#6b7280}
+				.prstudio-setup{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin:20px 0}
+				.prstudio-panel h2{margin-top:0;font-size:15px}.prstudio-panel p{font-size:13px;color:#50575e;line-height:1.5}
+				.prstudio-url{display:block;overflow-wrap:anywhere;background:#f6f7f8;border-radius:8px;padding:10px 12px;margin:10px 0;font-size:12.5px;font-family:ui-monospace,Consolas,monospace;color:#374151}
+				.prstudio-section{margin:0 0 20px}
+				.prstudio-section-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+				.prstudio-section-head h2{margin:0;font-size:16px;font-weight:600}
+				.prstudio-section-head .prstudio-count{font-size:12.5px;color:#6b7280;font-weight:500}
+				.prstudio-chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+				.prstudio-chip{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:5px 11px;border-radius:999px;background:#f3f4f6;color:#374151;white-space:nowrap}
+				.prstudio-chip.ok{background:#e7f6ec;color:#0a7a3f}.prstudio-chip.warn{background:#fdf1e2;color:#a35a00}.prstudio-chip.bad{background:#fce9e9;color:#b3261e}
+				table.prstudio-grid{width:100%;border-collapse:collapse}
+				table.prstudio-grid th{text-align:left;font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;color:#9aa0a9;padding:0 10px 10px;border-bottom:1px solid #eceef0}
+				table.prstudio-grid td{padding:12px 10px;border-bottom:1px solid #f1f2f4;font-size:13.5px;vertical-align:middle}
+				table.prstudio-grid tr:last-child td{border-bottom:0}
+				.prstudio-name{font-weight:600;color:#1d2327}
+				.prstudio-id{margin-top:2px}.prstudio-id summary{font-size:11.5px;color:#9aa0a9;cursor:pointer}
+				.prstudio-id code{font-size:11px;color:#6b7280;background:#f6f7f8;padding:1px 5px;border-radius:4px}
+				.prstudio-pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:4px 10px;font-weight:600;font-size:12px;white-space:nowrap}
+				.prstudio-pill:before{content:"";width:6px;height:6px;flex:none;border-radius:50%;background:currentColor}
+				.prstudio-pill.online{background:#e7f6ec;color:#0a7a3f}.prstudio-pill.stale{background:#fdf1e2;color:#a35a00}.prstudio-pill.offline{background:#f3f4f6;color:#6b7280}.prstudio-pill.revoked{background:#fce9e9;color:#b3261e}
+				.prstudio-pill.completato{background:#e7f6ec;color:#0a7a3f}.prstudio-pill.in-esecuzione{background:#e8eefd;color:#3050c8}.prstudio-pill.non-riuscito,.prstudio-pill.ambiguita-tecnica-terminalizzata{background:#fce9e9;color:#b3261e}.prstudio-pill.in-attesa,.prstudio-pill.annullato,.prstudio-pill.scaduto{background:#f3f4f6;color:#6b7280}
+				.prstudio-history{margin-top:14px;border-top:1px solid #eceef0;padding-top:4px}
+				.prstudio-history summary{cursor:pointer;font-size:13px;color:#6b7280;font-weight:600;padding:10px 0}
+				.prstudio-cleanup{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;background:#fafbfc;border:1px solid #eceef0;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12.5px;color:#6b7280}
+				.prstudio-cleanup .button{white-space:nowrap}
+				.prstudio-empty{padding:28px;text-align:center;color:#9aa0a9;font-size:13.5px}
 				@media(max-width:782px){.prstudio-dashboard .widefat{display:block;overflow-x:auto}.prstudio-setup{grid-template-columns:1fr}}
 			</style>
 			<h1>PR STUDIO Suite <?php echo esc_html( PRSTUDIO_UC_VERSION ); ?></h1>
@@ -157,20 +200,54 @@ final class PRSTUDIO_UC_Admin {
 				<section class="prstudio-panel"><h2>2. Collega Chrome</h2><p>Genera un codice temporaneo, poi inseriscilo nel pannello dell’estensione PR STUDIO. Il codice scade dopo 10 minuti.</p><form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"><input type="hidden" name="action" value="prstudio_uc_pairing_code"><?php wp_nonce_field( 'prstudio_uc_pairing_code' ); ?><?php submit_button( 'Genera codice per Chrome', 'primary', 'submit', false ); ?></form></section>
 			</div>
 
-			<h2>Browser collegati</h2>
-			<table class="widefat striped prstudio-table">
-				<thead><tr><th>Nome</th><th>Connessione</th><th>Versione</th><th>Ultimo contatto</th><th>Azioni</th></tr></thead><tbody>
-				<?php if ( ! $devices ) : ?><tr><td colspan="5" class="prstudio-empty">Nessun browser collegato. Completa il passaggio 2.</td></tr><?php endif; ?>
-				<?php foreach ( $devices as $device ) : $connection = (string) ( $device['connection_status'] ?? 'offline' ); ?>
-				<tr><td><strong><?php echo esc_html( (string) $device['name'] ); ?></strong><br><details><summary>Mostra ID</summary><code><?php echo esc_html( (string) $device['device_uuid'] ); ?></code></details></td><td><span class="prstudio-pill <?php echo esc_attr( $connection ); ?>"><?php echo esc_html( self::plain_label( $connection ) ); ?></span></td><td><?php echo esc_html( (string) ( $device['capabilities']['suiteVersion'] ?? $device['capabilities']['version'] ?? '—' ) ); ?></td><td><?php echo esc_html( self::age_label( $device['last_seen_age_seconds'] ?? null ) ); ?></td><td><?php if ( 'active' === $device['status'] ) : ?><form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"><input type="hidden" name="action" value="prstudio_uc_revoke_device"><input type="hidden" name="device_id" value="<?php echo esc_attr( (string) $device['device_uuid'] ); ?>"><?php wp_nonce_field( 'prstudio_uc_revoke_device' ); ?><button class="button" type="submit">Scollega</button></form><?php else : ?>—<?php endif; ?></td></tr>
-				<?php endforeach; ?>
-				</tbody></table>
+			<div class="prstudio-section">
+				<div class="prstudio-section-head">
+					<h2>Browser collegati</h2>
+					<span class="prstudio-count"><?php echo esc_html( (string) count( $active_devices ) ); ?> attivo/i<?php echo $revoked_devices ? ' · ' . esc_html( (string) count( $revoked_devices ) ) . ' nella cronologia' : ''; ?></span>
+				</div>
+				<table class="prstudio-grid">
+					<thead><tr><th>Nome</th><th>Connessione</th><th>Versione</th><th>Ultimo contatto</th><th>Azioni</th></tr></thead><tbody>
+					<?php if ( ! $active_devices ) : ?><tr><td colspan="5" class="prstudio-empty">Nessun browser collegato. Completa il passaggio 2.</td></tr><?php endif; ?>
+					<?php foreach ( $active_devices as $device ) : $connection = (string) ( $device['connection_status'] ?? 'offline' ); ?>
+					<tr><td><div class="prstudio-name"><?php echo esc_html( (string) $device['name'] ); ?></div><details class="prstudio-id"><summary>Mostra ID</summary><code><?php echo esc_html( (string) $device['device_uuid'] ); ?></code></details></td><td><span class="prstudio-pill <?php echo esc_attr( $connection ); ?>"><?php echo esc_html( self::plain_label( $connection ) ); ?></span></td><td><?php echo esc_html( (string) ( $device['capabilities']['suiteVersion'] ?? $device['capabilities']['version'] ?? '—' ) ); ?></td><td><?php echo esc_html( self::age_label( $device['last_seen_age_seconds'] ?? null ) ); ?></td><td><?php if ( 'active' === $device['status'] ) : ?><form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"><input type="hidden" name="action" value="prstudio_uc_revoke_device"><input type="hidden" name="device_id" value="<?php echo esc_attr( (string) $device['device_uuid'] ); ?>"><?php wp_nonce_field( 'prstudio_uc_revoke_device' ); ?><button class="button" type="submit">Scollega</button></form><?php else : ?>—<?php endif; ?></td></tr>
+					<?php endforeach; ?>
+					</tbody></table>
+				<?php if ( $revoked_devices ) : ?>
+				<details class="prstudio-history">
+					<summary>Cronologia dispositivi revocati (<?php echo esc_html( (string) count( $revoked_devices ) ); ?>)</summary>
+					<div class="prstudio-cleanup">
+						<span>I dispositivi revocati vengono rimossi automaticamente dopo <?php echo esc_html( (string) ( PRSTUDIO_UC_GC::retention()['revoked_devices_days'] ?? 30 ) ); ?> giorni.</span>
+						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>"><input type="hidden" name="action" value="prstudio_uc_maintenance"><input type="hidden" name="run_gc_now" value="1"><?php wp_nonce_field( 'prstudio_uc_maintenance' ); ?><button class="button" type="submit">Pulisci ora</button></form>
+					</div>
+					<table class="prstudio-grid">
+						<thead><tr><th>Nome</th><th>Connessione</th><th>Versione</th><th>Ultimo contatto</th></tr></thead><tbody>
+						<?php foreach ( $revoked_devices as $device ) : ?>
+						<tr><td><div class="prstudio-name"><?php echo esc_html( (string) $device['name'] ); ?></div></td><td><span class="prstudio-pill revoked">Revocato</span></td><td><?php echo esc_html( (string) ( $device['capabilities']['suiteVersion'] ?? $device['capabilities']['version'] ?? '—' ) ); ?></td><td><?php echo esc_html( self::age_label( $device['last_seen_age_seconds'] ?? null ) ); ?></td></tr>
+						<?php endforeach; ?>
+						</tbody></table>
+				</details>
+				<?php endif; ?>
+			</div>
 
-			<h2>Attività recenti</h2>
-			<table class="widefat striped prstudio-table"><thead><tr><th>Attività</th><th>Stato</th><th>Progresso</th><th>Aggiornata</th></tr></thead><tbody>
-				<?php if ( ! $tasks ) : ?><tr><td colspan="4" class="prstudio-empty">Non ci sono ancora attività da mostrare.</td></tr><?php endif; ?>
-				<?php foreach ( $tasks as $task ) : ?><tr><td><strong><?php echo esc_html( self::plain_label( (string) $task['action'] ) ); ?></strong><details><summary>Mostra ID</summary><code><?php echo esc_html( (string) $task['task_uuid'] ); ?></code></details></td><td><?php echo esc_html( self::plain_label( (string) $task['status'] ) ); ?></td><td><?php $step=(int)($task['checkpoint']['last_completed_step']??-1);echo esc_html($step>=0?'Passaggio '.($step+1).' completato':'In preparazione'); ?></td><td><?php echo esc_html( (string) $task['updated_gmt'] ); ?> UTC</td></tr><?php endforeach; ?>
-				</tbody></table>
+			<div class="prstudio-section">
+				<div class="prstudio-section-head">
+					<h2>Attività recenti</h2>
+					<span class="prstudio-count">ultime <?php echo esc_html( (string) count( $tasks ) ); ?></span>
+				</div>
+				<?php if ( $tasks ) : ?>
+				<div class="prstudio-chips">
+					<?php if ( $task_status_counts['completed'] ) : ?><span class="prstudio-chip ok"><?php echo esc_html( (string) $task_status_counts['completed'] ); ?> completate</span><?php endif; ?>
+					<?php if ( $task_status_counts['running'] ) : ?><span class="prstudio-chip warn"><?php echo esc_html( (string) $task_status_counts['running'] ); ?> in esecuzione</span><?php endif; ?>
+					<?php if ( $task_status_counts['failed'] ) : ?><span class="prstudio-chip bad"><?php echo esc_html( (string) $task_status_counts['failed'] ); ?> non riuscite</span><?php endif; ?>
+				</div>
+				<?php endif; ?>
+				<table class="prstudio-grid"><thead><tr><th>Attività</th><th>Stato</th><th>Progresso</th><th>Aggiornata</th></tr></thead><tbody>
+					<?php if ( ! $tasks ) : ?><tr><td colspan="4" class="prstudio-empty">Non ci sono ancora attività da mostrare.</td></tr><?php endif; ?>
+					<?php foreach ( $tasks as $task ) : $status_label = self::plain_label( (string) $task['status'] ); $status_class = sanitize_title( $status_label ); ?>
+					<tr><td><div class="prstudio-name"><?php echo esc_html( self::plain_label( (string) $task['action'] ) ); ?></div><details class="prstudio-id"><summary>Mostra ID</summary><code><?php echo esc_html( (string) $task['task_uuid'] ); ?></code></details></td><td><span class="prstudio-pill <?php echo esc_attr( $status_class ); ?>"><?php echo esc_html( $status_label ); ?></span></td><td><?php $step=(int)($task['checkpoint']['last_completed_step']??-1);echo esc_html($step>=0?'Passaggio '.($step+1).' completato':'In preparazione'); ?></td><td><?php echo esc_html( (string) $task['updated_gmt'] ); ?> UTC</td></tr>
+					<?php endforeach; ?>
+					</tbody></table>
+			</div>
 
 			<details class="prstudio-details">
 			<summary><strong>Dettagli tecnici e diagnostica</strong></summary>
@@ -215,8 +292,9 @@ final class PRSTUDIO_UC_Admin {
 			if ( $gc_display ) { delete_transient( 'prstudio_uc_gc_display_' . get_current_user_id() ); }
 			$long_poll_on = 'off' !== (string) get_option( 'prstudio_uc_long_poll', 'on' );
 			$interventions = PRSTUDIO_UC_Interventions::stats();
+			$interaction = array();
 			?>
-			<h2 style="margin-top:28px">Manutenzione runtime (17.0)</h2>
+			<h2 style="margin-top:28px">Manutenzione runtime</h2>
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="max-width:1100px">
 				<input type="hidden" name="action" value="prstudio_uc_maintenance">
 				<?php wp_nonce_field( 'prstudio_uc_maintenance' ); ?>
@@ -247,6 +325,7 @@ final class PRSTUDIO_UC_Admin {
 						'revisions_keep' => 'Revisioni da conservare per pagina',
 						'work_sessions_days' => 'Sessioni di lavoro (giorni)',
 						'schedules_days' => 'Pianificazioni (giorni)',
+						'revoked_devices_days' => 'Browser scollegati/revocati (giorni)',
 					);
 					foreach ( $labels as $key => $label ) :
 						if ( ! isset( $retention[ $key ] ) ) { continue; } ?>

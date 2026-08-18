@@ -44,6 +44,7 @@ final class PRSTUDIO_UC_GC {
             'transients_hours'     => 24,
             'revisions_keep'       => 5,
             'work_sessions_days'   => 14,
+            'revoked_devices_days' => 30,
         );
     }
 
@@ -107,6 +108,14 @@ final class PRSTUDIO_UC_GC {
                 'table' => PRSTUDIO_UC_Store::dead_letters_table(),
                 'sql'   => 'DELETE FROM %TABLE% WHERE created_gmt < %s ORDER BY id ASC LIMIT %d',
                 'cutoff'=> self::cutoff( $retention['dead_letters_days'] * DAY_IN_SECONDS ),
+            );
+            // Revocation itself is never deleted early -- only a revoked device
+            // past its retention window disappears from the admin list. An
+            // active/online/stale device is never touched here regardless of age.
+            $plan['revoked_devices'] = array(
+                'table' => PRSTUDIO_UC_Store::devices_table(),
+                'sql'   => "DELETE FROM %TABLE% WHERE status = 'revoked' AND revoked_gmt IS NOT NULL AND revoked_gmt < %s ORDER BY id ASC LIMIT %d",
+                'cutoff'=> self::cutoff( $retention['revoked_devices_days'] * DAY_IN_SECONDS ),
             );
         }
         if ( class_exists( 'WPAIB_Audit' ) && method_exists( 'WPAIB_Audit', 'table_name' ) ) {
