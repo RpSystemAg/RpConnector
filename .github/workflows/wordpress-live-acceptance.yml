@@ -1,0 +1,124 @@
+name: WordPress live acceptance
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wordpress-live-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  wordpress:
+    name: WP ${{ matrix.wordpress }} / PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        wordpress: ['6.5', 'latest']
+        php: ['8.0', '8.5']
+    services:
+      db:
+        image: mariadb:11.4
+        env:
+          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: 'yes'
+          MARIADB_DATABASE: wordpress_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+    env:
+      WP_PATH: /tmp/rpconnector-wordpress
+      WP_URL: http://127.0.0.1:8080
+      WP_VERSION: ${{ matrix.wordpress }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mysqli, mbstring, curl
+          tools: wp-cli:2.12.0
+
+      - name: Download real WordPress core
+        run: |
+          rm -rf "$WP_PATH"
+          mkdir -p "$WP_PATH"
+          if [ "$WP_VERSION" = "latest" ]; then
+            wp core download --path="$WP_PATH" --force
+          else
+            wp core download --path="$WP_PATH" --version="$WP_VERSION" --force
+          fi
+          wp core version --path="$WP_PATH"
+
+      - name: Configure and install WordPress
+        run: |
+          wp config create \
+            --path="$WP_PATH" \
+            --dbname=wordpress_test \
+            --dbuser=root \
+            --dbpass='' \
+            --dbhost=127.0.0.1:3306 \
+            --skip-check
+          wp core install \
+            --path="$WP_PATH" \
+            --url="$WP_URL" \
+            --title='RP Connector acceptance' \
+            --admin_user=rpadmin \
+            --admin_password='Acceptance-Only-Password-2026!' \
+            --admin_email='acceptance@example.invalid' \
+            --skip-email
+
+      - name: Install plugin from this exact commit
+        run: |
+          rm -rf "$WP_PATH/wp-content/plugins/prstudio-unified-control"
+          cp -a prstudio-unified-control "$WP_PATH/wp-content/plugins/prstudio-unified-control"
+          wp plugin activate prstudio-unified-control --path="$WP_PATH"
+          wp plugin status prstudio-unified-control --path="$WP_PATH"
+
+      - name: Exercise real bootstrap and schema migration
+        run: |
+          wp eval --path="$WP_PATH" '
+            if (!class_exists("PRSTUDIO_UC_Store")) { fwrite(STDERR, "PRSTUDIO_UC_Store missing\n"); exit(1); }
+            if (!PRSTUDIO_UC_Store::maybe_upgrade()) { fwrite(STDERR, "schema upgrade failed\n"); exit(1); }
+            $version=(string)get_option("prstudio_uc_schema_version", "");
+            if ($version !== PRSTUDIO_UC_Store::schema_version()) { fwrite(STDERR, "schema version mismatch: {$version}\n"); exit(1); }
+            echo "schema=".$version."\n";
+          '
+
+      - name: Deactivate/reactivate without corrupting durable schema
+        run: |
+          before=$(wp option get prstudio_uc_schema_version --path="$WP_PATH")
+          wp plugin deactivate prstudio-unified-control --path="$WP_PATH"
+          wp plugin activate prstudio-unified-control --path="$WP_PATH"
+          after=$(wp option get prstudio_uc_schema_version --path="$WP_PATH")
+          test "$before" = "$after"
+          wp eval --path="$WP_PATH" 'if (!PRSTUDIO_UC_Store::schema_ready()) { fwrite(STDERR,"schema not ready after reactivation\n"); exit(1); } echo "reactivation schema ready\n";'
+
+      - name: Exercise WordPress cron bootstrap
+        run: |
+          wp cron event run --due-now --path="$WP_PATH" || true
+          wp eval --path="$WP_PATH" 'echo wp_json_encode(PRSTUDIO_UC_Store::queue_stats(), JSON_UNESCAPED_SLASHES),"\n";'
+
+      - name: Serve and fetch the actual WordPress front end
+        run: |
+          php -S 127.0.0.1:8080 -t "$WP_PATH" > /tmp/rpconnector-wordpress-http.log 2>&1 &
+          echo $! > /tmp/rpconnector-wordpress-http.pid
+          for i in $(seq 1 40); do
+            if curl --fail --silent --show-error "$WP_URL/" -o /tmp/rpconnector-home.html; then break; fi
+            sleep 0.25
+          done
+          test -s /tmp/rpconnector-home.html
+          grep -qi '<html' /tmp/rpconnector-home.html
+
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          wp plugin list --path="$WP_PATH" || true
+          wp option get prstudio_uc_schema_version --path="$WP_PATH" || true
+          cat /tmp/rpconnector-wordpress-http.log || true
