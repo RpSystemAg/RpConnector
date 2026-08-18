@@ -15,3 +15,20 @@ jobs:
           node-version: '24'
       - run: node --check manifest.json 2>nul || node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8'))"
       - run: node --test tests/*.test.mjs
+
+  wordpress-plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'
+          tools: cs2pr
+      - name: PHP syntax lint (php -l on every changed-relevant file)
+        run: |
+          cd prstudio-unified-control
+          find . -name '*.php' -print0 | xargs -0 -n1 -P4 php -l
+      - name: WordPress Plugin Check
+        uses: wordpress/plugin-check-action@v1
+        with:
+          build-dir: './prstudio-unified-control'
