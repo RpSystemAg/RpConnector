@@ -1,0 +1,231 @@
+name: Enterprise verification
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: enterprise-verification-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repository-contract:
+    name: Repository + protocol contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enterprise static audit
+        run: python3 tests/enterprise-static-audit.py
+      - name: MCP 2026-07-28 conformance audit
+        run: python3 tests/mcp-2026-07-28-conformance.py
+      - name: Runtime implementation invariants
+        run: python3 tests/runtime-invariants-audit.py
+      - name: Exhaustive finite-state model
+        run: python3 tests/runtime-state-model-check.py
+      - name: One-guard constitution
+        run: python3 tests/one_guard_constitution.py
+
+  php-runtime-matrix:
+    name: PHP ${{ matrix.php }} runtime
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.0', '8.1', '8.2', '8.3', '8.4', '8.5']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mysqli, mbstring
+      - name: Lint every PHP source
+        run: find prstudio-unified-control tests -name '*.php' -print0 | xargs -0 -n1 -P4 php -l
+      - name: Core deterministic PHP smokes
+        run: |
+          php tests/php-agent-model-constitution.php
+          php tests/php-mcp-catalog-runtime-smoke.php
+          php tests/php-new-capabilities-smoke.php
+          php tests/php-tools-list-budget.php
+          php tests/php-browser-parent-reconciliation-smoke.php
+          php tests/php-runtime-recovery-prepare-smoke.php
+          php tests/php-agency-verification-monotonicity-smoke.php
+
+  python-runtime-matrix:
+    name: Python ${{ matrix.python }} tooling
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.11', '3.12', '3.13', '3.14']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Compile all Python tooling
+        run: python -m compileall -q tests bench
+      - name: Formal runtime model
+        run: python tests/runtime-state-model-check.py
+      - name: SQL source validator parses
+        run: python -m py_compile tests/validate-sql-syntax.py
+      - name: Benchmark CLI parses
+        run: python bench/prstudio-bench.py --help
+
+  browser-agent-matrix:
+    name: Browser Agent ${{ matrix.os }} / Node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: ['22', '24']
+    defaults:
+      run:
+        working-directory: prstudio-unified-browser-agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Generate release integrity inputs
+        run: python ../tests/build-release.py --build
+      - name: Parse manifest
+        run: node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8')); console.log('manifest ok')"
+      - name: Browser Agent deterministic suite
+        run: node --test tests/*.test.mjs
+
+  real-chrome-extension:
+    name: Real Chrome extension load
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Show installed Chrome
+        run: google-chrome --version
+      - name: Generate Browser Agent integrity files
+        run: python tests/build-release.py --build
+      - name: Load MV3 extension in a real Chrome process and observe its service worker
+        run: node tests/chrome-extension-live-smoke.mjs
+
+  real-database-matrix:
+    name: Real DB ${{ matrix.db }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        db:
+          - mariadb:10.11
+          - mariadb:11.4
+          - mysql:8.0
+          - mysql:8.4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: mysqli, mbstring
+      - name: Start database engine
+        run: |
+          docker run -d --name rpconnector-db \
+            -e MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=yes \
+            -e MYSQL_ALLOW_EMPTY_PASSWORD=yes \
+            -p 3306:3306 \
+            ${{ matrix.db }}
+      - name: Wait for SQL port and authentication
+        run: |
+          for i in $(seq 1 90); do
+            if php -r '$m=@new mysqli("127.0.0.1","root","", "",3306); exit($m->connect_errno?1:0);'; then exit 0; fi
+            sleep 1
+          done
+          docker logs rpconnector-db
+          exit 1
+      - name: Existing real task-queue integration
+        env:
+          PRSTUDIO_TEST_DB_HOST: 127.0.0.1
+          PRSTUDIO_TEST_DB_PORT: '3306'
+          PRSTUDIO_TEST_DB_USER: root
+          PRSTUDIO_TEST_DB_PASS: ''
+          PRSTUDIO_TEST_DB_NAME: prstudio_queue_test
+        run: php tests/php-task-queue-integration.php
+      - name: Real durable-job liveness and recovery integration
+        env:
+          PRSTUDIO_TEST_DB_HOST: 127.0.0.1
+          PRSTUDIO_TEST_DB_PORT: '3306'
+          PRSTUDIO_TEST_DB_USER: root
+          PRSTUDIO_TEST_DB_PASS: ''
+          PRSTUDIO_TEST_DB_NAME: prstudio_runtime_liveness
+        run: php tests/php-runtime-db-liveness-integration.php
+      - name: Database logs on failure
+        if: failure()
+        run: docker logs rpconnector-db
+
+  generated-surface-drift:
+    name: Generated surface + release drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: MCP tool/descriptor drift
+        run: node .github/scripts/check-mcp-tool-drift.mjs
+      - name: Build-info count drift
+        run: node .github/scripts/check-build-info-counts.mjs
+      - name: Strict release validation
+        run: node tests/validate-release.mjs --strict --php-smoke
+      - name: Rebuild generated release artifacts
+        run: python tests/build-release.py --build
+      - name: Generated files must be reproducible
+        run: git diff --exit-code
+
+  system-benchmark-preview:
+    name: SYSTEM-BENCH preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: mysqli, mbstring
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Three-run non-mutating benchmark preview
+        run: python bench/prstudio-bench.py --mode preview --runs 3 --php "$(command -v php)"
+      - name: Benchmark history must remain unmodified by preview
+        run: git diff --exit-code -- bench/SYSTEM-BENCH-HISTORY.ndjson bench/AGENT-BENCH-HISTORY.ndjson
+
+  wordpress-plugin-check:
+    name: WordPress Plugin Check (blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: wordpress/plugin-check-action@v1
+        with:
+          build-dir: './prstudio-unified-control'
