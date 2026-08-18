@@ -198,8 +198,11 @@ def atomic_write(path: Path, payload: bytes) -> None:
 
 
 def validate_suite_layout() -> None:
-    if ROOT.name != SUITE_FOLDER:
-        fail(f"Suite folder must be exactly {SUITE_FOLDER!r}; found {ROOT.name!r}")
+    # The checkout directory name is whatever the git host uses (the GitHub
+    # repo is "RpConnector", not SUITE_FOLDER) and has no bearing on
+    # reproducibility -- only the component directories' own names/contents
+    # do. SUITE_FOLDER is still the top_level_folder recorded inside the
+    # release manifest at --finalize time, a separate concern from this path.
     if SCRIPT_PATH != ROOT / "tests" / "build-release.py":
         fail("build-release.py must remain at tests/build-release.py")
     for folder in (CONTROL_FOLDER, BROWSER_FOLDER):

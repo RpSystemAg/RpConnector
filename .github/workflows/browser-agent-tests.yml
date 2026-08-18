@@ -13,6 +13,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Generate component MANIFEST/FILE-INTEGRITY (some tests read them directly)
+        run: python ../tests/build-release.py --build
       - run: node --check manifest.json 2>nul || node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8'))"
       - run: node --test tests/*.test.mjs
 
