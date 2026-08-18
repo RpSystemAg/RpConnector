@@ -1,4 +1,4 @@
-/* PR STUDIO 17.0 offscreen MediaStream/WebRTC producer.
+/* PR STUDIO offscreen MediaStream/WebRTC producer.
  * Media never passes through WordPress storage: only SDP/ICE/state metadata is
  * exchanged with the control plane.
  */
