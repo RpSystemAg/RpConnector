@@ -64,7 +64,26 @@ final class PRSTUDIO_UC_Agency_Runtime {
 		$wp_next=function_exists('wp_next_scheduled')?wp_next_scheduled(self::CRON_HOOK):false;
 		$as_next=function_exists('as_next_scheduled_action')?as_next_scheduled_action(self::AS_HOOK,array(),self::GROUP):false;
 		$next='action_scheduler'===$mode?$as_next:$wp_next;
-		return array('mode'=>$mode,'wp_cron_next'=>$wp_next,'action_scheduler_available'=>function_exists('as_schedule_recurring_action'),'action_scheduler_next'=>$as_next,'scheduled'=>(bool)$next,'next_gmt'=>$next?gmdate('c',(int)$next):'','topology'=>(string)(function_exists('get_option')?get_option(self::SCHEDULER_TOPOLOGY_OPTION,''):''));
+
+		// as_next_scheduled_action() returns an integer timestamp, or boolean
+		// true when the action is scheduled with no fixed date, or false when it
+		// is not scheduled at all. Casting that true to int yields 1, which
+		// formatted as "1970-01-01T00:00:01" -- a scheduler that is working
+		// correctly reported as decades overdue. Only format a real timestamp,
+		// and say plainly when the run is pending without one.
+		$timestamp = is_int( $next ) || ( is_string( $next ) && ctype_digit( $next ) ) ? (int) $next : 0;
+		$scheduled = false !== $next && null !== $next;
+
+		return array(
+			'mode'=>$mode,
+			'wp_cron_next'=>$wp_next,
+			'action_scheduler_available'=>function_exists('as_schedule_recurring_action'),
+			'action_scheduler_next'=>$as_next,
+			'scheduled'=>$scheduled,
+			'next_gmt'=>$timestamp>0?gmdate('c',$timestamp):'',
+			'next_run_pending_without_timestamp'=>$scheduled&&$timestamp<=0,
+			'topology'=>(string)(function_exists('get_option')?get_option(self::SCHEDULER_TOPOLOGY_OPTION,''):'')
+		);
 	}
 
 	public static function ensure_schedulers_on_init(): void {

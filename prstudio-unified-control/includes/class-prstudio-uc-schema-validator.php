@@ -4,12 +4,36 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
 final class PRSTUDIO_UC_Schema_Validator {
     private const TYPES = array( 'object', 'array', 'string', 'integer', 'number', 'boolean', 'null' );
 
+    /**
+     * array_is_list() equivalent that runs on PHP 8.0.
+     *
+     * The plugin header declares "Requires PHP: 8.0", but array_is_list() only
+     * arrived in 8.1 -- so on a genuinely supported install this validator threw
+     * a fatal Error the first time it checked any object or array, which is to
+     * say on the first tool call carrying arguments. `php -l` cannot see this: a
+     * call to a function that does not exist at runtime is valid syntax, and CI
+     * lints on a newer PHP where the function is present.
+     *
+     * The suite already had this exact helper in the GPT REST layer, written
+     * there and labelled PHP 8.0-compatible for the same reason; the validator
+     * simply did not use it.
+     */
+    private static function is_list_array( array $value ): bool {
+        if ( function_exists( 'array_is_list' ) ) { return array_is_list( $value ); }
+        $expected = 0;
+        foreach ( $value as $key => $unused ) {
+            if ( $key !== $expected ) { return false; }
+            $expected++;
+        }
+        return true;
+    }
+
     private static function is_object_value( $value ): bool {
-        return is_array( $value ) && ( array() === $value || ! array_is_list( $value ) );
+        return is_array( $value ) && ( array() === $value || ! self::is_list_array( $value ) );
     }
 
     private static function is_array_value( $value ): bool {
-        return is_array( $value ) && ( array() === $value || array_is_list( $value ) );
+        return is_array( $value ) && ( array() === $value || self::is_list_array( $value ) );
     }
 
     private static function type_matches( $value, string $type ): bool {

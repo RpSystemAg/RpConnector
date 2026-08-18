@@ -16,7 +16,7 @@
     "2025-03-26"
   ],
   "mcp_2026_tasks_status": "optional_extension_client_opt_in_not_required_for_core_execution",
-  "mcp_tool_count": 126,
+  "mcp_tool_count": 127,
   "mcp_authentication": "OAuth Authorization Code + PKCE S256 with requested scopes only and optional offline_access refresh rotation",
   "oauth_persistence_contract": [
     "prstudio_mcp_v5_clients",

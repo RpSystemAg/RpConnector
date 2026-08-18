@@ -3,10 +3,59 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
 final class PRSTUDIO_UC_Anti_Crash_Attestation {
     public const VERSION='1.0.0';
     private const OPTION='prstudio_uc_anti_crash_attestations_v1';
-    private const TTL=14400;
+    /**
+     * How long an attestation may be reused.
+     *
+     * Was 14400 (4h) while Anti_Crash::requirements() declares evidence fresh
+     * for 7200s. Reuse could therefore outlive the stated freshness policy by
+     * two hours, so the guard's own contract and its behaviour disagreed. The
+     * shorter of the two wins: a policy the code does not honour is not a policy.
+     */
+    private const TTL=7200;
+
+    /** Per-request memo; the fingerprint cannot change mid-request. */
+    private static $fingerprint_memo = null;
+
+    /**
+     * Identify the code an attestation was granted against.
+     *
+     * This previously hashed three anchor files: the plugin bootstrap, the
+     * capability overlay and the contract. Changing any executor -- the content
+     * transaction, the database backend, the bridge -- left all three untouched,
+     * so an attestation granted against the old code stayed valid against the
+     * new. For the suite's only mutation guard that is the wrong failure
+     * direction: the guard silently keeps trusting evidence for code that no
+     * longer exists.
+     *
+     * The fingerprint now covers every PHP file the plugin loads, by size and
+     * modification time. Reading 126 files on a mutation path would be the wrong
+     * trade, so this stats them instead and memoises per request: any edit,
+     * deploy or rollback moves mtime or size and invalidates outstanding
+     * attestations, which is exactly the intent.
+     */
     private static function fingerprint():string{
-        $anchors=array();foreach(array('prstudio-unified-control.php','capabilities/agency-capabilities.json','contract/capability-contract.json') as $rel){$p=PRSTUDIO_UC_DIR.$rel;$anchors[$rel]=is_readable($p)?hash_file('sha256',$p):'missing';}
-        return hash('sha256',wp_json_encode($anchors));
+        if ( null !== self::$fingerprint_memo ) { return self::$fingerprint_memo; }
+
+        $anchors=array();
+        foreach(array('prstudio-unified-control.php','capabilities/agency-capabilities.json','contract/capability-contract.json') as $rel){
+            $p=PRSTUDIO_UC_DIR.$rel;
+            $anchors[$rel]=is_readable($p)?hash_file('sha256',$p):'missing';
+        }
+
+        $code=array();
+        $includes=PRSTUDIO_UC_DIR.'includes';
+        if(is_dir($includes)){
+            $files=glob($includes.'/*.php');
+            if(is_array($files)){
+                sort($files);
+                foreach($files as $file){
+                    $code[basename($file)]=(int)@filesize($file).':'.(int)@filemtime($file);
+                }
+            }
+        }
+
+        self::$fingerprint_memo = hash('sha256',wp_json_encode(array('anchors'=>$anchors,'code'=>$code)));
+        return self::$fingerprint_memo;
     }
     private static function scope_for_tool(string $tool):string{
         if(str_contains($tool,'files')||str_contains($tool,'theme')||str_contains($tool,'plugin')||str_contains($tool,'filesystem'))return 'filesystem';
