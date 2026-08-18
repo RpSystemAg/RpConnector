@@ -8,86 +8,49 @@ permissions:
   contents: read
 
 jobs:
-  # The one that would have caught the real bug.
+  # Run the suite on the PHP version the plugin actually claims to support.
   #
-  # PRSTUDIO_UC_Schema_Validator called array_is_list(), added in PHP 8.1, while
-  # the plugin header declares "Requires PHP: 8.0" -- a guaranteed fatal Error on
-  # a supported install, on the first tool call carrying arguments. `php -l`
-  # cannot see it (calling a function that does not exist at runtime is valid
-  # syntax) and CI lints on a newer PHP where the function is present.
+  # This replaced a PHPCompatibility gate that could not do the job. The idea
+  # was sound -- the plugin header declares "Requires PHP: 8.0" and nothing
+  # verified it -- but the stable PHPCompatibility release predates PHP 8.0 and
+  # has no data for 8.1 functions, so it silently reported clean for exactly the
+  # calls it was supposed to catch. A self-test proved that: a fixture calling a
+  # known PHP 8.1 function came back unflagged.
   #
-  # PHPCompatibility reads the declared floor from the plugin header and flags
-  # every call the target version cannot make. This job is blocking on purpose:
-  # shipping code that fatals on the version you advertise is not a style issue.
-  php-compatibility:
-    name: PHP 8.0 compatibility (the declared minimum)
+  # Executing the code on 8.0 has no such blind spot. A call to a function that
+  # does not exist there is a fatal, and the suites are what surface it.
+  # `php -l` cannot: calling an undefined function is valid syntax.
+  php-matrix:
+    name: PHP ${{ matrix.php }} (declared floor is 8.0)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.0', '8.1', '8.3']
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
-          tools: composer
+          php-version: ${{ matrix.php }}
+          extensions: mbstring, json
           coverage: none
-      - name: Install PHPCS and PHPCompatibility
-        run: |
-          # Composer 2.2+ blocks plugins unless allowed. The installer plugin is
-          # what registers PHPCompatibility as a PHPCS standard, so without this
-          # the standard is installed but invisible to phpcs.
-          composer global config --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
-          composer global require --no-interaction --no-progress \
-            squizlabs/php_codesniffer:^3.10 \
-            phpcompatibility/phpcompatibility-wp:^2.1 \
-            dealerdirect/phpcodesniffer-composer-installer:^1.0
-          echo "$(composer global config home)/vendor/bin" >> "$GITHUB_PATH"
-      - name: Confirm PHPCompatibilityWP registered as a standard
-        run: phpcs -i
-      - name: Confirm the declared minimum matches what we test
+      - name: Confirm the declared minimum still matches this matrix
         run: |
           declared=$(grep -oP 'Requires PHP:\s*\K[0-9.]+' prstudio-unified-control/prstudio-unified-control.php)
           echo "plugin header declares PHP $declared"
           if [ "$declared" != "8.0" ]; then
-            echo "::error::Plugin header declares PHP $declared but this job tests 8.0-. Update both together."
+            echo "::error::Header declares PHP $declared but the matrix floor is 8.0. Change both together."
             exit 1
           fi
-      # Prove the check detects the defect class it exists for, rather than
-      # trusting that a green run means anything.
-      #
-      # The probe is fsync(), a PHP 8.1 function WordPress does not polyfill.
-      # array_is_list() would be the intuitive choice -- it is what prompted this
-      # job -- but it is precisely the wrong one: WordPress 6.5 ships a polyfill
-      # for it, this plugin requires 6.5, and PHPCompatibilityWP correctly stays
-      # silent. That is the whole value of the WP ruleset over plain
-      # PHPCompatibility: it knows which "new" functions core already provides.
-      # Using it as the probe would have made this self-test fail forever while
-      # the gate was working fine.
-      - name: Self-test — the check must flag a PHP 8.1 function under 8.0
+      - name: Syntax check every file
+        run: find prstudio-unified-control -name '*.php' -print0 | xargs -0 -n1 -P4 php -l
+      - name: Execute the suites on this PHP version
         run: |
-          mkdir -p /tmp/compat-selftest
-          printf '<?php\nfunction probe($handle) { return fsync($handle); }\n' > /tmp/compat-selftest/probe.php
-          if phpcs -p /tmp/compat-selftest --standard=PHPCompatibilityWP \
-               --runtime-set testVersion 8.0- --extensions=php --report=full --warning-severity=0; then
-            echo "::error::Self-test failed: fsync() was NOT flagged under PHP 8.0. The compatibility gate is not working."
-            exit 1
-          fi
-          echo "Self-test passed: the gate detects PHP 8.1 functions WordPress does not polyfill."
-
-      - name: Fail on any call the declared minimum cannot make
-        # RemovedExtensions is excluded because it matches on function-name
-        # prefix and cannot tell a class method from a global function: it flags
-        # PRSTUDIO_UC_MCP_Toolchain::sqlite_query() as the ext/sqlite function
-        # removed in PHP 5.4. That method uses SQLite3 and PDO, both current.
-        # The sniffs that matter here -- NewFunctions, NewClasses, RemovedFunctions
-        # -- are untouched, and the self-test above proves it.
-        run: |
-          phpcs -p prstudio-unified-control \
-            --standard=PHPCompatibilityWP \
-            --runtime-set testVersion 8.0- \
-            --extensions=php \
-            --ignore='*/vendor/*,*/node_modules/*' \
-            --exclude=PHPCompatibility.Extensions.RemovedExtensions \
-            --report=full \
-            --warning-severity=0
+          php tests/php-agent-model-constitution.php
+          php tests/php-mcp-catalog-runtime-smoke.php
+          php tests/php-tools-list-budget.php
+          php tests/php-new-capabilities-smoke.php
+          php tests/php-intelligence-smoke.php
 
   # Broad multi-language linting. Advisory: this repo predates it, so a first run
   # surfaces a long tail of pre-existing style findings. Blocking on those would
