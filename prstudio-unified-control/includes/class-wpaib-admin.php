@@ -8,7 +8,7 @@ final class WPAIB_Admin {
 		check_admin_referer( 'prstudio_bridge_admin' ); $action = sanitize_key( (string) wp_unslash( $_POST['prstudio_bridge_action'] ) ); $notice = 'saved';
 		if ( 'save' === $action ) {
 			WPAIB_Auth::update_settings( array(
-				'max_file_bytes' => max( 1048576, min( 33554432, (int) ( $_POST['max_file_bytes'] ?? 8388608 ) ) ), 'rate_limit_per_min' => max( 10, min( 1000, (int) ( $_POST['rate_limit_per_min'] ?? 600 ) ) ), 'report_email' => sanitize_email( (string) ( $_POST['report_email'] ?? '' ) ), 'report_enabled' => ! empty( $_POST['report_enabled'] ), 'market_country' => sanitize_text_field( (string) ( $_POST['market_country'] ?? 'IT' ) ), 'market_region' => sanitize_text_field( (string) ( $_POST['market_region'] ?? 'Sicilia' ) ), 'market_province' => sanitize_text_field( (string) ( $_POST['market_province'] ?? 'Agrigento' ) ),
+				'max_file_bytes' => max( 1048576, min( 33554432, (int) ( $_POST['max_file_bytes'] ?? 8388608 ) ) ), 'rate_limit_per_min' => max( 10, min( 1000, (int) ( $_POST['rate_limit_per_min'] ?? 600 ) ) ), 'report_email' => sanitize_email( wp_unslash( (string) ( $_POST['report_email'] ?? '' ) ) ), 'report_enabled' => ! empty( $_POST['report_enabled'] ), 'market_country' => sanitize_text_field( wp_unslash( (string) ( $_POST['market_country'] ?? 'IT' ) ) ), 'market_region' => sanitize_text_field( wp_unslash( (string) ( $_POST['market_region'] ?? 'Sicilia' ) ) ), 'market_province' => sanitize_text_field( wp_unslash( (string) ( $_POST['market_province'] ?? 'Agrigento' ) ) ),
 			) );
 		} elseif ( 'rotate_key' === $action ) { $key = WPAIB_Auth::rotate_pairing_key(); set_transient( 'prstudio_pairing_key_' . get_current_user_id(), $key, 300 ); $notice = 'key_rotated'; }
 		elseif ( 'revoke_tokens' === $action ) { WPAIB_Auth::revoke_all( false ); $notice = 'tokens_revoked'; }
@@ -17,7 +17,7 @@ final class WPAIB_Admin {
 	}
 	private static function checked_setting( array $settings, string $key ): void { checked( ! empty( $settings[ $key ] ) ); }
 	public static function render(): void {
-		if ( ! WPAIB_Auth::can_administer() ) { wp_die( esc_html__( 'Accesso negato.', 'pr-studio-ai-bridge' ) ); }
+		if ( ! WPAIB_Auth::can_administer() ) { wp_die( esc_html__( 'Accesso negato.', 'prstudio-unified-control' ) ); }
 		$settings = WPAIB_Auth::settings(); $status = WPAIB_Site::status(); $agency = PRSTUDIO_Agency::status(); $search_console = PRSTUDIO_UC_Search_Console_Browser::status(); $key = get_transient( 'prstudio_pairing_key_' . get_current_user_id() ); if ( $key ) { delete_transient( 'prstudio_pairing_key_' . get_current_user_id() ); }
 		$notice = sanitize_key( (string) ( $_GET['prstudio_notice'] ?? '' ) );
 		$notice_error = in_array( $notice, array( 'email_failed' ), true );

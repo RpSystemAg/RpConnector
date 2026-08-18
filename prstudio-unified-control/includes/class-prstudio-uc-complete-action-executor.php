@@ -1,4 +1,5 @@
 <?php
+// phpcs:ignore missing_direct_file_access_protection -- direct-access guard IS present on the line below; it uses `&& ! defined('PRSTUDIO_UC_TESTING')` for testability and Plugin Check's static pattern doesn't recognize that compound form.
 if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
 /**
  * Concrete execution layer for every formerly metadata-only control action.
@@ -343,7 +344,7 @@ final class PRSTUDIO_UC_Complete_Action_Executor {
 
 	public static function apply_managed_redirects(): void {
 		if ( is_admin() || wp_doing_ajax() || wp_doing_cron() ) { return; }
-		$cfg = self::runtime_config(); $uri = (string) ( $_SERVER['REQUEST_URI'] ?? '/' ); $path = (string) wp_parse_url( $uri, PHP_URL_PATH );
+		$cfg = self::runtime_config(); $uri = sanitize_text_field( wp_unslash( (string) ( $_SERVER['REQUEST_URI'] ?? '/' ) ) ); $path = (string) wp_parse_url( $uri, PHP_URL_PATH );
 		foreach ( (array) ( $cfg['redirects'] ?? array() ) as $source => $entry ) {
 			if ( ! is_array( $entry ) ) { continue; }
 			$source_path = (string) wp_parse_url( $source, PHP_URL_PATH ); if ( '' === $source_path ) { $source_path = $source; }
@@ -432,7 +433,7 @@ final class PRSTUDIO_UC_Complete_Action_Executor {
 
 	public static function enforce_blocked_ips(): void {
 		if ( is_admin() && current_user_can( 'manage_options' ) ) { return; }
-		$cfg = self::runtime_config(); $ip = sanitize_text_field( (string) ( $_SERVER['REMOTE_ADDR'] ?? '' ) );
+		$cfg = self::runtime_config(); $ip = sanitize_text_field( wp_unslash( (string) ( $_SERVER['REMOTE_ADDR'] ?? '' ) ) );
 		if ( $ip && in_array( $ip, (array) ( $cfg['blocked_ips'] ?? array() ), true ) ) { status_header( 403 ); exit; }
 	}
 	private static function route_backup_manage( string $action, array $args ) {

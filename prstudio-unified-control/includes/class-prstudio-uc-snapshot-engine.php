@@ -1,4 +1,5 @@
 <?php
+// phpcs:ignore missing_direct_file_access_protection -- direct-access guard IS present on the line below; it uses `&& ! defined('PRSTUDIO_UC_TESTING')` for testability and Plugin Check's static pattern doesn't recognize that compound form.
 if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
 final class PRSTUDIO_UC_Snapshot_Engine {
     private static function dir():string{$base=class_exists('PRSTUDIO_UC_Memory')?PRSTUDIO_UC_Memory::site_dir():(defined('WP_CONTENT_DIR')?WP_CONTENT_DIR:sys_get_temp_dir());$d=rtrim($base,'/').'/snapshots';if(!is_dir($d)){function_exists('wp_mkdir_p')?wp_mkdir_p($d):@mkdir($d,0750,true);}return $d;}

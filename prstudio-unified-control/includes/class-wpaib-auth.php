@@ -188,7 +188,7 @@ final class WPAIB_Auth {
 		$resource = esc_url_raw( (string) ( $params['resource'] ?? self::mcp_url() ) );
 		$client = self::get_client( $client_id );
 		if ( ! $client || ! self::redirect_uri_allowed( $client, $redirect_uri ) || 'code' !== (string) ( $params['response_type'] ?? '' ) || 'S256' !== $challenge_method || '' === $challenge || untrailingslashit( $resource ) !== untrailingslashit( self::mcp_url() ) ) {
-			wp_die( esc_html__( 'Richiesta OAuth non valida.', 'pr-studio-ai-bridge' ), 'OAuth non valido', array( 'response' => 400 ) );
+			wp_die( esc_html__( 'Richiesta OAuth non valida.', 'prstudio-unified-control' ), 'OAuth non valido', array( 'response' => 400 ) );
 		}
 		if ( ! is_user_logged_in() ) {
 			wp_safe_redirect( wp_login_url( add_query_arg( array_filter( $params, 'is_scalar' ), self::authorization_endpoint() ) ) );
@@ -197,11 +197,11 @@ final class WPAIB_Auth {
 		if ( ! self::can_administer() ) { wp_die( 'Solo un amministratore può autorizzare il bridge.', 'Accesso negato', array( 'response' => 403 ) ); }
 		if ( 'POST' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) ) {
 			check_admin_referer( 'wpaib_oauth_approve' );
-			if ( 'deny' === sanitize_text_field( (string) ( $_POST['decision'] ?? '' ) ) ) {
-				wp_redirect( add_query_arg( array( 'error' => 'access_denied', 'error_description' => 'Autorizzazione negata.', 'state' => $state, 'iss' => self::authorization_server_issuer() ), $redirect_uri ) );
+			if ( 'deny' === sanitize_text_field( wp_unslash( (string) ( $_POST['decision'] ?? '' ) ) ) ) {
+				wp_safe_redirect( add_query_arg( array( 'error' => 'access_denied', 'error_description' => 'Autorizzazione negata.', 'state' => $state, 'iss' => self::authorization_server_issuer() ), $redirect_uri ) );
 				exit;
 			}
-			$key = sanitize_text_field( (string) ( $_POST['pairing_key'] ?? '' ) );
+			$key = sanitize_text_field( wp_unslash( (string) ( $_POST['pairing_key'] ?? '' ) ) );
 			if ( ! self::verify_pairing_key( $key ) ) { self::render_authorize_page( $params, 'Chiave di collegamento non valida.' ); exit; }
 			$code_id = self::random_id( 10 );
 			$code = 'wpaib_ac_' . $code_id . '_' . self::b64url( random_bytes( 32 ) );
@@ -211,7 +211,7 @@ final class WPAIB_Auth {
 				'generation' => (int) self::settings()['generation'],
 			), self::CODE_TTL );
 			WPAIB_Audit::log( 'oauth.authorize', 'success', $client_id );
-			wp_redirect( add_query_arg( array( 'code' => $code, 'state' => $state, 'iss' => self::authorization_server_issuer() ), $redirect_uri ) );
+			wp_safe_redirect( add_query_arg( array( 'code' => $code, 'state' => $state, 'iss' => self::authorization_server_issuer() ), $redirect_uri ) );
 			exit;
 		}
 		self::render_authorize_page( $params );
@@ -487,13 +487,13 @@ final class WPAIB_Auth {
 			'https://accounts.google.com/o/oauth2/v2/auth'
 		);
 		WPAIB_Audit::log( 'google.oauth.start', 'success', 'search-console', array( 'user_id' => get_current_user_id() ) );
-		wp_redirect( $url );
+		wp_safe_redirect( $url );
 		exit;
 	}
 
 	public static function handle_google_oauth_callback(): void {
 		if ( ! is_user_logged_in() || ! self::can_administer() ) { wp_die( 'Accesso negato.', 'Google OAuth', array( 'response' => 403 ) ); }
-		$state = sanitize_text_field( (string) ( $_GET['state'] ?? '' ) );
+		$state = sanitize_text_field( wp_unslash( (string) ( $_GET['state'] ?? '' ) ) );
 		$key = 'wpaib_google_oauth_state_' . hash( 'sha256', $state );
 		$flow = get_transient( $key );
 		delete_transient( $key );
@@ -505,7 +505,7 @@ final class WPAIB_Auth {
 			WPAIB_Audit::log( 'google.oauth.callback', 'error', sanitize_key( (string) $_GET['error'] ) );
 			self::google_redirect_notice( 'google_access_denied' );
 		}
-		$code = sanitize_text_field( (string) ( $_GET['code'] ?? '' ) );
+		$code = sanitize_text_field( wp_unslash( (string) ( $_GET['code'] ?? '' ) ) );
 		$verifier = self::google_open( (string) $flow['verifier'] );
 		$credentials = self::google_credentials();
 		if ( '' === $code || is_wp_error( $verifier ) || is_wp_error( $credentials ) ) { self::google_redirect_notice( 'google_callback_invalid' ); }

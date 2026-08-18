@@ -386,7 +386,7 @@ final class WPAIB_REST {
 		if ( 'rest_routes' === $action ) { return array( 'routes' => array_keys( rest_get_server()->get_routes() ) ); }
 		if ( 'get_debug_config' === $action ) { return array( 'WP_DEBUG' => defined( 'WP_DEBUG' ) && WP_DEBUG, 'WP_DEBUG_LOG' => defined( 'WP_DEBUG_LOG' ) ? WP_DEBUG_LOG : null, 'WP_DEBUG_DISPLAY' => defined( 'WP_DEBUG_DISPLAY' ) ? WP_DEBUG_DISPLAY : null, 'SCRIPT_DEBUG' => defined( 'SCRIPT_DEBUG' ) && SCRIPT_DEBUG ); }
 		if ( 'get_runtime_config' === $action || 'get_feature_flags' === $action ) { return array( 'settings' => WPAIB_Auth::settings(), 'runtime_overrides' => get_option( 'wpaib_runtime_overrides', array() ) ); }
-		if ( 'get_environment_variables_masked' === $action ) { $keys = array( 'HTTP_HOST', 'SERVER_SOFTWARE', 'SERVER_PROTOCOL', 'HTTPS', 'PHP_SELF' ); $out = array(); foreach ( $keys as $key ) { $out[ $key ] = isset( $_SERVER[ $key ] ) ? sanitize_text_field( (string) $_SERVER[ $key ] ) : null; } return $out; }
+		if ( 'get_environment_variables_masked' === $action ) { $keys = array( 'HTTP_HOST', 'SERVER_SOFTWARE', 'SERVER_PROTOCOL', 'HTTPS', 'PHP_SELF' ); $out = array(); foreach ( $keys as $key ) { $out[ $key ] = isset( $_SERVER[ $key ] ) ? sanitize_text_field( wp_unslash( (string) $_SERVER[ $key ] ) ) : null; } return $out; }
 		if ( in_array( $action, array( 'set_debug_config', 'set_runtime_config', 'set_runtime_limits', 'set_feature_flags' ), true ) ) { $value = self::value( $args, 'body', self::value( $args, 'params', array() ) ); $value = is_array( $value ) ? self::redact( $value ) : array(); update_option( 'wpaib_runtime_overrides', $value, false ); foreach ( array( 'memory_limit', 'max_execution_time' ) as $key ) { if ( isset( $value[ $key ] ) ) { @ini_set( $key, (string) $value[ $key ] ); } } return array( 'stored' => true, 'runtime_overrides' => $value, 'note' => 'Costanti definite in wp-config.php non vengono riscritte automaticamente.' ); }
 		if ( in_array( $action, array( 'enable_maintenance', 'disable_maintenance' ), true ) ) { $file = trailingslashit( ABSPATH ) . '.maintenance'; if ( 'enable_maintenance' === $action ) { $ok = false !== file_put_contents( $file, '<?php $upgrading = ' . time() . ';' ); } else { $ok = ! file_exists( $file ) || unlink( $file ); } return $ok ? array( 'maintenance' => 'enable_maintenance' === $action ) : new WP_Error( 'wpaib_maintenance_failed', 'Impossibile modificare lo stato manutenzione.', array( 'status' => 500 ) ); }
 		if ( 'run_health_fix' === $action ) { flush_rewrite_rules( false ); wp_cache_flush(); return array( 'rewrite_rules_flushed' => true, 'object_cache_flushed' => true ); }
@@ -1198,7 +1198,7 @@ final class WPAIB_REST {
 		if ( false !== strpos( $accept, 'text/event-stream' ) ) {
 			$registry = PRSTUDIO_Agency::control_registry_info();
 			$hash = (string) ( $registry['registry_hash'] ?? '' );
-			$last = sanitize_text_field( (string) ( $_SERVER['HTTP_LAST_EVENT_ID'] ?? '' ) );
+			$last = sanitize_text_field( wp_unslash( (string) ( $_SERVER['HTTP_LAST_EVENT_ID'] ?? '' ) ) );
 			nocache_headers();
 			header( 'Content-Type: text/event-stream; charset=utf-8' );
 			header( 'Cache-Control: no-cache, no-store, must-revalidate' );
