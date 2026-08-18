@@ -5,18 +5,21 @@ final class PRSTUDIO_UC_Schema_Validator {
     private const TYPES = array( 'object', 'array', 'string', 'integer', 'number', 'boolean', 'null' );
 
     /**
-     * array_is_list() equivalent that runs on PHP 8.0.
+     * array_is_list() equivalent that does not depend on the host providing it.
      *
-     * The plugin header declares "Requires PHP: 8.0", but array_is_list() only
-     * arrived in 8.1 -- so on a genuinely supported install this validator threw
-     * a fatal Error the first time it checked any object or array, which is to
-     * say on the first tool call carrying arguments. `php -l` cannot see this: a
-     * call to a function that does not exist at runtime is valid syntax, and CI
-     * lints on a newer PHP where the function is present.
+     * array_is_list() arrived in PHP 8.1 and this plugin declares a PHP 8.0
+     * floor, which looks like a fatal waiting to happen. It is not, and the
+     * correction is worth recording: WordPress 6.5 ships a polyfill for it in
+     * wp-includes/compat.php, and this plugin requires WordPress 6.5, so on any
+     * supported install the function exists. PHPCompatibilityWP knows this and
+     * deliberately does not flag it.
      *
-     * The suite already had this exact helper in the GPT REST layer, written
-     * there and labelled PHP 8.0-compatible for the same reason; the validator
-     * simply did not use it.
+     * The guard stays anyway, because it costs nothing and removes the
+     * dependency on that coincidence: the validator also runs under the test
+     * harness and any future context where WordPress is not loaded, and a bare
+     * PHP 8.0 process would fatal there. The suite already had this helper in
+     * the GPT REST layer, labelled PHP 8.0-compatible; the validator simply did
+     * not use it.
      */
     private static function is_list_array( array $value ): bool {
         if ( function_exists( 'array_is_list' ) ) { return array_is_list( $value ); }

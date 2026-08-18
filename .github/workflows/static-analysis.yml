@@ -50,20 +50,27 @@ jobs:
             echo "::error::Plugin header declares PHP $declared but this job tests 8.0-. Update both together."
             exit 1
           fi
-      # Prove the check actually detects the defect class it exists for, rather
-      # than trusting that a green run means anything. array_is_list() is the
-      # real bug that shipped; if this fixture stops being flagged, the job has
-      # silently stopped protecting us.
+      # Prove the check detects the defect class it exists for, rather than
+      # trusting that a green run means anything.
+      #
+      # The probe is fsync(), a PHP 8.1 function WordPress does not polyfill.
+      # array_is_list() would be the intuitive choice -- it is what prompted this
+      # job -- but it is precisely the wrong one: WordPress 6.5 ships a polyfill
+      # for it, this plugin requires 6.5, and PHPCompatibilityWP correctly stays
+      # silent. That is the whole value of the WP ruleset over plain
+      # PHPCompatibility: it knows which "new" functions core already provides.
+      # Using it as the probe would have made this self-test fail forever while
+      # the gate was working fine.
       - name: Self-test — the check must flag a PHP 8.1 function under 8.0
         run: |
           mkdir -p /tmp/compat-selftest
-          printf '<?php\nfunction probe(array $v): bool { return array_is_list($v); }\n' > /tmp/compat-selftest/probe.php
+          printf '<?php\nfunction probe($handle) { return fsync($handle); }\n' > /tmp/compat-selftest/probe.php
           if phpcs -p /tmp/compat-selftest --standard=PHPCompatibilityWP \
                --runtime-set testVersion 8.0- --extensions=php --report=full --warning-severity=0; then
-            echo "::error::Self-test failed: array_is_list() was NOT flagged under PHP 8.0. The compatibility gate is not working."
+            echo "::error::Self-test failed: fsync() was NOT flagged under PHP 8.0. The compatibility gate is not working."
             exit 1
           fi
-          echo "Self-test passed: the gate detects PHP 8.1 functions used under an 8.0 floor."
+          echo "Self-test passed: the gate detects PHP 8.1 functions WordPress does not polyfill."
 
       - name: Fail on any call the declared minimum cannot make
         # RemovedExtensions is excluded because it matches on function-name
