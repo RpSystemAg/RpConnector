@@ -24,19 +24,31 @@ jobs:
       - name: Runtime invariant audit
         run: python3 tests/runtime-invariants-audit.py
 
-  php-runtime-smokes:
-    name: PHP runtime smokes
+  recovery-prepare-arity:
+    name: Recovery SQL prepare arity
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      - name: Lint invariant tests
-        run: |
-          php -l tests/php-runtime-recovery-prepare-smoke.php
-          php -l tests/php-agency-verification-monotonicity-smoke.php
+      - run: php -l tests/php-runtime-recovery-prepare-smoke.php
       - name: Strict wpdb prepare arity
         run: php tests/php-runtime-recovery-prepare-smoke.php
-      - name: Verification monotonicity
+
+  verification-monotonicity:
+    name: Verification monotonicity
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: php -l tests/php-agency-verification-monotonicity-smoke.php
+      - name: Weak child evidence cannot become verified mission evidence
         run: php tests/php-agency-verification-monotonicity-smoke.php
-      - name: Existing browser parent reconciliation regression
+
+  browser-parent-regression:
+    name: Browser parent reconciliation regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Existing parent reconciliation smoke
         run: php tests/php-browser-parent-reconciliation-smoke.php
