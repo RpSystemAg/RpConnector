@@ -881,6 +881,7 @@ HTML;
         $tools[]=self::tool('browser_live_signal','Browser LIVE signaling','Widget signaling exchange for the attached WebRTC viewer. Carries bounded SDP/ICE/state metadata only, never media frames.',self::obj(array('session_id'=>self::str('WebRTC signaling session id.'),'after'=>self::integer('Last consumed signaling sequence.',0),'events'=>array('type'=>'array','maxItems'=>32,'items'=>self::any_object('SDP/ICE/state signaling event.'))),array('session_id')),self::annotations(true,false,true,true));
         $tools[]=self::tool('browser_live_stop','Stop Browser LIVE viewer','Close the viewer side of an attached WebRTC session and notify the Browser Agent.',self::obj(array('session_id'=>self::str('WebRTC signaling session id.'),'reason'=>self::str('Close reason.')),array('session_id')),self::annotations(true,false,true,true));
         $tools[]=self::tool('browser_live_status','Browser LIVE status','Inspect the private ephemeral WebRTC signaling service and the latest 12-gate diagnostic evidence.',self::obj(),self::annotations(true,false,true,true));
+        $tools[]=self::tool('browser_task_control','Control browser task','Cancel or requeue one browser task from the server side. Use this when a task is stuck: cancel clears it, requeue drops its lease so the next agent poll can claim it again. attempt_count is preserved so you can still tell whether the agent ever tried.',self::obj(array('task_id'=>self::str('Browser task ID.'),'action'=>self::str('cancel or requeue.',array('enum'=>array('cancel','requeue'))),'reason'=>self::str('Operator reason.')),array('task_id','action')),self::annotations(false,false,true));
         $tools[]=self::tool('browser_status','Browser status','Inspect the Browser Agent, or read one browser task to completion by passing task_id with wait_seconds. Defaults to compact active-device output; request history only for diagnostics.',self::obj(array('task_id'=>self::str('Optional Browser task ID.'),'wait_seconds'=>self::integer('Hold the request until the task settles.',0,25),'include_history'=>self::bool('Include revoked/offline device history. Default false.')),array(),false),self::annotations(true,false,true,true));
         $tools[]=self::tool('browser_tabs','List browser tabs','Use this to see Agent-owned/available tabs before interacting.',self::obj($tab),self::annotations(true,false,true,true));
         $tools[]=self::tool('browser_adopt_tabs','Adopt already-open tabs','Use this when the user explicitly asks to use tabs they already opened. Filters all matching HTTP(S) tabs, can adopt multiple tabs, and binds them to the current execution lane so another chat cannot take them.',self::obj(array('lane_token'=>self::str('Lane token from prstudio_context_open.'),'tab_ids'=>array('type'=>'array','items'=>array('type'=>'integer'),'maxItems'=>12),'origin'=>self::str('Exact origin, e.g. https://merchants.google.com.'),'url_contains'=>self::str('Optional URL substring.'),'title_contains'=>self::str('Optional title substring.'),'limit'=>self::integer('Maximum tabs to adopt.',1,12),'device_id'=>self::str(),'sync_wait_seconds'=>self::integer('',0,20)),array('lane_token')),self::annotations(false,false,true,true));
@@ -1351,6 +1352,7 @@ HTML;
                     $args['sync_wait_seconds']=min(20,max(1,(int)$args['wait_seconds']));
                 }
                 return self::browser_dispatch('playwright_status',$args);
+            case 'browser_task_control': return self::control_browser_task($args);
             case 'browser_tabs': return self::browser_dispatch('playwright_list_pages',$args);
             case 'browser_adopt_tabs': return self::browser_dispatch('playwright_adopt_tabs',$args);
             case 'local_studio': return self::browser_dispatch('local_studio_run',$args);
@@ -1505,6 +1507,53 @@ HTML;
             if(in_array($status,$terminal,true))return $job;
         }
         return $job;
+    }
+
+    /**
+     * Cancel or requeue one browser task from the server side.
+     *
+     * Without this, a browser task that the agent never picked up could be
+     * observed but not cleared: cancel existed for Agency and PR STUDIO jobs
+     * but not for the browser queue, so a stuck task had to be waited out or
+     * removed by the garbage collector on its own schedule. That turned a
+     * recoverable condition into something that looked wedged.
+     *
+     * This is queue bookkeeping, not a mutation guard: it changes the state of
+     * a pending instruction, and never inspects or authorizes site effects.
+     */
+    private static function control_browser_task(array $args){
+        $task_id=sanitize_text_field((string)($args['task_id']??''));
+        $action=sanitize_key((string)($args['action']??'cancel'));
+        $reason=substr(sanitize_text_field((string)($args['reason']??$action)),0,300);
+        if(''===$task_id)return new WP_Error('browser_task_id_required','task_id is required.',array('status'=>400));
+        $task=PRSTUDIO_UC_Store::get_task($task_id);
+        if(!$task)return new WP_Error('browser_task_not_found','Browser task not found.',array('status'=>404));
+        $status=(string)($task['status']??'');
+
+        if('cancel'===$action){
+            if(PRSTUDIO_UC_State_Machine::is_terminal($status)){
+                return array('ok'=>true,'task_id'=>$task_id,'action'=>'cancel','already_terminal'=>true,'status'=>$status,'note'=>'Task was already finished; nothing to cancel.');
+            }
+            $cancelled=PRSTUDIO_UC_Store::cancel($task_id);
+            if(!is_array($cancelled))return new WP_Error('browser_task_cancel_failed','Task could not be cancelled from its current state.',array('status'=>409,'status_now'=>$status));
+            PRSTUDIO_UC_Store::event($task_id,'task.cancelled_by_operator',array('reason'=>$reason,'previous_status'=>$status));
+            return array('ok'=>true,'task_id'=>$task_id,'action'=>'cancel','previous_status'=>$status,'status'=>(string)($cancelled['status']??''),'reason'=>$reason);
+        }
+
+        if('requeue'===$action){
+            // Clear the lease so the next poll can claim it again. Attempt count is
+            // deliberately preserved: it is the evidence that tells an operator
+            // whether the agent ever tried, which is exactly what was missing while
+            // the dispatcher was broken.
+            if(PRSTUDIO_UC_State_Machine::is_terminal($status)){
+                return new WP_Error('browser_task_terminal','A finished task cannot be requeued; submit a new one.',array('status'=>409,'status_now'=>$status));
+            }
+            $requeued=PRSTUDIO_UC_Store::release_lease_for_requeue($task_id,$reason);
+            if(!is_array($requeued))return new WP_Error('browser_task_requeue_failed','Task could not be returned to the queue.',array('status'=>409,'status_now'=>$status));
+            return array('ok'=>true,'task_id'=>$task_id,'action'=>'requeue','previous_status'=>$status,'status'=>(string)($requeued['status']??''),'attempt_count'=>(int)($requeued['attempt_count']??0),'reason'=>$reason);
+        }
+
+        return new WP_Error('browser_task_control_invalid','Unsupported action. Use cancel or requeue.',array('status'=>400));
     }
 
     private static function control_job(array $args,array $auth){

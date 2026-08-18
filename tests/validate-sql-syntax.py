@@ -74,11 +74,56 @@ def normalize(sql: str) -> str:
     Only placeholders and interpolations are substituted. Comment syntax is
     deliberately left untouched -- that is the defect under test.
     """
+    # Named runtime templates such as %TABLE%, substituted by the caller before
+    # execution (the garbage collector builds its delete plan this way).
+    sql = re.sub(r"%[A-Z_]{2,}%", "tbl", sql)
     sql = re.sub(r"\{?\$[A-Za-z_][A-Za-z0-9_]*(?:(?:->|::)\w+(?:\(\))?)*\}?", "tbl", sql)
     sql = sql.replace("%%", "%")
     sql = re.sub(r"%[sdf]", "'x'", sql)
     sql = sql.replace("\\'", "'").replace('\\"', '"').replace("\\n", "\n").replace("\\t", "\t")
     return sql.strip()
+
+
+def is_parseable_candidate(sql: str) -> bool:
+    """Reject fragments the extractor cannot legitimately complete.
+
+    A trailing clause keyword, an unbalanced parenthesis or a surviving printf
+    placeholder means the statement is still being assembled somewhere this
+    walker does not follow. Reporting those as syntax errors would bury the
+    real finding under noise, which is how the original defect stayed hidden.
+    """
+    if not sql:
+        return False
+    # Prose that merely opens with a SQL verb is not a statement. Error messages
+    # and tool descriptions in this codebase legitimately begin with "delete ..."
+    # or "Create ...", so require the verb's structural companion clause before
+    # handing the text to a parser.
+    shapes = (
+        r"^SELECT\b.*\bFROM\b",
+        r"^SELECT\s+(?:DISTINCT\s+)?(?:COUNT|SUM|MAX|MIN|AVG|VERSION|DATABASE)\s*\(",
+        r"^INSERT\b.*\bINTO\b",
+        r"^REPLACE\b.*\bINTO\b",
+        r"^UPDATE\b.*\bSET\b",
+        r"^DELETE\b.*\bFROM\b",
+        r"^CREATE\s+(?:TABLE|INDEX|UNIQUE|DATABASE|VIEW)\b",
+        r"^ALTER\s+TABLE\b",
+        r"^DROP\s+(?:TABLE|INDEX|DATABASE|VIEW)\b",
+        r"^TRUNCATE\s+(?:TABLE\s+)?\S",
+        r"^SHOW\s+(?:TABLES|COLUMNS|INDEX|VARIABLES|STATUS|CREATE)\b",
+    )
+    if not any(re.search(shape, sql, re.IGNORECASE | re.DOTALL) for shape in shapes):
+        return False
+    if re.search(r"%[A-Za-z]", sql):
+        return False
+    if sql.count("(") != sql.count(")"):
+        return False
+    if re.search(
+        r"\b(FROM|INTO|JOIN|WHERE|SET|VALUES|AND|OR|ON|BY|LIKE|IN|SELECT|UPDATE|DELETE)\s*$",
+        sql,
+        re.IGNORECASE,
+    ):
+        return False
+    return True
 
 
 def main() -> int:
@@ -114,7 +159,8 @@ def main() -> int:
             continue
 
         candidate = normalize(entry["sql"])
-        if not candidate:
+        if not is_parseable_candidate(candidate):
+            skipped_fragments += 1
             continue
         try:
             sqlglot.parse_one(candidate, dialect="mysql")

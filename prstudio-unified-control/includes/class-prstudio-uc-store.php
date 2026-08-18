@@ -617,6 +617,36 @@ final class PRSTUDIO_UC_Store {
 		return self::transition( $task_uuid, PRSTUDIO_UC_State_Machine::CANCELLED );
 	}
 
+	/**
+	 * Return a non-terminal task to the queue by dropping its lease.
+	 *
+	 * attempt_count is deliberately left alone. It is the only evidence that
+	 * distinguishes "the agent tried and failed" from "the agent never claimed
+	 * this" -- the signature that identified the dispatcher outage -- and
+	 * resetting it on requeue would erase exactly that.
+	 */
+	public static function release_lease_for_requeue( string $task_uuid, string $reason = 'operator_requeue' ): ?array {
+		global $wpdb;
+		$task = self::get_task( $task_uuid );
+		if ( ! $task || PRSTUDIO_UC_State_Machine::is_terminal( (string) $task['status'] ) ) { return null; }
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- job-queue bookkeeping is set-based by design; WP_Query is not applicable to this table.
+		$wpdb->update(
+			self::tasks_table(),
+			array(
+				'status' => PRSTUDIO_UC_State_Machine::QUEUED,
+				'device_uuid' => null,
+				'lease_token' => null,
+				'lease_expires_gmt' => null,
+				'updated_gmt' => self::now(),
+			),
+			array( 'task_uuid' => $task_uuid ),
+			array( '%s', '%s', '%s', '%s', '%s' ),
+			array( '%s' )
+		);
+		self::event( $task_uuid, 'task.requeued_by_operator', array( 'reason' => $reason, 'previous_status' => (string) $task['status'] ) );
+		return self::get_task( $task_uuid );
+	}
+
 	public static function cancel_for_device( string $task_uuid, string $device_uuid ): ?array {
 		global $wpdb;
 		$task = self::get_task( $task_uuid );
