@@ -69,6 +69,17 @@ final class PRSTUDIO_UC_Verifier {
 				$inspection = is_array( $payload['structuredInspection'] ?? null ) ? $payload['structuredInspection'] : ( is_array( $payload['inspection'] ?? null ) ? $payload['inspection'] : array() );
 				$verified = $property_ok && ! empty( $inspection['data_verified'] ) && ! empty( $inspection['verified_fields'] );
 				if ( ! $verified ) { $reason = 'gsc_url_inspection_data_not_verified'; }
+				// "Request indexing" is dispatched as a URL inspection carrying
+				// request_indexing=true -- there is no distinct queued action name --
+				// so without this branch the run was graded on the inspection alone
+				// and reported verified while the indexing request itself was never
+				// confirmed. That is a false positive on the one part the caller
+				// actually asked for, so require the confirmation when it was requested.
+				if ( $verified && self::boolean_flag( $args['request_indexing'] ?? false ) ) {
+					$indexing = is_array( $payload['indexingRequest'] ?? null ) ? $payload['indexingRequest'] : array();
+					$verified = ! empty( $indexing['verified'] );
+					if ( ! $verified ) { $reason = 'gsc_indexing_confirmation_not_verified'; }
+				}
 			} elseif ( 'search_console_request_indexing' === $action ) {
 				$inspection = is_array( $payload['structuredInspection'] ?? null ) ? $payload['structuredInspection'] : array();
 				$indexing = is_array( $payload['indexingRequest'] ?? null ) ? $payload['indexingRequest'] : array();

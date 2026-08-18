@@ -288,22 +288,64 @@ final class PRSTUDIO_UC_Wait_Channel {
     /* Concurrency cap                                                     */
     /* ------------------------------------------------------------------ */
 
+    /**
+     * Claim one long-poll slot.
+     *
+     * The previous implementation read the counter, compared it, then wrote back
+     * the incremented value. Two requests arriving together both read the same
+     * number and both passed the check, so the cap could be exceeded under
+     * exactly the concurrency it exists to bound -- and since a slot is held for
+     * up to MAX_WAIT_SECONDS, an overshoot pins PHP workers for that whole time.
+     *
+     * wp_cache_incr() is a single atomic operation on a real backend (Redis and
+     * Memcached both implement INCR server-side), so claim first and check the
+     * value the increment returned: a caller that lands above the cap gives its
+     * slot straight back. wp_cache_add() seeds the key without clobbering a
+     * concurrent seed, because it only writes when the key is absent.
+     *
+     * Honest limitation: with no persistent object cache the counter is
+     * per-process, so the cap bounds each PHP worker rather than the pool. That
+     * is still worth enforcing -- it is the per-worker case that pins a process
+     * -- but it is not the global guarantee the constant name suggests, so
+     * status() reports which of the two is actually in force.
+     */
     private static function acquire_slot(): bool {
-        if ( ! function_exists( 'wp_cache_get' ) ) { return true; }
-        $found = false;
-        $active = wp_cache_get( self::WAITERS_KEY, self::GROUP, false, $found );
-        $active = $found && is_numeric( $active ) ? (int) $active : 0;
-        if ( $active >= self::MAX_CONCURRENT_WAITERS ) { return false; }
-        wp_cache_set( self::WAITERS_KEY, $active + 1, self::GROUP, self::MAX_WAIT_SECONDS + 10 );
+        if ( ! function_exists( 'wp_cache_incr' ) || ! function_exists( 'wp_cache_add' ) ) { return true; }
+
+        // Seed only when absent; a concurrent seed must not reset a live count.
+        wp_cache_add( self::WAITERS_KEY, 0, self::GROUP, self::MAX_WAIT_SECONDS + 10 );
+
+        $active = wp_cache_incr( self::WAITERS_KEY, 1, self::GROUP );
+        if ( false === $active ) {
+            // Backend does not support atomic increment. Refusing here would
+            // disable long-poll entirely on that install; allowing it keeps the
+            // channel working, and the per-request budget still bounds the hold.
+            return true;
+        }
+        if ( (int) $active > self::MAX_CONCURRENT_WAITERS ) {
+            self::release_slot();
+            return false;
+        }
         return true;
     }
 
     private static function release_slot(): void {
-        if ( ! function_exists( 'wp_cache_get' ) ) { return; }
-        $found = false;
-        $active = wp_cache_get( self::WAITERS_KEY, self::GROUP, false, $found );
-        $active = $found && is_numeric( $active ) ? (int) $active : 1;
-        wp_cache_set( self::WAITERS_KEY, max( 0, $active - 1 ), self::GROUP, self::MAX_WAIT_SECONDS + 10 );
+        if ( ! function_exists( 'wp_cache_decr' ) ) { return; }
+        $remaining = wp_cache_decr( self::WAITERS_KEY, 1, self::GROUP );
+        // Backends clamp at zero rather than going negative, but a decrement that
+        // races a key expiry can still report below zero; reseed so the next
+        // acquire starts from a sane floor instead of inheriting a negative count.
+        if ( false !== $remaining && (int) $remaining < 0 && function_exists( 'wp_cache_set' ) ) {
+            wp_cache_set( self::WAITERS_KEY, 0, self::GROUP, self::MAX_WAIT_SECONDS + 10 );
+        }
+    }
+
+    /** Whether the waiter cap is pool-wide or only per PHP worker. */
+    private static function slot_scope(): string {
+        if ( ! function_exists( 'wp_cache_incr' ) ) { return 'unbounded_no_object_cache'; }
+        return function_exists( 'wp_using_ext_object_cache' ) && wp_using_ext_object_cache()
+            ? 'global_persistent_object_cache'
+            : 'per_php_worker';
     }
 
     /* ------------------------------------------------------------------ */

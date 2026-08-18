@@ -345,6 +345,31 @@ $wpdb->insert( $tasks_table, array(
 $stale = PRSTUDIO_UC_Store::claim_next( 'device-third' );
 check( 'an expired queued task is not claimed', null === $stale || ( $stale['task_uuid'] ?? '' ) !== $stale_uuid );
 
+// 7. queue_stats must see the browser task table, not just jobs.
+//    While it read only the jobs table, a stalled dispatcher was structurally
+//    invisible to the watchdog: browser tasks could sit unclaimed indefinitely
+//    and the Sentinel still reported healthy.
+$stale_undispatched = wp_generate_uuid4();
+$wpdb->insert( $tasks_table, array(
+    'task_uuid' => $stale_undispatched, 'device_uuid' => null, 'action' => 'search_console_sites',
+    'arguments' => '{}', 'status' => PRSTUDIO_UC_State_Machine::QUEUED,
+    'created_gmt' => gmdate( 'Y-m-d H:i:s', time() - 600 ),
+    'updated_gmt' => gmdate( 'Y-m-d H:i:s', time() - 600 ),
+    'expires_gmt' => gmdate( 'Y-m-d H:i:s', time() + 3600 ),
+) );
+$stats = PRSTUDIO_UC_Store::queue_stats();
+check( 'queue_stats reports the browser task queue', is_array( $stats['browser_tasks'] ?? null ),
+    'browser_tasks key absent -- the watchdog cannot see browser tasks at all' );
+check( 'queue_stats counts an undispatched browser task',
+    (int) ( $stats['browser_tasks']['undispatched'] ?? 0 ) >= 1,
+    'undispatched=' . (int) ( $stats['browser_tasks']['undispatched'] ?? 0 ) );
+check( 'queue_stats reports the oldest undispatched timestamp',
+    '' !== (string) ( $stats['browser_tasks']['oldest_undispatched_gmt'] ?? '' ) );
+check( 'a task the agent already attempted is not counted as undispatched',
+    ! isset( $stats['browser_tasks']['undispatched'] ) || (int) $stats['browser_tasks']['undispatched'] < 2,
+    'the leased task from step 3 has attempt_count=1 and must be excluded; undispatched='
+        . (int) ( $stats['browser_tasks']['undispatched'] ?? 0 ) );
+
 echo "\ntotal SQL statements executed: {$wpdb->queries_run}\n";
 if ( $wpdb->errors ) {
     echo "\n=== ALL SQL ERRORS OBSERVED ===\n";

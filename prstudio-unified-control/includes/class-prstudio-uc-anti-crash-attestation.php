@@ -18,7 +18,41 @@ final class PRSTUDIO_UC_Anti_Crash_Attestation {
         if('passed'!==(string)($record['status']??''))return array('ok'=>false,'stored'=>false,'reason'=>'record_not_passed');$scope=implode(',',array_values(array_unique((array)($work['scope']??array('wordpress')))));$all=get_option(self::OPTION,array());if(!is_array($all))$all=array();$key=hash('sha256',$scope.'|'.self::fingerprint());$all[$key]=array('scope'=>$scope,'fingerprint'=>self::fingerprint(),'evidence_sha256'=>(string)($record['evidence_sha256']??''),'created_at'=>time(),'expires_at'=>time()+self::TTL);update_option(self::OPTION,array_slice($all,-32,null,true),false);return array('ok'=>true,'stored'=>true,'key'=>$key,'expires_gmt'=>gmdate('c',time()+self::TTL));
     }
     public static function reusable(string $tool_name,array $args=array()):array{
-        $scope=self::scope_for_tool($tool_name);$all=get_option(self::OPTION,array());if(!is_array($all))$all=array();$fp=self::fingerprint();$now=time();foreach($all as $row){if((int)($row['expires_at']??0)<=$now)continue;if(!hash_equals((string)($row['fingerprint']??''),$fp))continue;$scopes=array_filter(explode(',',(string)($row['scope']??'')));if(!in_array($scope,$scopes,true)&&!in_array('suite',$scopes,true)&&!in_array('wordpress',$scopes,true))continue;return array('ok'=>true,'reused'=>true,'scope'=>$scope,'evidence_sha256'=>$row['evidence_sha256']??'','expires_gmt'=>gmdate('c',(int)$row['expires_at']));}return array('ok'=>false,'reused'=>false,'scope'=>$scope);
+        $scope = self::scope_for_tool( $tool_name );
+        $all = get_option( self::OPTION, array() );
+        if ( ! is_array( $all ) ) { $all = array(); }
+        $fp = self::fingerprint();
+        $now = time();
+
+        foreach ( $all as $row ) {
+            if ( (int) ( $row['expires_at'] ?? 0 ) <= $now ) { continue; }
+            if ( ! hash_equals( (string) ( $row['fingerprint'] ?? '' ), $fp ) ) { continue; }
+
+            $scopes = array_filter( explode( ',', (string) ( $row['scope'] ?? '' ) ) );
+
+            // `suite` is the only wildcard: it means the operator attested the
+            // whole surface deliberately. `wordpress` used to be accepted here as
+            // a second wildcard, which silently defeated scope separation --
+            // wordpress is also the DEFAULT scope for anything unclassified, so
+            // nearly every attestation carried it, and a still-valid WordPress
+            // attestation was therefore reusable for filesystem, database and
+            // browser mutations that were never attested at all.
+            //
+            // In an architecture where the anti-crash test is the only mutation
+            // guard, a scope that leaks across domains is the guard silently not
+            // running. Exact match or an explicit `suite` attestation only.
+            if ( ! in_array( $scope, $scopes, true ) && ! in_array( 'suite', $scopes, true ) ) { continue; }
+
+            return array(
+                'ok' => true,
+                'reused' => true,
+                'scope' => $scope,
+                'matched_scope' => in_array( $scope, $scopes, true ) ? $scope : 'suite',
+                'evidence_sha256' => $row['evidence_sha256'] ?? '',
+                'expires_gmt' => gmdate( 'c', (int) $row['expires_at'] ),
+            );
+        }
+        return array( 'ok' => false, 'reused' => false, 'scope' => $scope );
     }
     public static function status():array{$all=get_option(self::OPTION,array());$now=time();$active=array_values(array_filter(is_array($all)?$all:array(),static fn($r)=>(int)($r['expires_at']??0)>$now));return array('version'=>self::VERSION,'active'=>count($active),'fingerprint'=>self::fingerprint(),'ttl_seconds'=>self::TTL);}
 }

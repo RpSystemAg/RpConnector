@@ -15,4 +15,63 @@ final class PRSTUDIO_UC_Safety_Runtime { public const VERSION='2.0.0';
  public static function self_heal():array{$r=class_exists('PRSTUDIO_UC_Job_Engine')?PRSTUDIO_UC_Job_Engine::recover():['ok'=>false];return['ok'=>!empty($r['ok']),'scope'=>'safe_housekeeping_only','recovery'=>$r];}
  public static function sign(array $payload,int $ttl=300):array{$sec=PRSTUDIO_UC_Auth::signing_secret();$ts=time();$nonce=bin2hex(random_bytes(16));$body=json_encode($payload,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);return['timestamp'=>$ts,'nonce'=>$nonce,'ttl'=>max(30,min(600,$ttl)),'payload'=>$payload,'signature'=>hash_hmac('sha256',$ts."\n".$nonce."\n".$body,$sec),'algorithm'=>'HMAC-SHA256'];}
 }
-final class PRSTUDIO_UC_Secrets_Vault { private static function path():string{return PRSTUDIO_UC_Memory::site_dir().'/secrets.vault.json';}private static function key():string{return hash_hkdf('sha256',PRSTUDIO_UC_Auth::signing_secret(),32,'prstudio-vault-2.0',PRSTUDIO_UC_Memory::site_identity()['canonical_hash']);}private static function raw():array{$d=is_readable(self::path())?json_decode((string)file_get_contents(self::path()),true):[];return is_array($d)?$d:[];}public static function set(string $name,string $value):bool{if(!function_exists('openssl_encrypt'))return false;$name=sanitize_key($name);$a=self::raw();$iv=random_bytes(12);$tag='';$c=openssl_encrypt($value,'aes-256-gcm',self::key(),OPENSSL_RAW_DATA,$iv,$tag,$name,16);if($c===false)return false;$a[$name]=['iv'=>base64_encode($iv),'tag'=>base64_encode($tag),'cipher'=>base64_encode($c),'updated_gmt'=>gmdate('c')];return false!==@file_put_contents(self::path(),json_encode($a,JSON_PRETTY_PRINT)."\n",LOCK_EX);}public static function get(string $name):?string{$name=sanitize_key($name);$x=self::raw()[$name]??null;if(!is_array($x)||!function_exists('openssl_decrypt'))return null;$v=openssl_decrypt(base64_decode($x['cipher'],true),'aes-256-gcm',self::key(),OPENSSL_RAW_DATA,base64_decode($x['iv'],true),base64_decode($x['tag'],true),$name);return is_string($v)?$v:null;}}
+final class PRSTUDIO_UC_Secrets_Vault {
+    private static function path():string{return PRSTUDIO_UC_Memory::site_dir().'/secrets.vault.json';}
+    private static function lock_path():string{return PRSTUDIO_UC_Memory::site_dir().'/.secrets.vault.lock';}
+    private static function key():string{return hash_hkdf('sha256',PRSTUDIO_UC_Auth::signing_secret(),32,'prstudio-vault-2.0',PRSTUDIO_UC_Memory::site_identity()['canonical_hash']);}
+    private static function raw():array{$d=is_readable(self::path())?json_decode((string)file_get_contents(self::path()),true):[];return is_array($d)?$d:[];}
+
+    /**
+     * Run a read-modify-write on the vault under an exclusive lock.
+     *
+     * LOCK_EX on file_put_contents() only serializes that one write call. It does
+     * not cover the read that produced the array being written, so two callers
+     * storing different secrets could both load the same version, each add their
+     * own key, and the second write would drop the first secret entirely -- a
+     * silent lost update in the one store where losing a value is least
+     * acceptable.
+     *
+     * The lock is held across read, merge and write, on a separate lock file so
+     * the vault itself can be replaced by an atomic rename: a reader either sees
+     * the whole previous file or the whole new one, never a partial write.
+     */
+    private static function mutate(callable $callback):bool{
+        $dir=PRSTUDIO_UC_Memory::site_dir();
+        if(!is_dir($dir)){function_exists('wp_mkdir_p')?wp_mkdir_p($dir):@mkdir($dir,0750,true);}
+        $fh=@fopen(self::lock_path(),'c+');
+        if(!is_resource($fh)||!@flock($fh,LOCK_EX)){if(is_resource($fh))@fclose($fh);return false;}
+        try{
+            $state=self::raw();
+            $result=$callback($state);
+            if(false===$result)return false;
+            $json=json_encode($state,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES);
+            if(false===$json)return false;
+            try{$suffix=bin2hex(random_bytes(5));}catch(Throwable $e){$suffix=str_replace('.','',uniqid('',true));}
+            $tmp=self::path().'.'.$suffix.'.tmp';
+            if(false===@file_put_contents($tmp,$json."\n",LOCK_EX))return false;
+            @chmod($tmp,0600);
+            if(@rename($tmp,self::path()))return true;
+            @unlink($tmp);
+            return false;
+        }finally{@flock($fh,LOCK_UN);@fclose($fh);}
+    }
+
+    public static function set(string $name,string $value):bool{
+        if(!function_exists('openssl_encrypt'))return false;
+        $name=sanitize_key($name);
+        if(''===$name)return false;
+        $iv=random_bytes(12);$tag='';
+        $c=openssl_encrypt($value,'aes-256-gcm',self::key(),OPENSSL_RAW_DATA,$iv,$tag,$name,16);
+        if($c===false)return false;
+        $entry=['iv'=>base64_encode($iv),'tag'=>base64_encode($tag),'cipher'=>base64_encode($c),'updated_gmt'=>gmdate('c')];
+        return self::mutate(static function(array &$state)use($name,$entry){$state[$name]=$entry;return true;});
+    }
+
+    public static function forget(string $name):bool{
+        $name=sanitize_key($name);
+        if(''===$name)return false;
+        return self::mutate(static function(array &$state)use($name){unset($state[$name]);return true;});
+    }
+
+    public static function get(string $name):?string{$name=sanitize_key($name);$x=self::raw()[$name]??null;if(!is_array($x)||!function_exists('openssl_decrypt'))return null;$v=openssl_decrypt(base64_decode($x['cipher'],true),'aes-256-gcm',self::key(),OPENSSL_RAW_DATA,base64_decode($x['iv'],true),base64_decode($x['tag'],true),$name);return is_string($v)?$v:null;}
+}

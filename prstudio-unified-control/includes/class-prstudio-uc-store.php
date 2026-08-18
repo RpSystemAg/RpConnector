@@ -1114,7 +1114,41 @@ final class PRSTUDIO_UC_Store {
 
 	public static function queue_stats(): array {
 		// phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.NotPrepared -- table/column identifier only, from a fixed helper or the identifier() allowlist + SHOW TABLES check -- never external input; values are parameterized via $wpdb->prepare()
-		global $wpdb;$rows=$wpdb->get_results('SELECT status, COUNT(*) AS total FROM '.self::jobs_table().' GROUP BY status',ARRAY_A);$states=array();foreach(is_array($rows)?$rows:array() as $row){$states[self::canonical_job_state((string)$row['status'])]=(int)$row['total'];}$dead=(int)$wpdb->get_var('SELECT COUNT(*) FROM '.self::dead_letters_table());return array('states'=>$states,'dead_letters'=>$dead,'lease_seconds'=>self::JOB_LEASE_SECONDS,'schema_version'=>self::SCHEMA_VERSION);
+		global $wpdb;$rows=$wpdb->get_results('SELECT status, COUNT(*) AS total FROM '.self::jobs_table().' GROUP BY status',ARRAY_A);$states=array();foreach(is_array($rows)?$rows:array() as $row){$states[self::canonical_job_state((string)$row['status'])]=(int)$row['total'];}$dead=(int)$wpdb->get_var('SELECT COUNT(*) FROM '.self::dead_letters_table());
+		// The browser task queue lives in its own table, so a stats call that read
+		// only jobs made a stalled dispatcher structurally invisible: the watchdog
+		// reported healthy while browser tasks sat unclaimed. The undispatched
+		// counter is the specific signal that was missing -- queued, never leased,
+		// attempt_count still zero, which is the difference between "the agent tried
+		// and failed" and "nothing ever picked this up".
+		// phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.NotPrepared -- table identifier from a fixed helper; values are parameterized below.
+		$task_rows = $wpdb->get_results( 'SELECT status, COUNT(*) AS total FROM ' . self::tasks_table() . ' GROUP BY status', ARRAY_A );
+		$task_states = array();
+		foreach ( is_array( $task_rows ) ? $task_rows : array() as $row ) {
+			$task_states[ (string) $row['status'] ] = (int) $row['total'];
+		}
+		// phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.NotPrepared -- table identifier from a fixed helper; the cutoff is parameterized.
+		$undispatched = (int) $wpdb->get_var( $wpdb->prepare(
+			'SELECT COUNT(*) FROM ' . self::tasks_table() . ' WHERE status = %s AND attempt_count = 0 AND created_gmt < %s AND expires_gmt > UTC_TIMESTAMP()',
+			PRSTUDIO_UC_State_Machine::QUEUED,
+			gmdate( 'Y-m-d H:i:s', time() - 120 )
+		) );
+		$oldest_undispatched = (string) $wpdb->get_var( $wpdb->prepare(
+			'SELECT created_gmt FROM ' . self::tasks_table() . ' WHERE status = %s AND attempt_count = 0 AND expires_gmt > UTC_TIMESTAMP() ORDER BY created_gmt ASC LIMIT 1',
+			PRSTUDIO_UC_State_Machine::QUEUED
+		) );
+		return array(
+			'states'=>$states,
+			'dead_letters'=>$dead,
+			'lease_seconds'=>self::JOB_LEASE_SECONDS,
+			'schema_version'=>self::SCHEMA_VERSION,
+			'browser_tasks'=>array(
+				'states'=>$task_states,
+				'undispatched'=>$undispatched,
+				'undispatched_threshold_seconds'=>120,
+				'oldest_undispatched_gmt'=>$oldest_undispatched,
+			),
+		);
 	}
 
 	public static function recent_jobs( int $limit = 50 ): array {

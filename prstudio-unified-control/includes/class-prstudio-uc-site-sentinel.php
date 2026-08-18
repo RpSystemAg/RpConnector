@@ -59,6 +59,37 @@ final class PRSTUDIO_UC_Site_Sentinel {
 		if(in_array('queue',$scope,true)&&PRSTUDIO_UC_Store::schema_ready()){
 			$stats=PRSTUDIO_UC_Store::queue_stats();$running=(int)($stats['states']['RUNNING']??0);$dead=(int)($stats['dead_letters']??0);
 			if($dead>0)$findings[]=self::finding('dead_letters_present','warning','One or more mission jobs require operator review.',array('count'=>$dead));
+			// A device that heartbeats is not a device that is consuming work. Those
+			// are separate paths, and when only the second broke the watchdog kept
+			// reporting healthy while every browser task sat unclaimed. Queued with
+			// attempt_count still zero is the exact signature of a dispatcher that
+			// never picked the task up, as opposed to one that tried and failed.
+			$browser_queue=is_array($stats['browser_tasks']??null)?$stats['browser_tasks']:array();
+			$undispatched=(int)($browser_queue['undispatched']??0);
+			if($undispatched>0){
+				$devices_online=0;
+				if(method_exists('PRSTUDIO_UC_Store','list_devices')){
+					foreach(PRSTUDIO_UC_Store::list_devices() as $device){
+						if('revoked'===(string)($device['status']??''))continue;
+						$seen=strtotime((string)($device['last_seen_gmt']??''));
+						if($seen>0&&(time()-$seen)<120)$devices_online++;
+					}
+				}
+				$findings[]=self::finding(
+					'browser_dispatcher_not_consuming',
+					$devices_online>0?'critical':'warning',
+					$devices_online>0
+						?'Browser Agent reports online but is not claiming queued tasks; the dispatcher is not consuming the queue.'
+						:'Browser tasks are queued with no agent online to claim them.',
+					array(
+						'undispatched'=>$undispatched,
+						'devices_online'=>$devices_online,
+						'threshold_seconds'=>(int)($browser_queue['undispatched_threshold_seconds']??120),
+						'oldest_undispatched_gmt'=>(string)($browser_queue['oldest_undispatched_gmt']??''),
+						'remedy'=>'Inspect with browser_status; clear or requeue individual tasks with browser_task_control.',
+					)
+				);
+			}
 			if($running>100)$findings[]=self::finding('running_queue_pressure','warning','Unusually high number of running jobs.',array('count'=>$running));
 			if(!empty($args['repair'])){$recovery=array('jobs'=>PRSTUDIO_UC_Store::recover_stale_jobs(300),'tasks'=>PRSTUDIO_UC_Store::recover_stale_tasks());if(class_exists('PRSTUDIO_UC_Artifacts')){$recovery['expired_artifacts']=PRSTUDIO_UC_Artifacts::cleanup();}}
 		}

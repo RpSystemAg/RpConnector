@@ -108,6 +108,33 @@ final class PRSTUDIO_UC_Execution_Lanes {
      * that do not provide add_option/delete_option fall back to direct
      * execution; production WordPress always provides them.
      */
+    /**
+     * Delete an option only if its stored value still matches what we read.
+     *
+     * WordPress has no compare-and-delete for options, so this issues the check
+     * and the delete as one statement: the WHERE clause carries the expected
+     * serialized value, and the row is removed only when nothing replaced it in
+     * between. Returns true when this call is the one that removed it.
+     */
+    private static function delete_option_if_unchanged( string $option, $expected ): bool {
+        global $wpdb;
+        if ( ! isset( $wpdb ) || ! function_exists( 'maybe_serialize' ) ) { return false; }
+        $serialized = maybe_serialize( $expected );
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- a conditional delete is the point; the options API cannot express compare-and-delete.
+        $deleted = (int) $wpdb->query( $wpdb->prepare(
+            "DELETE FROM {$wpdb->options} WHERE option_name = %s AND option_value = %s",
+            $option,
+            $serialized
+        ) );
+        if ( $deleted > 0 && function_exists( 'wp_cache_delete' ) ) {
+            // The options cache would otherwise keep serving the row this
+            // statement just removed.
+            wp_cache_delete( $option, 'options' );
+            wp_cache_delete( 'alloptions', 'options' );
+        }
+        return $deleted > 0;
+    }
+
     private static function with_mutex( callable $callback ) {
         if ( ! function_exists( 'add_option' ) || ! function_exists( 'delete_option' ) ) {
             return $callback();
@@ -130,9 +157,17 @@ final class PRSTUDIO_UC_Execution_Lanes {
 
             $existing = get_option( self::MUTEX_OPTION, null );
             if ( is_array( $existing ) && (float) ( $existing['expires_at'] ?? 0 ) <= microtime( true ) ) {
-                // Delete only stale mutexes. If another contender wins the
-                // following atomic add_option(), this request simply retries.
-                delete_option( self::MUTEX_OPTION );
+                // Reclaim a stale mutex, but only the exact record this request
+                // observed. An unconditional delete_option() here was a lost
+                // update: two contenders could both read the same expired lock,
+                // the first delete it and a third acquire a fresh one, and then
+                // the second -- still acting on its stale read -- delete that new
+                // owner's lock. Two lanes could then mutate at once, which is the
+                // one thing this mutex exists to prevent.
+                //
+                // A conditional delete keyed on the serialized value makes the
+                // reclaim atomic: it matches only if nobody replaced the row.
+                self::delete_option_if_unchanged( self::MUTEX_OPTION, $existing );
             }
 
             // Keep the retry jitter below a typical database round trip. A

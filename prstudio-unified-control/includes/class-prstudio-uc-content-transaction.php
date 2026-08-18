@@ -12,6 +12,12 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
 final class PRSTUDIO_UC_Content_Transaction {
     public const VERSION = '1.0.0';
     private const MAX_CONTENT_BYTES = 5242880; // 5 MiB.
+    /**
+     * How long a writer waits for the per-post advisory lock before giving up.
+     * Short on purpose: a caller that waits is told to retry rather than holding
+     * a PHP worker, and the critical section is a handful of queries.
+     */
+    private const ENTITY_LOCK_TIMEOUT_SECONDS = 5;
 
     private static function error( string $code, string $message, int $status = 400, array $data = array() ) {
         $data['status'] = $status;
@@ -136,6 +142,72 @@ final class PRSTUDIO_UC_Content_Transaction {
             );
             if ( is_wp_error( $lane ) ) { return $lane; }
         }
+        // Serialize concurrent writers on this one post before reading it.
+        // Everything below -- read, precondition check, write -- has to happen as
+        // a unit. The hash comparison proves the content had not changed when it
+        // was read; it says nothing about the window between that check and
+        // wp_update_post(). Two callers could both read the same valid hash, both
+        // pass the optimistic-lock check, and the second silently overwrite the
+        // first with content derived from a stale base. Nothing upstream closes
+        // that window either: a lane is explicitly not a prerequisite for
+        // deterministic WordPress mutations.
+        $lock = self::acquire_entity_lock( $id );
+        if ( 'busy' === $lock['state'] ) {
+            return self::error(
+                'prstudio_content_locked',
+                'Another write to this content is in progress. Retry in a moment.',
+                409,
+                array( 'retryable' => true, 'id' => $id )
+            );
+        }
+        try {
+            return self::patch_locked( $id, $args, $lock );
+        } finally {
+            self::release_entity_lock( $lock );
+        }
+    }
+
+    /**
+     * Acquire a per-post advisory lock for the read-verify-write critical section.
+     *
+     * GET_LOCK is atomic, connection-scoped and released automatically if the
+     * request dies, so a crashed writer cannot strand the post. The database name
+     * is folded into the lock name because GET_LOCK's namespace is server-wide
+     * and several sites may share one MySQL instance.
+     *
+     * @return array{state:string,name:string}
+     */
+    private static function acquire_entity_lock( int $post_id ): array {
+        global $wpdb;
+        if ( ! isset( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) ) {
+            return array( 'state' => 'unavailable', 'name' => '' );
+        }
+        $scope = ( defined( 'DB_NAME' ) ? (string) DB_NAME : '' ) . '|' . (string) $wpdb->prefix;
+        $name = 'prstudio_content_' . substr( hash( 'sha256', $scope . '|' . $post_id ), 0, 40 );
+        $result = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', $name, self::ENTITY_LOCK_TIMEOUT_SECONDS ) );
+        if ( null === $result ) {
+            // The server does not support advisory locks here. Proceeding
+            // unserialized is worse than refusing outright would be for
+            // availability, so continue and record that the window is open.
+            return array( 'state' => 'unavailable', 'name' => '' );
+        }
+        return '1' === (string) $result
+            ? array( 'state' => 'held', 'name' => $name )
+            : array( 'state' => 'busy', 'name' => $name );
+    }
+
+    private static function release_entity_lock( array $lock ): void {
+        global $wpdb;
+        if ( 'held' !== ( $lock['state'] ?? '' ) || '' === (string) ( $lock['name'] ?? '' ) ) { return; }
+        if ( ! isset( $wpdb ) || ! method_exists( $wpdb, 'query' ) ) { return; }
+        $wpdb->query( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', (string) $lock['name'] ) );
+    }
+
+    /**
+     * The critical section of patch(): read, verify preconditions, write.
+     * Runs under the per-post advisory lock acquired by patch().
+     */
+    private static function patch_locked( int $id, array $args, array $lock ) {
         $post = get_post( $id );
         if ( ! $post instanceof WP_Post ) { return self::error( 'prstudio_content_missing', 'Content not found.', 404 ); }
 
