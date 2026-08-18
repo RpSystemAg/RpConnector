@@ -31,11 +31,17 @@ jobs:
           coverage: none
       - name: Install PHPCS and PHPCompatibility
         run: |
+          # Composer 2.2+ blocks plugins unless allowed. The installer plugin is
+          # what registers PHPCompatibility as a PHPCS standard, so without this
+          # the standard is installed but invisible to phpcs.
+          composer global config --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
           composer global require --no-interaction --no-progress \
             squizlabs/php_codesniffer:^3.10 \
             phpcompatibility/phpcompatibility-wp:^2.1 \
             dealerdirect/phpcodesniffer-composer-installer:^1.0
-          echo "$HOME/.composer/vendor/bin" >> "$GITHUB_PATH"
+          echo "$(composer global config home)/vendor/bin" >> "$GITHUB_PATH"
+      - name: Confirm PHPCompatibilityWP registered as a standard
+        run: phpcs -i
       - name: Confirm the declared minimum matches what we test
         run: |
           declared=$(grep -oP 'Requires PHP:\s*\K[0-9.]+' prstudio-unified-control/prstudio-unified-control.php)
