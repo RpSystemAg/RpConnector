@@ -1,0 +1,76 @@
+name: Static analysis
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: static-analysis-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  php-compatibility:
+    name: PHP 8.0 compatibility (declared minimum)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: '8.3'
+          tools: composer
+          coverage: none
+      - name: Install exact PHP compatibility toolchain
+        run: |
+          composer global config allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
+          composer global require --no-interaction --no-progress \
+            squizlabs/php_codesniffer:3.13.5 \
+            phpcompatibility/phpcompatibility-wp:2.1.8 \
+            dealerdirect/phpcodesniffer-composer-installer:1.2.1
+          echo "$HOME/.composer/vendor/bin" >> "$GITHUB_PATH"
+          composer global show --direct
+      - name: Confirm declared minimum is exactly the tested floor
+        run: |
+          declared=$(grep -oP 'Requires PHP:\s*\K[0-9.]+' prstudio-unified-control/prstudio-unified-control.php)
+          echo "plugin header declares PHP $declared"
+          if [ "$declared" != "8.0" ]; then
+            echo "::error::Plugin header declares PHP $declared but this gate tests 8.0-. Update both together."
+            exit 1
+          fi
+      - name: Fail on calls unavailable at PHP 8.0
+        run: |
+          phpcs -p prstudio-unified-control \
+            --standard=PHPCompatibilityWP \
+            --runtime-set testVersion 8.0- \
+            --extensions=php \
+            --ignore='*/vendor/*,*/node_modules/*' \
+            --report=full \
+            --warning-severity=0
+
+  megalinter:
+    name: MegaLinter PHP flavor (blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: MegaLinter 9.6.0
+        uses: oxsecurity/megalinter/flavors/php@ef3e84b8b836d76db562d0f3ed7da61e8fd538bc # v9.6.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VALIDATE_ALL_CODEBASE: true
+      - name: Upload report even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: megalinter-report-${{ github.sha }}
+          path: megalinter-reports
+          if-no-files-found: warn
+          retention-days: 14
