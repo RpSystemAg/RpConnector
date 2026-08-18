@@ -96,6 +96,46 @@ recovery = function_body(STORE, "recover_stale_tasks")
 if "lease_expires_gmt" not in recovery or "recovery_count" not in recovery:
     violations.append("INV-6 recovery: stale browser lease recovery path is missing required fencing/accounting")
 
+# INV-7: the durable worker must have an implementation-level no-progress
+# watchdog. Merely limiting a single PHP invocation is insufficient: repeated
+# READY -> RUNNING -> READY / WAITING -> READY cycles can otherwise live forever
+# while every individual invocation remains bounded.
+no_progress_markers = (
+    "progress_signature",
+    "no_progress",
+    "stuck_signature",
+    "stuck_count",
+    "progress_watchdog",
+    "no_progress_watchdog",
+)
+if not any(marker in RUNTIME or marker in STORE or marker in JOB_ENGINE for marker in no_progress_markers):
+    violations.append(
+        "INV-7 no-progress: durable jobs have no persisted progress-signature watchdog; bounded worker calls can still form an unbounded mission loop"
+    )
+
+# INV-8: WAITING_FOR_BROWSER must carry an explicit parent-visible deadline.
+# The child task's broad TTL is not a sufficient mission/step deadline: a parent
+# must be able to diagnose its wait and deterministically recover/terminate.
+wait = function_body(STORE, "wait_leased_job")
+wait_deadline_markers = (
+    "browser_deadline_gmt",
+    "waiting_deadline_gmt",
+    "step_deadline_gmt",
+    "wait_deadline_gmt",
+    "deadline_gmt",
+)
+if not any(marker in wait or marker in run_one for marker in wait_deadline_markers):
+    violations.append(
+        "INV-8 wait-deadline: WAITING_FOR_BROWSER is persisted without an explicit parent/step deadline"
+    )
+
+# INV-9: a healthy bounded yield must preserve enough information to prove
+# monotonic progress. step_index alone is not sufficient when a step can
+# redispatch a child; checkpoint/evidence identity must participate.
+release = function_body(STORE, "release_leased_job")
+if "checkpoint" not in release or "step_index" not in release:
+    violations.append("INV-9 yield-progress: bounded yield does not durably preserve checkpoint + step identity")
+
 if violations:
     print("RUNTIME INVARIANT AUDIT: FAIL")
     for item in violations:
