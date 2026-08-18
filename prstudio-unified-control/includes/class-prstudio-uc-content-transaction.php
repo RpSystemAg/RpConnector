@@ -109,7 +109,24 @@ final class PRSTUDIO_UC_Content_Transaction {
     public static function patch( array $args ) {
 
         $id = absint( $args['id'] ?? 0 );
-        if ( ! $id ) { return self::error( 'prstudio_content_id_required', 'A valid existing post ID is required.' ); }
+        // prstudio_do documents target as "URL or ID", and a URL is what a caller
+        // naturally has when it is looking at a page. Resolve it here rather than
+        // rejecting: the alternative forced an extra lookup turn to convert a URL
+        // the site itself can map, and made the documented contract untrue.
+        if ( ! $id && function_exists( 'url_to_postid' ) ) {
+            foreach ( array( 'url', 'permalink', 'target', 'post_url' ) as $key ) {
+                $candidate = trim( (string) ( $args[ $key ] ?? '' ) );
+                if ( '' === $candidate || ! preg_match( '#^https?://#i', $candidate ) ) { continue; }
+                $resolved = absint( url_to_postid( $candidate ) );
+                if ( $resolved > 0 ) { $id = $resolved; break; }
+            }
+        }
+        if ( ! $id ) {
+            return self::error(
+                'prstudio_content_id_required',
+                'A valid existing post ID is required. A URL is also accepted when it resolves to a post on this site; the URL supplied did not resolve, so pass id explicitly.'
+            );
+        }
         if ( class_exists( 'PRSTUDIO_UC_Execution_Lanes' ) && ! empty( $args['lane_token'] ) ) {
             $lane = PRSTUDIO_UC_Execution_Lanes::guard(
                 (string) $args['lane_token'],

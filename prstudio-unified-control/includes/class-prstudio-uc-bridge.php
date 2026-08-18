@@ -207,19 +207,49 @@ final class PRSTUDIO_UC_Bridge {
 		$verification = is_array( $task['verification'] ?? null ) ? $task['verification'] : array();
 		$executed = PRSTUDIO_UC_State_Machine::COMPLETED === $status;
 		$completed_verified = $executed && ! empty( $verification['ok'] );
-		$correlation_id = sanitize_text_field( (string) ( $task['arguments']['correlation_id'] ?? $task['result']['correlation_id'] ?? '' ) );
+		// Preserve the caller's correlation id instead of discarding anything that
+		// does not match the canonical `corr_<32 hex>` shape. Blanking it meant the
+		// outer response carried an id while this inner payload reported "", which
+		// silently broke tracing across the two halves of the same task. The value
+		// is only ever echoed back, so a length-and-charset bound is the property
+		// that matters; the canonical form is still reported so a consumer can tell
+		// a generated id from a caller-supplied one.
+		$correlation_raw = sanitize_text_field( (string) ( $task['arguments']['correlation_id'] ?? $task['result']['correlation_id'] ?? '' ) );
+		$correlation_id = substr( (string) preg_replace( '/[^A-Za-z0-9_.:-]/', '', $correlation_raw ), 0, 128 );
+		$correlation_canonical = 1 === preg_match( '/^corr_[a-f0-9]{32}$/', $correlation_id );
+
+		// A cancellation is an outcome the operator asked for, not a fault. Folding
+		// every non-completed terminal state into technical_error reported a
+		// successful cancel as a failure -- the job really was CANCELLED, but the
+		// response said the call had errored, so a caller could not tell a
+		// deliberate stop from a crash. expired is likewise not a technical fault.
+		if ( $completed_verified ) {
+			$outcome_status = 'verified';
+		} elseif ( $executed ) {
+			$outcome_status = 'degraded';
+		} elseif ( PRSTUDIO_UC_State_Machine::CANCELLED === $status ) {
+			$outcome_status = 'cancelled';
+		} elseif ( PRSTUDIO_UC_State_Machine::EXPIRED === $status ) {
+			$outcome_status = 'expired';
+		} elseif ( $terminal ) {
+			$outcome_status = 'technical_error';
+		} else {
+			$outcome_status = 'queued';
+		}
+
 		return array(
 			'provider' => 'prstudio_chrome_extension',
 			'target' => 'live',
 			'task_id' => $task['task_uuid'] ?? '',
-			'correlation_id' => preg_match( '/^corr_[a-f0-9]{32}$/', $correlation_id ) ? $correlation_id : '',
+			'correlation_id' => $correlation_id,
+			'correlation_id_canonical' => $correlation_canonical,
 			'status' => $status,
 			'checkpoint' => $task['checkpoint'] ?? array(),
 			'result' => $task['result'] ?? array(),
 			'error' => $task['error'] ?? array(),
 			'message' => $terminal ? 'Task terminato.' : 'Task accodato o in esecuzione.',
 			'_control_outcome' => array(
-				'status' => $completed_verified ? 'verified' : ( $executed ? 'degraded' : ( $terminal ? 'technical_error' : 'queued' ) ),
+				'status' => $outcome_status,
 				'executed' => $executed,
 				'mutated' => false,
 				'verified' => $completed_verified,

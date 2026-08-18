@@ -5,7 +5,13 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 final class PRSTUDIO_UC_Health {
 	private static function integrity_status(): array {
 		$manifest_path = PRSTUDIO_UC_DIR . 'FILE-INTEGRITY.json';
-		if ( ! is_readable( $manifest_path ) ) { return array( 'present'=>false, 'verified'=>false, 'reason'=>'manifest_unreadable' ); }
+		// A missing manifest is not an integrity failure. FILE-INTEGRITY.json is a
+		// packaging artifact generated at release time, so it is present in the
+		// distributed ZIP and absent from a source checkout. Reporting red for a
+		// source install told users their site was compromised when nothing was
+		// wrong, and buried the signal that actually matters: a manifest that IS
+		// present and does NOT match, which means the files changed after packaging.
+		if ( ! is_readable( $manifest_path ) ) { return array( 'present'=>false, 'verified'=>false, 'applicable'=>false, 'reason'=>'manifest_absent_source_install' ); }
 		$manifest_raw = file_get_contents( $manifest_path );
 		$manifest = json_decode( (string) $manifest_raw, true );
 		if ( ! is_array( $manifest ) || 'SHA-256' !== (string) ( $manifest['algorithm'] ?? '' ) || ! is_array( $manifest['files'] ?? null ) ) {
@@ -94,7 +100,12 @@ final class PRSTUDIO_UC_Health {
 		$checks = array(
 			'contract' => ! empty( PRSTUDIO_UC_Contract::data() ),
 			'database_tables' => ! in_array( false, $tables, true ),
-			'integrity_manifest' => ! empty( $integrity_status['verified'] ),
+			// Only a manifest that is present and mismatched is a failure; see
+			// integrity_status(). The reason is always carried in the integrity
+			// payload, so an absent manifest stays visible without faking green.
+			'integrity_manifest' => isset( $integrity_status['applicable'] ) && false === $integrity_status['applicable']
+				? true
+				: ! empty( $integrity_status['verified'] ),
 			'private_storage' => defined( 'WP_CONTENT_DIR' ) ? is_writable( WP_CONTENT_DIR ) : true,
 			'screenshot_storage' => ! empty( $artifact_status['ok'] ),
 			'durable_schema_v4' => PRSTUDIO_UC_Store::schema_ready(),

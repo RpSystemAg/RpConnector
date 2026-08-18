@@ -129,10 +129,27 @@ final class PRSTUDIO_UC_Do {
     public static function resolve( array $args ) {
         $raw_intent = (string) ( $args['intent'] ?? '' );
         if ( '' === trim( $raw_intent ) ) {
-            return new WP_Error(
-                'prstudio_do_intent_required',
-                'Describe what to do, e.g. intent="screenshot", intent="replace_text", intent="backlog".',
-                array( 'status' => 400, 'examples' => array_slice( array_keys( self::intent_map() ), 0, 20 ) )
+            // The tool manual documents "call with no arguments to list known
+            // intents", so do exactly that. Returning an error here contradicted
+            // the manual and turned the cheapest discovery path in the suite into
+            // a dead end -- the model would fall back to a capability search that
+            // costs a round trip and often lands somewhere less direct.
+            $map = self::intent_map();
+            $intents = array();
+            foreach ( $map as $key => $spec ) {
+                $intents[ (string) $key ] = (string) ( $spec['tool'] ?? '' );
+            }
+            ksort( $intents );
+            return array(
+                'ok' => true,
+                'listing' => 'intents',
+                'count' => count( $intents ),
+                'intents' => $intents,
+                'usage' => 'Call again with intent="<one of the keys above>" plus that tool\'s arguments.',
+                'note' => 'These are fast paths to a single typed tool. For an operation not listed here use prstudio_capability_search.',
+                'version' => self::VERSION,
+                'component' => 'prstudio_do',
+                'suite_version' => defined( 'PRSTUDIO_UC_VERSION' ) ? PRSTUDIO_UC_VERSION : '',
             );
         }
 
