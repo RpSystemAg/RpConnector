@@ -66,6 +66,7 @@ final class PRSTUDIO_UC_Agent_Model {
             'create or configure something new' => 'the typed tool for that domain; prstudio_capability_search only when the operation is genuinely unknown',
             'search console / seo performance'  => 'the typed GSC tools',
             'live UI, visual problem, canvas'   => 'Browser Agent (browser_* tools); browser_batch for deterministic sequences',
+            'animated or visually striking page' => 'the delivery lane already exists end to end: styles-manage append_custom_css for CSS (WordPress Additional CSS, versioned and read-back verified) and frontend-manage inject_script for JS, which persists under a named id and renders in wp_footer on every frontend page (256 KiB cap). Load an animation library from its CDN inside that script if you need one. Then browser_open plus browser_screenshot to confirm it actually renders and animates. Do not conclude the suite cannot style or animate a site',
             'code and repository work'          => 'engineering_repo_map, engineering_validate, engineering_terminal',
             'known capability, unknown schema'  => 'prstudio_capability_describe -- do not guess arguments, do not read the registry file',
             'unknown operation'                 => 'prstudio_capability_search',
