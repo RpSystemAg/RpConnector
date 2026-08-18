@@ -16,7 +16,7 @@ jobs:
   wordpress:
     name: WP ${{ matrix.wordpress }} / PHP ${{ matrix.php }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
@@ -39,6 +39,8 @@ jobs:
       WP_VERSION: ${{ matrix.wordpress }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
         with:
           php-version: ${{ matrix.php }}
@@ -106,11 +108,11 @@ jobs:
           wp cron event run --due-now --path="$WP_PATH"
           wp eval --path="$WP_PATH" 'echo wp_json_encode(PRSTUDIO_UC_Store::queue_stats(), JSON_UNESCAPED_SLASHES),"\n";'
 
-      - name: Serve the actual WordPress process
+      - name: Serve WordPress with eight real concurrent PHP workers
         run: |
-          php -S 127.0.0.1:8080 -t "$WP_PATH" "$WP_PATH/index.php" > /tmp/rpconnector-wordpress-http.log 2>&1 &
+          PHP_CLI_SERVER_WORKERS=8 php -S 127.0.0.1:8080 -t "$WP_PATH" "$WP_PATH/index.php" > /tmp/rpconnector-wordpress-http.log 2>&1 &
           echo $! > /tmp/rpconnector-wordpress-http.pid
-          for i in $(seq 1 60); do
+          for i in $(seq 1 80); do
             if curl --fail --silent --show-error "$WP_URL/" -o /tmp/rpconnector-home.html; then break; fi
             sleep 0.25
           done
@@ -126,6 +128,64 @@ jobs:
             .client_id_metadata_document_supported == true and
             (.code_challenge_methods_supported | index("S256")) != null
           ' /tmp/oauth-metadata.json
+
+      - name: Concurrent DCR — accepted registrations cannot be lost
+        run: |
+          set -euo pipefail
+          wp option delete prstudio_mcp_v5_clients --path="$WP_PATH" || true
+          wp db query --path="$WP_PATH" "DELETE FROM wp_options WHERE option_name LIKE '_transient_prstudio_mcp_v5_dcr_%' OR option_name LIKE '_transient_timeout_prstudio_mcp_v5_dcr_%';"
+          rm -f /tmp/dcr-*.json /tmp/dcr-*.code
+          seq 1 12 | xargs -P12 -I{} sh -c '
+            curl --silent --show-error \
+              -o "/tmp/dcr-{}.json" \
+              -w "%{http_code}" \
+              -X POST "http://127.0.0.1:8080/?rest_route=/prstudio-unified/v1/oauth/register" \
+              -H "Content-Type: application/json" \
+              --data-binary "{\"client_name\":\"parallel-{}\",\"redirect_uris\":[\"http://127.0.0.1/callback/{}\"],\"scope\":\"prstudio.read\"}" \
+              > "/tmp/dcr-{}.code"
+          '
+          for i in $(seq 1 12); do
+            test "$(cat /tmp/dcr-$i.code)" = '200'
+            jq -e '.client_id | type == "string" and length > 0' "/tmp/dcr-$i.json" >/dev/null
+          done
+          persisted=$(wp option get prstudio_mcp_v5_clients --format=json --path="$WP_PATH" | jq 'length')
+          echo "parallel DCR accepted=12 persisted=$persisted"
+          test "$persisted" -eq 12
+
+      - name: Concurrent DCR rate limit is bounded and persistence matches accepted responses
+        run: |
+          set -euo pipefail
+          wp option delete prstudio_mcp_v5_clients --path="$WP_PATH" || true
+          wp db query --path="$WP_PATH" "DELETE FROM wp_options WHERE option_name LIKE '_transient_prstudio_mcp_v5_dcr_%' OR option_name LIKE '_transient_timeout_prstudio_mcp_v5_dcr_%';"
+          rm -f /tmp/rate-*.json /tmp/rate-*.code
+          seq 1 40 | xargs -P20 -I{} sh -c '
+            curl --silent --show-error \
+              -o "/tmp/rate-{}.json" \
+              -w "%{http_code}" \
+              -X POST "http://127.0.0.1:8080/?rest_route=/prstudio-unified/v1/oauth/register" \
+              -H "Content-Type: application/json" \
+              --data-binary "{\"client_name\":\"rate-{}\",\"redirect_uris\":[\"http://127.0.0.1/rate/{}\"],\"scope\":\"prstudio.read\"}" \
+              > "/tmp/rate-{}.code"
+          '
+          accepted=0
+          rejected=0
+          for i in $(seq 1 40); do
+            code=$(cat "/tmp/rate-$i.code")
+            if [ "$code" = '200' ]; then
+              accepted=$((accepted+1))
+            elif [ "$code" = '429' ]; then
+              rejected=$((rejected+1))
+            else
+              echo "unexpected DCR status $code for request $i"
+              cat "/tmp/rate-$i.json"
+              exit 1
+            fi
+          done
+          persisted=$(wp option get prstudio_mcp_v5_clients --format=json --path="$WP_PATH" | jq 'length')
+          echo "DCR accepted=$accepted rejected=$rejected persisted=$persisted"
+          test "$accepted" -le 20
+          test "$accepted" -eq "$persisted"
+          test "$rejected" -ge 20
 
       - name: Mint an ephemeral runtime token inside real WordPress
         run: |
@@ -154,7 +214,7 @@ jobs:
             -H 'Mcp-Method: tools/list' \
             --data-binary @/tmp/mcp-tools-list.json
           grep -qi '^MCP-Protocol-Version: 2026-07-28' /tmp/mcp-tools-headers.txt
-          jq -e '.jsonrpc == "2.0" and .id == "tools-ci" and (.result.tools | type == "array") and (.result.tools | length > 0)' /tmp/mcp-tools-response.json
+          jq -e '.jsonrpc == "2.0" and .id == "tools-ci" and (.result.tools | type == "array") and (.result.tools | length > 0) and (.result._meta["io.modelcontextprotocol/serverInfo"].name == "RP Studio Connector")' /tmp/mcp-tools-response.json
 
       - name: MCP modern request without _meta is rejected
         run: |
@@ -206,4 +266,5 @@ jobs:
         run: |
           wp plugin list --path="$WP_PATH" || true
           wp option get prstudio_uc_schema_version --path="$WP_PATH" || true
+          wp option get prstudio_mcp_v5_clients --format=json --path="$WP_PATH" || true
           cat /tmp/rpconnector-wordpress-http.log || true
