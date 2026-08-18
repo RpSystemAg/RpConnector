@@ -1,0 +1,84 @@
+name: Static analysis
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  # The one that would have caught the real bug.
+  #
+  # PRSTUDIO_UC_Schema_Validator called array_is_list(), added in PHP 8.1, while
+  # the plugin header declares "Requires PHP: 8.0" -- a guaranteed fatal Error on
+  # a supported install, on the first tool call carrying arguments. `php -l`
+  # cannot see it (calling a function that does not exist at runtime is valid
+  # syntax) and CI lints on a newer PHP where the function is present.
+  #
+  # PHPCompatibility reads the declared floor from the plugin header and flags
+  # every call the target version cannot make. This job is blocking on purpose:
+  # shipping code that fatals on the version you advertise is not a style issue.
+  php-compatibility:
+    name: PHP 8.0 compatibility (the declared minimum)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer
+          coverage: none
+      - name: Install PHPCS and PHPCompatibility
+        run: |
+          composer global require --no-interaction --no-progress \
+            squizlabs/php_codesniffer:^3.10 \
+            phpcompatibility/phpcompatibility-wp:^2.1 \
+            dealerdirect/phpcodesniffer-composer-installer:^1.0
+          echo "$HOME/.composer/vendor/bin" >> "$GITHUB_PATH"
+      - name: Confirm the declared minimum matches what we test
+        run: |
+          declared=$(grep -oP 'Requires PHP:\s*\K[0-9.]+' prstudio-unified-control/prstudio-unified-control.php)
+          echo "plugin header declares PHP $declared"
+          if [ "$declared" != "8.0" ]; then
+            echo "::error::Plugin header declares PHP $declared but this job tests 8.0-. Update both together."
+            exit 1
+          fi
+      - name: Fail on any call the declared minimum cannot make
+        run: |
+          phpcs -p prstudio-unified-control \
+            --standard=PHPCompatibilityWP \
+            --runtime-set testVersion 8.0- \
+            --extensions=php \
+            --ignore='*/vendor/*,*/node_modules/*' \
+            --report=full \
+            --warning-severity=0
+
+  # Broad multi-language linting. Advisory: this repo predates it, so a first run
+  # surfaces a long tail of pre-existing style findings. Blocking on those would
+  # train everyone to ignore the job, which is how a real finding gets missed.
+  # Read the report, fix in batches, and tighten specific linters to blocking
+  # once their backlog is clear.
+  megalinter:
+    name: MegaLinter (advisory)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # MegaLinter diffs against the base ref to decide what changed.
+          fetch-depth: 0
+      - name: MegaLinter
+        uses: oxsecurity/megalinter/flavors/php@v8
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VALIDATE_ALL_CODEBASE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: megalinter-report
+          path: |
+            megalinter-reports
+          retention-days: 14
