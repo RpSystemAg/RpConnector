@@ -12,7 +12,7 @@ try {
     fail('MCP tools() must execute without Throwable: ' . get_class($e) . ': ' . $e->getMessage());
 }
 if (!is_array($tools)) fail('tools() must return array');
-if (count($tools) !== 123) fail('expected 123 tools, got ' . count($tools));
+if (count($tools) !== 125) fail('expected 125 tools, got ' . count($tools));
 $names = [];
 foreach ($tools as $index => $tool) {
     if (!is_array($tool)) fail("tool {$index} is not array");
@@ -33,6 +33,6 @@ foreach ($tools as $index => $tool) {
 $json = json_encode(['jsonrpc'=>'2.0','id'=>1,'result'=>['tools'=>$tools]], JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
 if ($json === false) fail('catalog JSON encoding failed: ' . json_last_error_msg());
 if (strlen($json) > 1024*1024) fail('catalog exceeds 1 MiB response budget: ' . strlen($json));
-pass('MCP tools() executes and returns 123 unique tools');
+pass('MCP tools() executes and returns 125 unique tools');
 pass('Every tool has valid object schemas and boolean annotations');
 pass('Catalog JSON encodes successfully (' . strlen($json) . ' bytes)');

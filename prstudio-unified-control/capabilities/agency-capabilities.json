@@ -4410,6 +4410,177 @@
       "source": {
         "kind": "native"
       }
+    },
+    {
+      "id": "seo.autopilot.status",
+      "version": "1.0.0",
+      "domain": "content_seo",
+      "description": "Legge lo stato della campagna SEO Autopilot attiva (contatori PENDING/CLAIMED/APPLIED_UNVERIFIED/COMPLETED/BLOCKED/REVIEW_REQUIRED) senza claim né mutazioni.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "campaign_id": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_SEO_Autopilot::mcp_status",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_through",
+      "cache_policy": "none",
+      "verification_policy": "runtime_status",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "seo.autopilot.next",
+      "version": "1.0.0",
+      "domain": "content_seo",
+      "description": "Risolve/crea la campagna SEO attiva, riconcilia l'inventario prodotti e reclama atomicamente il prossimo entity_type:entity_id PENDING. Non applica alcuna modifica SEO da sola.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "campaign_id": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "worker_id": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "skip_reconcile": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_SEO_Autopilot::mcp_next",
+      "read_only": false,
+      "write": true,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": false,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_compact_facts",
+      "cache_policy": "none",
+      "verification_policy": "count_and_provenance",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "release_claim",
+      "estimated_cost": "medium",
+      "concurrency_policy": "serialized_row_claim",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "seo.autopilot.control",
+      "version": "1.0.0",
+      "domain": "content_seo",
+      "description": "Transizioni di stato su un entity claimato o sulla campagna: init, reconcile, mark_applied_unverified, complete, block, release. BLOCKED è riservato a impossibilità tecniche/di business genuine (AGENTS.md LAW 1-3), mai a incertezza del modello.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["init", "reconcile", "mark_applied_unverified", "complete", "block", "release"]
+          },
+          "campaign_id": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "entity_type": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "entity_id": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "claim_token": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "resolved_issues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50
+          },
+          "remaining_issues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "degraded": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 255
+          }
+        },
+        "required": ["action"],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_SEO_Autopilot::mcp_control",
+      "read_only": false,
+      "write": true,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": false,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_compact_facts",
+      "cache_policy": "none",
+      "verification_policy": "count_and_provenance",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "serialized_row_claim",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
     }
   ]
 }

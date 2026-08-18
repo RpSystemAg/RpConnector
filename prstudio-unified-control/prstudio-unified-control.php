@@ -149,6 +149,7 @@ final class PRSTUDIO_Unified_Control_Plane {
         PRSTUDIO_UC_One_Guard_Legacy_Migration::run();
         PRSTUDIO_UC_Agency_Runtime::activate();
         PRSTUDIO_UC_Interventions::install();
+        PRSTUDIO_UC_SEO_Autopilot::install();
         PRSTUDIO_UC_GC::activate();
         if ( function_exists('wp_next_scheduled') && ! wp_next_scheduled( 'prstudio_uc_artifact_cleanup' ) ) {
             wp_schedule_event( time()+HOUR_IN_SECONDS, 'hourly', 'prstudio_uc_artifact_cleanup' );
@@ -173,6 +174,7 @@ final class PRSTUDIO_Unified_Control_Plane {
         PRSTUDIO_UC_One_Guard_Legacy_Migration::run();
         PRSTUDIO_UC_GC::activate();
         PRSTUDIO_UC_Interventions::install();
+        PRSTUDIO_UC_SEO_Autopilot::install();
     }
     public function action_links(array $links): array { array_unshift($links,'<a href="'.esc_url(admin_url('tools.php?page=prstudio-unified-browser')).'">Configura</a>'); return $links; }
 }

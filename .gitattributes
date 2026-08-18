@@ -1,0 +1,19 @@
+# Force LF everywhere. This repo bakes per-file SHA-256 hashes into its own
+# release integrity manifest (tests/build-release.py, FILE-INTEGRITY.json) and
+# into PRSTUDIO_UC_Health's runtime tamper check -- a checkout that silently
+# rewrites LF to CRLF on a Windows contributor's machine (Git's default
+# core.autocrlf=true with no .gitattributes) would make those hashes
+# unreproducible between contributors even though nothing about the source
+# actually changed. Binary formats are listed explicitly so they are never
+# touched by line-ending normalization.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.zip binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
