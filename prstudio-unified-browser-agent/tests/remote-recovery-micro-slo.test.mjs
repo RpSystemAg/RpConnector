@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { performance } from "node:perf_hooks";
 import test from "node:test";
 
@@ -71,8 +72,9 @@ function createFileStorageArea(path) {
   };
 }
 
-const storagePath = "/mnt/data/handoff8-audit/evidence/remote-recovery-micro-storage.json";
-const evidencePath = "/mnt/data/handoff8-audit/evidence/remote-recovery-micro-slo.json";
+const evidenceDir = join(tmpdir(), "rpconnector-handoff8-audit", "evidence");
+const storagePath = join(evidenceDir, "remote-recovery-micro-storage.json");
+const evidencePath = join(evidenceDir, "remote-recovery-micro-slo.json");
 const local = createFileStorageArea(storagePath);
 const session = createMemoryStorageArea();
 const noop = async () => undefined;
