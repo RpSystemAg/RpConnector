@@ -113,12 +113,52 @@ final class PRSTUDIO_UC_Bridge {
 			$all_devices = PRSTUDIO_UC_Store::list_devices();
 			$include_history = ! empty( $arguments['include_history'] );
 			$visible_devices = $include_history ? $all_devices : array_values( array_filter( $all_devices, static fn( $device ) => 'active' === (string) ( $device['status'] ?? '' ) ) );
-			$devices = PRSTUDIO_UC_Store::public_devices( $visible_devices );
+
+			// include_history returned every device ever paired -- on a site with
+			// 52 of them that is ~231 KB, past the point where the transport
+			// truncates. The diagnostic became unusable exactly when it was
+			// needed: asking for history is what you do when something is wrong,
+			// and the answer arrived cut off mid-record.
+			//
+			// Bound it and say so. limit/offset make the rest reachable instead
+			// of silently absent, and the filters answer the question people
+			// actually open this for -- which device, and what state is it in.
+			$device_filter = sanitize_key( (string) ( $arguments['device_status'] ?? '' ) );
+			if ( '' !== $device_filter ) {
+				$visible_devices = array_values( array_filter(
+					$visible_devices,
+					static fn( $device ) => $device_filter === (string) ( $device['status'] ?? '' )
+						|| $device_filter === (string) ( $device['connection_status'] ?? '' )
+				) );
+			}
+			$device_id_filter = sanitize_text_field( (string) ( $arguments['device_id'] ?? '' ) );
+			if ( '' !== $device_id_filter ) {
+				$visible_devices = array_values( array_filter(
+					$visible_devices,
+					static fn( $device ) => $device_id_filter === (string) ( $device['device_uuid'] ?? '' )
+				) );
+			}
+
+			$matched = count( $visible_devices );
+			$limit = max( 1, min( 100, (int) ( $arguments['limit'] ?? ( $include_history ? 25 : 100 ) ) ) );
+			$offset = max( 0, (int) ( $arguments['offset'] ?? 0 ) );
+			$page = array_slice( $visible_devices, $offset, $limit );
+			$devices = PRSTUDIO_UC_Store::public_devices( $page );
 			return array(
 				'available' => ! empty( array_filter( $all_devices, static fn( $device ) => ! empty( $device['online'] ) ) ),
 				'provider' => 'prstudio_chrome_extension',
 				'target' => 'live',
 				'devices' => $devices,
+				'page' => array(
+					'returned' => count( $devices ),
+					'matched' => $matched,
+					'limit' => $limit,
+					'offset' => $offset,
+					'has_more' => ( $offset + count( $devices ) ) < $matched,
+					'next_offset' => ( $offset + count( $devices ) ) < $matched ? $offset + $limit : null,
+					'filters' => array( 'device_status' => $device_filter, 'device_id' => $device_id_filter ),
+					'note' => 'Bounded so the response is never truncated in transport. Use offset, or device_id/device_status, to reach the rest.',
+				),
 				'device_history' => array(
 					'total' => count( $all_devices ),
 					'active' => count( array_filter( $all_devices, static fn( $row ) => 'active' === (string) ( $row['status'] ?? '' ) ) ),

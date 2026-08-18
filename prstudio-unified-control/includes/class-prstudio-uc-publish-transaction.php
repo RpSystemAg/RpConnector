@@ -92,6 +92,33 @@ final class PRSTUDIO_UC_Publish_Transaction {
 
         $idempotency = trim( (string) ( $args['idempotency_key'] ?? '' ) );
         if ( '' === $idempotency ) { $idempotency = hash( 'sha256', $type . '|' . $slug . '|' . $title . '|' . hash( 'sha256', $content ) ); }
+        // Serialize on the idempotency key for the check-then-insert window.
+        // existing_by_key() reads postmeta, but the meta that would make a
+        // duplicate visible is only written after wp_insert_post() returns --
+        // and there is no unique constraint on it. Two identical publishes
+        // arriving together therefore both saw "not found" and both created a
+        // post. A lane is not required for this executor, so nothing upstream
+        // closed that window either.
+        //
+        // GET_LOCK is connection-scoped and released automatically if the
+        // request dies, so a crashed publish cannot strand the key.
+        $publish_lock = null;
+        if ( isset( $GLOBALS['wpdb'] ) && method_exists( $GLOBALS['wpdb'], 'get_var' ) ) {
+            $scope = ( defined( 'DB_NAME' ) ? (string) DB_NAME : '' ) . '|' . (string) $GLOBALS['wpdb']->prefix;
+            $publish_lock = 'prstudio_publish_' . substr( hash( 'sha256', $scope . '|' . $idempotency ), 0, 40 );
+            $got = $GLOBALS['wpdb']->get_var( $GLOBALS['wpdb']->prepare( 'SELECT GET_LOCK(%s, %d)', $publish_lock, 10 ) );
+            if ( '1' !== (string) $got ) {
+                // Another publish holds this exact key. Treating that as an
+                // error is right: returning "created" for a post this request
+                // did not create would be the duplicate problem in a new form.
+                $publish_lock = null;
+                if ( null !== $got ) {
+                    return self::error( 'publish_idempotency_busy', 'An identical publish is already in progress. Retry in a moment.', 409, array( 'retryable'=>true, 'idempotency_key'=>$idempotency ) );
+                }
+            }
+        }
+
+        try {
         $existing = self::existing_by_key( $idempotency );
         if ( $existing ) {
             $url = get_permalink( $existing );
@@ -203,5 +230,13 @@ final class PRSTUDIO_UC_Publish_Transaction {
             'technical_errors'=>$technical_errors,
             'warnings'=>$claim_warnings,
         );
+        } finally {
+            // Release explicitly rather than relying on connection teardown:
+            // PHP-FPM reuses connections, so a lock left held would block the
+            // next request that happened to use the same key.
+            if ( null !== $publish_lock && isset( $GLOBALS['wpdb'] ) && method_exists( $GLOBALS['wpdb'], 'query' ) ) {
+                $GLOBALS['wpdb']->query( $GLOBALS['wpdb']->prepare( 'SELECT RELEASE_LOCK(%s)', $publish_lock ) );
+            }
+        }
     }
 }
