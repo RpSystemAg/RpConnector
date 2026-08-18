@@ -1116,8 +1116,47 @@ HTML;
             if(isset($seen[$action]))continue;
             $desc=(string)($meta['description']??'');$tool=(string)($meta['tool_name']??'');$hay=strtolower($action.' '.$desc.' '.$tool);$score=0;
             $typed_tool=self::typed_browser_tool_for_action($action);
-            if(''===$q)$score=1;elseif($action===$q)$score=100;elseif(str_contains($action,$q))$score=60;elseif(str_contains($hay,$q))$score=30;
+            // Score per token, not on the whole phrase. Matching the raw query as
+            // one substring meant a natural request could never hit: "list pages"
+            // does not appear in "playwright_list_pages" because the action uses
+            // underscores, so the search returned nothing for the action that was
+            // sitting right there. Flattening separators and scoring each word
+            // makes the phrasing a caller actually types resolve.
+            // Include the typed tool's own name in what is searchable. A caller
+            // who types "open" means browser_open, but that word appears nowhere
+            // in playwright_new_page, so the obvious query returned an unrelated
+            // action. The typed name is the vocabulary the caller was given, so
+            // it belongs in the haystack.
+            $flat_action=str_replace(array('_','-'),' ',$action);
+            if(''!==$typed_tool){$flat_action.=' '.str_replace(array('browser_','_','-'),array('',' ',' '),$typed_tool);}
+            $flat_hay=str_replace(array('_','-'),' ',$hay).' '.str_replace(array('_','-'),' ',$typed_tool);
+            $q_flat=str_replace(array('_','-'),' ',$q);
+            if(''===$q){
+                $score=1;
+            }elseif($action===$q||$flat_action===$q_flat){
+                $score=100;
+            }else{
+                $tokens=array_values(array_filter(preg_split('/\s+/',$q_flat)?:array(),static fn($t)=>strlen((string)$t)>1));
+                if(!$tokens){
+                    $score=str_contains($flat_hay,$q_flat)?30:0;
+                }else{
+                    $in_action=0;$in_hay=0;
+                    foreach($tokens as $token){
+                        if(str_contains($flat_action,$token)){$in_action++;continue;}
+                        if(str_contains($flat_hay,$token))$in_hay++;
+                    }
+                    // Every token present in the action name is the strongest
+                    // signal a caller named the operation, however they spaced it.
+                    if($in_action===count($tokens))$score=80;
+                    elseif($in_action>0)$score=40+(int)round(20*$in_action/count($tokens));
+                    elseif($in_hay===count($tokens))$score=25;
+                    elseif($in_hay>0)$score=10;
+                }
+            }
             if($score<1)continue;if(str_contains($q,'screenshot')&&str_contains($action,'screenshot'))$score+=25;
+            // A typed tool exists for this action, so prefer it in the ranking:
+            // it is the cheaper, better-documented way to do the same thing.
+            if(''!==$typed_tool)$score+=5;
             $aliases=str_starts_with($action,'playwright_')?array('puppeteer_'.substr($action,11)):array();
             $item=array('action'=>$action,'aliases'=>$aliases,'description'=>$desc,'read_only'=>(bool)($meta['read_only']??false),'destructive'=>(bool)($meta['destructive']??false),'input_schema'=>$meta['input_schema']??array(),'executor'=>'browser_agent');
             if(''!==$typed_tool){$item['tier']='typed';$item['canonical_tool']=$typed_tool;}else{$item['tier']='advanced';}$item['generic_dispatch_supported']=true;
