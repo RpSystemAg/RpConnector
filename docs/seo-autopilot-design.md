@@ -1,51 +1,43 @@
-# SEO Autopilot campaign tracking — design proposal (v1, pre-implementation)
+# SEO Autopilot campaign tracking — design (v2, confirmed against code)
 
-Status: draft, pending confirmation against a full read of `PRSTUDIO_UC_Memory`, `PRSTUDIO_UC_Idempotency`, `PRSTUDIO_UC_Execution_Lanes`, `PRSTUDIO_UC_Job_Engine`, `PRSTUDIO_UC_Mission_Engine`, `PRSTUDIO_UC_Playbook_Engine` and the capability/autoload wiring (in progress). Items marked **[confirmed]** were read directly tonight; items marked **[proposed]** are the design choice pending that confirmation, not yet implemented.
+Status: confirmed via direct code read (Explore agent, 52 file reads). Ready for implementation pending sign-off on the two deviations flagged below.
 
 ## A. Files/classes involved
 
 New:
-- `includes/class-prstudio-uc-seo-autopilot.php` — `PRSTUDIO_UC_SEO_Autopilot`, the orchestrator. Naming matches the existing `PRSTUDIO_UC_<Name>` convention **[confirmed pattern, seen throughout includes/]**.
-- One new table for entity rows (see C).
+- `includes/class-prstudio-uc-seo-autopilot.php` — `PRSTUDIO_UC_SEO_Autopilot`.
+- `wp_prstudio_uc_seo_campaign_entities` table + install migration.
+- `tests/php-seo-autopilot-*-smoke.php` (standalone CLI smoke tests, matching the existing pattern — no PHPUnit/wp-env in this repo).
 
-Touched, not replaced:
-- `includes/class-prstudio-uc-store.php` — template for the new table's migration/claim pattern **[confirmed: has `*_table()` helpers, `$wpdb->prepare()`-based claim logic with lease_token/lease_expires_gmt]**.
-- `includes/class-prstudio-uc-interventions.php` — read-before-propose, write-after-apply; campaign state and intervention ledger stay two separate, cooperating systems as specified.
-- `includes/class-prstudio-uc-mcp-v5.php` — register 3 new tools (`seo.autopilot.status/next/control`), same `self::tool(...)` pattern used by the existing 123 **[confirmed: 123/123 verified matching earlier tonight]**.
-- `capabilities/capability-registry.json` (or whatever process generates it — pending agent confirmation of hand-edited vs. generated).
-- `RP-STUDIO-CHATGPT-PLUGIN-1.0.0.json` — `tool_names` + `expected_tools`, same drift-check already added to CI.
-- SEO skill/instructions doc — one short protocol rule, no state, no IDs (as specified).
+Touched:
+- `includes/class-prstudio-uc-autoload.php` — one line in the hand-maintained class map (confirmed: no directory-scan autoloader; a class is invisible until added here).
+- `prstudio-unified-control.php` `activate()` — add `PRSTUDIO_UC_SEO_Autopilot::install()` alongside the existing `PRSTUDIO_UC_Interventions::install()` call.
+- `capabilities/agency-capabilities.json` — 3 new entries (hand-edited overlay, not the generated `capability-registry.json`).
+- `includes/class-prstudio-uc-mcp-v5.php` — 3 new `self::tool(...)` declarations + 3 `case` branches in `call_tool()`.
+- `RP-STUDIO-CHATGPT-PLUGIN-1.0.0.json` + the drift-check script (already in CI).
+- `tests/validate-release.mjs` — register the new smoke test.
+- SEO skill/instructions doc — one protocol line, no state.
 
-## B. Storage to reuse
+## B. Storage
 
-Two different shapes, two different existing patterns:
-- **Campaign record** (1 row per campaign, small, needs a stable named alias like `ACTIVE_SEO_MISSION` → `SEO-MASTER-IDEALMARKET-2026-V1`): **[proposed]** reuse `PRSTUDIO_UC_Memory`'s document/alias mechanism if it supports named documents — this is exactly what an "alias resolving to a mission id" sounds like it's for. Not yet confirmed the API shape supports this; if it doesn't, a single-row table alongside the entities table is the fallback, not a new bespoke memory system.
-- **Entity records** (~800-1000 rows, need indexed status lookups and atomic per-row claims): a JSON blob does not give real per-row locking at this cardinality. **[proposed]** new table, see C.
+Confirmed by reading `PRSTUDIO_UC_Memory`, `PRSTUDIO_UC_Agency_State`/Operational Twin, `PRSTUDIO_UC_Execution_Lanes`, `PRSTUDIO_UC_Store`, and the Job/Mission engine in full:
 
-## C. Does this need a new table — yes, proposed schema
+- **Entity rows (~800-1000, need atomic claim + indexed status query): new table**, not Memory/Agency_State. Both of those are one JSON blob per site/state, rewritten whole on every mutation, behind one `flock()` shared with unrelated traffic (Memory's lock is sitewide — shared with logging from every other subsystem) — no indexed "next PENDING" query is possible without an O(n) in-PHP scan. Execution_Lanes is explicitly capped at 128 short-TTL lock entries in one `wp_options` row — a mutex layer, not a system of record. `PRSTUDIO_UC_Store` already has the exact right pattern: transactional `SELECT ... FOR UPDATE` → `UPDATE` claim (`claim_next()`/`claim_job_internal()`), lease/heartbeat, stale-claim recovery sweep. New table copies this pattern directly.
+- **`ACTIVE_SEO_MISSION` alias**: `PRSTUDIO_UC_Memory::mission(string $id, ?array $state=null)` is built for exactly this — an arbitrary-id alias/state store, low write frequency. Campaign counters stay in the new table (updated atomically alongside claims), not in Memory, so counter updates don't contend with the sitewide lock.
+- **`source_fingerprint`**: reuse `PRSTUDIO_UC_Product_Audit::fingerprint()` verbatim as the template (id, modified, name, slug, status, stock, stock_status, image_id + 5 RankMath fields → `PRSTUDIO_UC_Memory::fingerprint()` for canonicalization). Not a new hashing scheme.
+- **Initial inventory seeding**: `wc_get_products()` (HPOS-safe), matching `PRSTUDIO_UC_Operational_Twin::commerce_entities()` — not raw `get_posts()`. The bootstrap file already mandates the WC CRUD layer over raw post-table assumptions.
 
-`wp_prstudio_uc_seo_campaign_entities`, built with the same dbDelta/schema-version pattern already used by `PRSTUDIO_UC_Store` **[confirmed pattern]**:
+## C. New table — yes, confirmed necessary. Schema unchanged from v1 draft.
 
-- `id` bigint PK, `campaign_id`, `entity_type`, `entity_id`, `entity_key` (generated `entity_type:entity_id`), `canonical_url`, `status`, `priority`, `source_fingerprint`, `issue_revision`, `resolved_issues` (json), `remaining_issues` (json), `claimed_by`, `claim_expires_at`, `operation_id`, `first_seen_gmt`, `last_observed_gmt`, `completed_gmt`, `notes` (json).
-- `UNIQUE KEY (campaign_id, entity_type, entity_id)`, `KEY (campaign_id, status, priority)` for the claim-next query.
-- Claim uses the same conditional-UPDATE lease pattern as `PRSTUDIO_UC_Store::mark_running()` — no new locking primitive.
-- Campaign row (counters, `inventory_hash`, `active` flag) either in `PRSTUDIO_UC_Memory` (if B holds) or a second small table.
+## D. Flow — unchanged from v1, one addition
 
-## D. Flow
+`claim_next()` additionally calls `PRSTUDIO_UC_Interventions::filter_new()` (existing bulk-check method, not a new one) to exclude issues already settled, and can layer `PRSTUDIO_UC_Execution_Lanes::acquire('product:<id>', ...)` as a secondary guard against a concurrent manual/browser edit on the same product — not the primary claim mechanism, which is the table's own row lock.
 
-```
-"next" / "continua"
-  → seo.autopilot.next (MCP, authenticated, same layer as the 123 existing tools)
-  → resolve_active_seo_mission()      [Memory alias lookup]
-  → reconcile check (cheap: new products since last reconcile? — full reconcile is a separate, explicit operation, not run on every "next")
-  → claim_next(): SELECT next PENDING by (priority DESC, entity_id ASC) WHERE status NOT IN (COMPLETED, BLOCKED, REVIEW_REQUIRED) AND (claim_expires_at IS NULL OR claim_expires_at < NOW())
-  → atomic UPDATE …WHERE id = ? AND status = ? (CAS, same shape as existing lease claims) → CLAIMED
-  → cross-check PRSTUDIO_UC_Interventions::state_of(entity_key) so already-APPLIED issues aren't re-proposed
-  → return entity descriptor to caller (NOT the audit itself — research/optimize happens on the ChatGPT/Browser-Agent side, which already has GSC/live-site access this environment does not)
-  → caller does the work, then calls a complete/commit capability
-  → complete_entity(): verify → update resolved/remaining issues → record intervention → release claim → update campaign counters → COMPLETED or back to PENDING with new issue_revision
-```
+## Two deviations from the original spec — flagging before writing code, not deciding unilaterally
 
-## Explicit scope line for this pass
+1. **Tool naming.** The spec proposed `seo.autopilot.status/next/control` (dot notation). All 123 existing MCP tools use `snake_case`, `prstudio_`-prefixed (`prstudio_health`, `commerce_product_audit`, `gsc_url_inspection`) — none use dots. Proposing `prstudio_seo_autopilot_status` / `_next` / `_control` instead, to match the one actual convention in this codebase rather than introduce a second one.
+2. **`REVIEW_REQUIRED`/`BLOCKED` semantics.** `AGENTS.md` (the binding constitution) is explicit: "A future feature that can stop a technically valid action is forbidden unless it is the Anti-Crash mutation guard," and verification uncertainty must render as `verified=false, degraded=true` on a completed action, never a blocking/parked state. So `REVIEW_REQUIRED`/`BLOCKED` can only fire on a genuine technical/business inability (e.g. Rank Math ≥90 not reachable without a semantically incorrect change — the spec's own stated exception), never on "the model wasn't confident." Implementing it any looser would violate the constitution this whole plugin already runs under.
 
-This design covers the **persistent tracking/queue system only** (part 1 of the request): campaign state, atomic claim, resume-without-context, ledger integration, reconcile. It defines the capability surface and entity schema that the "agency quality" research/optimization behavior (GSC, Trends, Rank Math live observation, content rewriting) will plug into, but that behavior itself runs live-connected (ChatGPT + Browser Agent against the real site) and isn't something this repo's test suite can execute or verify — it's tested here only as far as the state machine and interfaces are concerned.
+## Not yet built, correctly out of scope for this pass
+
+The "Agency Quality" research/optimization behavior (GSC, Trends, Rank Math live observation, content rewriting) — this defines the state machine and capability surface it plugs into, not that behavior itself, which runs live-connected and isn't testable in this environment.
