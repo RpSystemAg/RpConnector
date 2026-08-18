@@ -78,6 +78,11 @@ jobs:
           php tests/php-agent-model-constitution.php
           php tests/php-mcp-catalog-runtime-smoke.php
           php tests/php-new-capabilities-smoke.php
+      - name: tools/list must stay within the host tool-schema budget
+        # Non-negotiable, same standing as the one-guard check. A surface over
+        # the host's ceiling does not fail loudly -- tools stay visible in the
+        # prompt and silently stop being callable -- so it has to be caught here.
+        run: php tests/php-tools-list-budget.php
       - name: One-guard constitution (anti-crash must stay the only mutation guard)
         run: python3 tests/one_guard_constitution.py
       - uses: actions/setup-node@v4

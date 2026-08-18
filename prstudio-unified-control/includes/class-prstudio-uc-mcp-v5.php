@@ -213,7 +213,18 @@ final class PRSTUDIO_UC_MCP_V5 {
             return self::rpc_error($id,-32602,'Unknown resource URI.');
         }
         if ( 'tools/list' === $method ) {
-            $result = array( 'tools'=>self::tools() );
+            $budgeted = self::tools_within_budget();
+            $result = array( 'tools'=>$budgeted['tools'] );
+            if ( $budgeted['withheld'] > 0 ) {
+                $result['_prstudio_surface'] = array(
+                    'advertised' => count( $budgeted['tools'] ),
+                    'withheld' => $budgeted['withheld'],
+                    'reason' => 'tools_list_token_budget',
+                    'approx_tokens' => $budgeted['tokens'],
+                    'budget_tokens' => self::TOOLS_LIST_TOKEN_BUDGET,
+                    'reach_the_rest_with' => array( 'prstudio_capability_search', 'prstudio_execute', 'prstudio_tool_manual' ),
+                );
+            }
             if ( '2026-07-28' === self::$response_protocol ) { $result['ttlMs'] = 300000; $result['cacheScope'] = 'private'; }
             return self::rpc_result( $id, $result );
         }
@@ -1521,6 +1532,105 @@ HTML;
      * This is queue bookkeeping, not a mutation guard: it changes the state of
      * a pending instruction, and never inspects or authorizes site effects.
      */
+    /**
+     * Tools that must always be advertised, in priority order.
+     *
+     * These are the ones a model cannot reach any other way: the routers and the
+     * discovery surface. Everything withheld from tools/list stays reachable
+     * through prstudio_capability_search plus prstudio_execute, so trimming the
+     * advertised list costs a lookup, never a capability. Trimming these would
+     * cost the capability itself, because there would be nothing left to search
+     * with.
+     */
+    private const SURFACE_ESSENTIAL = array(
+        'prstudio_do','prstudio_capability_search','prstudio_capability_describe','prstudio_execute',
+        'prstudio_tool_manual','prstudio_health','prstudio_observe','prstudio_flow','prstudio_backlog',
+        'prstudio_context_open','prstudio_job_get','prstudio_job_control','prstudio_intervention_record',
+        'browser_status','browser_task_control','browser_open','browser_screenshot','browser_snapshot',
+        'wordpress_content_transaction','procedural_skill_search','procedural_skill_get',
+    );
+
+    /**
+     * Hard ceiling on the tools/list surface, in approximate tokens.
+     *
+     * A host does not read tools/list from an unlimited buffer. ChatGPT's MCP
+     * connector refuses a server whose combined tool surface -- every name,
+     * description and input schema together -- exceeds roughly 5,000 tokens, and
+     * it does not fail loudly: the tools stay visible in the prompt while
+     * becoming uncallable, which reads like a permissions fault and sends you
+     * looking in entirely the wrong place. This suite emitted about 22,000
+     * tokens, four and a half times over.
+     *
+     * So the budget is enforced here rather than documented and hoped for. The
+     * surface is assembled until the ceiling is reached and then stops, which
+     * means adding tools can never silently push the server past the limit
+     * again -- new tools simply fall below the line and remain reachable through
+     * search and the generic executor.
+     */
+    private const TOOLS_LIST_TOKEN_BUDGET = 5000;
+
+    /** Approximate a token count from encoded bytes. Deliberately conservative. */
+    private static function approx_tokens( int $bytes ): int { return (int) ceil( $bytes / 4 ); }
+
+    /** Bytes this tool contributes to the surface a host ingests. */
+    private static function surface_bytes( array $tool ): int {
+        $encoded = json_encode(
+            array( 'name'=>$tool['name'] ?? '', 'description'=>$tool['description'] ?? '', 'inputSchema'=>$tool['inputSchema'] ?? array() ),
+            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+        );
+        return false === $encoded ? 0 : strlen( $encoded );
+    }
+
+    /**
+     * Assemble the largest tools/list surface that stays inside the token budget.
+     *
+     * Essential tools go in first and in their declared order, so the routers and
+     * the discovery surface are never the ones dropped. The remainder is added
+     * smallest-first: at a fixed budget that advertises the most tools, and the
+     * verbose ones are exactly those whose guidance prstudio_tool_manual already
+     * carries in full.
+     *
+     * @return array{tools:array<int,array>,withheld:int,tokens:int}
+     */
+    private static function tools_within_budget(): array {
+        $all = self::tools();
+        $by_name = array();
+        foreach ( $all as $tool ) { $by_name[ (string) ( $tool['name'] ?? '' ) ] = $tool; }
+
+        $ordered = array();
+        foreach ( self::SURFACE_ESSENTIAL as $name ) {
+            if ( isset( $by_name[ $name ] ) ) { $ordered[] = $by_name[ $name ]; unset( $by_name[ $name ] ); }
+        }
+        $rest = array_values( $by_name );
+        usort( $rest, static function ( array $a, array $b ) {
+            $delta = self::surface_bytes( $a ) <=> self::surface_bytes( $b );
+            return 0 !== $delta ? $delta : strcmp( (string) ( $a['name'] ?? '' ), (string) ( $b['name'] ?? '' ) );
+        } );
+
+        // Two bytes of JSON array framing per element; small, but the ceiling is
+        // a ceiling and an estimate that runs under it is not an estimate.
+        $selected = array();
+        $bytes = 2;
+        $budget_bytes = self::TOOLS_LIST_TOKEN_BUDGET * 4;
+        foreach ( array_merge( $ordered, $rest ) as $tool ) {
+            $cost = self::surface_bytes( $tool ) + 1;
+            if ( $selected && ( $bytes + $cost ) > $budget_bytes ) { continue; }
+            $selected[] = $tool;
+            $bytes += $cost;
+        }
+
+        return array(
+            'tools' => $selected,
+            'withheld' => max( 0, count( $all ) - count( $selected ) ),
+            'tokens' => self::approx_tokens( $bytes ),
+        );
+    }
+
+    /** Test accessors for the surface budget. The law is enforced above; these only observe it. */
+    public static function advertised_tools_for_test(): array { return self::tools_within_budget(); }
+    public static function tools_list_budget_for_test(): int { return self::TOOLS_LIST_TOKEN_BUDGET; }
+    public static function essential_tools_for_test(): array { return self::SURFACE_ESSENTIAL; }
+
     private static function control_browser_task(array $args){
         $task_id=sanitize_text_field((string)($args['task_id']??''));
         $action=sanitize_key((string)($args['action']??'cancel'));

@@ -9,7 +9,30 @@ LAW 4 — HUMAN INTERVENTION IS AUTH-CHALLENGE ONLY.
 LAW 5 — TRANSIENT FAILURE RETRIES; IT DOES NOT PARK THE MISSION.  
 LAW 6 — OWNERSHIP IS SESSION/LANE SCOPED.  
 LAW 7 — NO TRIAL INPUT.  
-LAW 8 — NO MODEL ROUND-TRIP WITHOUT NEW JUDGMENT.
+LAW 8 — NO MODEL ROUND-TRIP WITHOUT NEW JUDGMENT.  
+LAW 9 — THE TOOLS/LIST SURFACE NEVER EXCEEDS 5,000 TOKENS.
+
+### Law 9 in full
+
+Every name, description and input schema that `tools/list` emits counts against
+one ceiling of approximately 5,000 tokens. This is not a style preference. A
+host that enforces it does not reject the server: the tools stay visible in the
+prompt and silently stop being callable, which presents as a permissions or
+protocol fault and sends the investigation somewhere else entirely. The suite
+shipped at roughly 22,000 tokens — four and a half times over — and that is the
+most likely cause of the "tool not exposed" reports.
+
+The ceiling is enforced in code, not by convention:
+`PRSTUDIO_UC_MCP_V5::tools_within_budget()` assembles the surface until the
+budget is reached and then stops, so adding a tool can never push the server
+past the limit again. Essential routers and the discovery surface are admitted
+first and are never trimmed; everything below the line stays fully reachable
+through `prstudio_capability_search` plus `prstudio_execute`, so a withheld tool
+costs a lookup, never a capability.
+
+`tests/php-tools-list-budget.php` fails the build if the emitted surface exceeds
+the budget or if any essential tool was trimmed. It has the same standing as the
+one-guard constitution check: do not raise the constant to make it pass.
 
 ## Runtime invariant
 

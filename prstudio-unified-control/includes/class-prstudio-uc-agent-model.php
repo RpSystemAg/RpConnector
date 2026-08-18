@@ -46,6 +46,9 @@ final class PRSTUDIO_UC_Agent_Model {
             'ownership_is_session_or_lane_scoped' => true,
             'no_trial_input' => true,
             'no_model_roundtrip_without_new_judgment' => true,
+            // Law 9. Enforced by PRSTUDIO_UC_MCP_V5::tools_within_budget() and
+            // asserted by tests/php-tools-list-budget.php.
+            'tools_list_surface_within_token_budget' => true,
         );
     }
 
