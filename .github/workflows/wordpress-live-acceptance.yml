@@ -16,7 +16,7 @@ jobs:
   wordpress:
     name: WP ${{ matrix.wordpress }} / PHP ${{ matrix.php }}
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -65,6 +65,7 @@ jobs:
             --dbpass='' \
             --dbhost=127.0.0.1:3306 \
             --skip-check
+          wp config set WP_ENVIRONMENT_TYPE local --path="$WP_PATH"
           wp core install \
             --path="$WP_PATH" \
             --url="$WP_URL" \
@@ -102,19 +103,95 @@ jobs:
 
       - name: Exercise WordPress cron bootstrap
         run: |
-          wp cron event run --due-now --path="$WP_PATH" || true
+          wp cron event run --due-now --path="$WP_PATH"
           wp eval --path="$WP_PATH" 'echo wp_json_encode(PRSTUDIO_UC_Store::queue_stats(), JSON_UNESCAPED_SLASHES),"\n";'
 
-      - name: Serve and fetch the actual WordPress front end
+      - name: Serve the actual WordPress process
         run: |
-          php -S 127.0.0.1:8080 -t "$WP_PATH" > /tmp/rpconnector-wordpress-http.log 2>&1 &
+          php -S 127.0.0.1:8080 -t "$WP_PATH" "$WP_PATH/index.php" > /tmp/rpconnector-wordpress-http.log 2>&1 &
           echo $! > /tmp/rpconnector-wordpress-http.pid
-          for i in $(seq 1 40); do
+          for i in $(seq 1 60); do
             if curl --fail --silent --show-error "$WP_URL/" -o /tmp/rpconnector-home.html; then break; fi
             sleep 0.25
           done
           test -s /tmp/rpconnector-home.html
           grep -qi '<html' /tmp/rpconnector-home.html
+
+      - name: Verify OAuth authorization-server metadata over real HTTP
+        run: |
+          curl --fail --silent --show-error "$WP_URL/.well-known/oauth-authorization-server" -o /tmp/oauth-metadata.json
+          jq -e '
+            .issuer != null and
+            .authorization_response_iss_parameter_supported == true and
+            .client_id_metadata_document_supported == true and
+            (.code_challenge_methods_supported | index("S256")) != null
+          ' /tmp/oauth-metadata.json
+
+      - name: Mint an ephemeral runtime token inside real WordPress
+        run: |
+          wp eval --path="$WP_PATH" '
+            $method=(new ReflectionClass("PRSTUDIO_UC_MCP_Auth_V5"))->getMethod("issue_tokens");
+            $method->setAccessible(true);
+            $tokens=$method->invoke(null,"ci-runtime-client","prstudio.read prstudio.write offline_access",PRSTUDIO_UC_MCP_Auth_V5::mcp_url());
+            if (!is_array($tokens) || empty($tokens["access_token"])) { fwrite(STDERR,"token issuance failed\n"); exit(1); }
+            file_put_contents("/tmp/rpconnector-access-token",$tokens["access_token"]);
+          '
+          test -s /tmp/rpconnector-access-token
+
+      - name: MCP 2026-07-28 authenticated tools/list over WordPress HTTP
+        run: |
+          token=$(cat /tmp/rpconnector-access-token)
+          cat > /tmp/mcp-tools-list.json <<'JSON'
+          {"jsonrpc":"2.0","id":"tools-ci","method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/clientInfo":{"name":"rpconnector-ci","version":"1.0"}}}}
+          JSON
+          curl --fail --silent --show-error \
+            -D /tmp/mcp-tools-headers.txt \
+            -o /tmp/mcp-tools-response.json \
+            -X POST "$WP_URL/?rest_route=/prstudio-unified/v1/mcp" \
+            -H "Authorization: Bearer $token" \
+            -H 'Content-Type: application/json' \
+            -H 'MCP-Protocol-Version: 2026-07-28' \
+            -H 'Mcp-Method: tools/list' \
+            --data-binary @/tmp/mcp-tools-list.json
+          grep -qi '^MCP-Protocol-Version: 2026-07-28' /tmp/mcp-tools-headers.txt
+          jq -e '.jsonrpc == "2.0" and .id == "tools-ci" and (.result.tools | type == "array") and (.result.tools | length > 0)' /tmp/mcp-tools-response.json
+
+      - name: MCP modern request without _meta is rejected
+        run: |
+          token=$(cat /tmp/rpconnector-access-token)
+          status=$(curl --silent --show-error \
+            -o /tmp/mcp-missing-meta.json \
+            -w '%{http_code}' \
+            -X POST "$WP_URL/?rest_route=/prstudio-unified/v1/mcp" \
+            -H "Authorization: Bearer $token" \
+            -H 'Content-Type: application/json' \
+            -H 'MCP-Protocol-Version: 2026-07-28' \
+            -H 'Mcp-Method: ping' \
+            --data-binary '{"jsonrpc":"2.0","id":"bad-meta","method":"ping","params":{}}')
+          test "$status" = '400'
+          jq -e '.error.code == -32602' /tmp/mcp-missing-meta.json
+
+      - name: MCP modern initialize is explicitly absent
+        run: |
+          token=$(cat /tmp/rpconnector-access-token)
+          cat > /tmp/mcp-initialize.json <<'JSON'
+          {"jsonrpc":"2.0","id":"init-modern","method":"initialize","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}
+          JSON
+          status=$(curl --silent --show-error \
+            -o /tmp/mcp-initialize-response.json \
+            -w '%{http_code}' \
+            -X POST "$WP_URL/?rest_route=/prstudio-unified/v1/mcp" \
+            -H "Authorization: Bearer $token" \
+            -H 'Content-Type: application/json' \
+            -H 'MCP-Protocol-Version: 2026-07-28' \
+            -H 'Mcp-Method: initialize' \
+            --data-binary @/tmp/mcp-initialize.json)
+          test "$status" = '404'
+          jq -e '.error.code == -32601' /tmp/mcp-initialize-response.json
+
+      - name: Remove ephemeral token material
+        if: always()
+        run: rm -f /tmp/rpconnector-access-token
 
       - name: Diagnostics on failure
         if: failure()
