@@ -42,14 +42,20 @@ jobs:
           python tests/runtime-chaos-model.py
           python tests/one_guard_constitution.py
 
-      - name: Strict release validation
-        run: node tests/validate-release.mjs --strict --php-smoke
-
       - name: Generated contracts must match source
         run: |
           python tests/regenerate-contract-artifacts.py --php-binary php --check
           node .github/scripts/check-mcp-tool-drift.mjs
           node .github/scripts/check-build-info-counts.mjs
+
+      - name: Generate release integrity artifacts for exact commit
+        run: python tests/build-release.py --build
+
+      - name: Strict release validation
+        run: node tests/validate-release.mjs --strict --php-smoke
+
+      - name: Generated release artifacts must be reproducible
+        run: git diff --exit-code
 
       - name: AGENT-BENCH must be measured, not calibrated
         run: python bench/agent-bench-status.py
