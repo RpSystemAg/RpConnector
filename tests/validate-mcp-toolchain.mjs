@@ -14,7 +14,7 @@ const sidepanel = await read('prstudio-unified-browser-agent/sidepanel.js');
 const overlay = JSON.parse(await read('prstudio-unified-control/capabilities/agency-capabilities.json'));
 const manifest = JSON.parse(await read('prstudio-unified-browser-agent/manifest.json'));
 
-assert.match(toolchain, /public const VERSION = '17\.0\.0'/);
+assert.match(toolchain, /public const VERSION = '1\.0\.0'/);
 assert.equal(manifest.version, '1.0.0');
 assert.deepEqual(manifest.permissions, ['tabs','scripting','storage','debugger','sidePanel','notifications','alarms','windows','system.display','activeTab','tabCapture','offscreen','contextMenus']);
 

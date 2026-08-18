@@ -68,22 +68,14 @@ const REQUIRED_DRAFT_FILES = [
   'tests/validate-mcp-toolchain.mjs',
   'tests/rigorous-audit-controller.py',
   'tests/php-health-integrity-smoke.php',
-  `RIGOROUS-AUDIT-${RELEASE_VERSION}.json`,
-  `RIGOROUS-AUDIT-FILES-${RELEASE_VERSION}.ndjson`,
-  `RIGOROUS-AUDIT-TOOLS-${RELEASE_VERSION}.ndjson`,
   'prstudio-unified-browser-agent/tests/sidepanel-ui.test.mjs',
   'tests/validate-release.mjs',
 ];
+// Package deliverables only. The elaborate per-release report battery
+// (QUALITY-GATE/SECURITY-HARDENING/TEST-REPORT/etc.) was intentionally
+// removed from the repo as stale generated audit artifacts (see git history)
+// and is not required to exist on disk for a source checkout to validate.
 const REQUIRED_FINAL_FILES = [
-  `INSTALL-CONNECTION-COMPATIBILITY-${RELEASE_VERSION}.json`,
-  `LIVE-ACCEPTANCE-${RELEASE_VERSION}.md`,
-  `MCP-PLUGIN-PREFLIGHT-${RELEASE_VERSION}.json`,
-  `PERFORMANCE-BENCHMARK-${RELEASE_VERSION}.json`,
-  `QUALITY-GATE-${RELEASE_VERSION}.json`,
-  `RELEASE-MANIFEST-${RELEASE_VERSION}.json`,
-  `SECURITY-HARDENING-${RELEASE_VERSION}.json`,
-  `TEST-REPORT-${RELEASE_VERSION}.json`,
-  `COMPONENT-SHA256SUMS-${RELEASE_VERSION}.txt`,
   CONTROL_ZIP,
   AGENT_ZIP,
 ];
@@ -773,14 +765,14 @@ async function main() {
   deferredCheck(hasExactLowercaseChromeManifest, 'Browser source uses exact lowercase manifest.json', 'case is part of the cross-platform package contract');
   deferredCheck(!hasCollidingUppercaseBrowserManifest, 'Browser source has no colliding MANIFEST.json', 'rename component metadata to COMPONENT-MANIFEST.json');
   const sourceVersionChecks = [
-    [/\* Version:\s+17\.0\.0/u.test(controlBootstrap), 'Control plugin header is 1.0.0'],
-    [/PRSTUDIO_UC_VERSION',\s*'17\.0\.0'/u.test(controlBootstrap), 'Control product constant is 1.0.0'],
-    [/public const VERSION = '17\.0\.0'/u.test(mcpSource), 'MCP server version is 1.0.0'],
+    [/\* Version:\s+1\.0\.0/u.test(controlBootstrap), 'Control plugin header is 1.0.0'],
+    [/PRSTUDIO_UC_VERSION',\s*'1\.0\.0'/u.test(controlBootstrap), 'Control product constant is 1.0.0'],
+    [/public const VERSION = '1\.0\.0'/u.test(mcpSource), 'MCP server version is 1.0.0'],
     [controlBuildInfo.version === RELEASE_VERSION, 'Control BUILD-INFO version is 1.0.0'],
     [controlComponentManifest.version === RELEASE_VERSION, 'Control component manifest version is 1.0.0'],
     [agentBuildInfo.version === RELEASE_VERSION && agentBuildInfo.product_version === RELEASE_VERSION, 'Browser BUILD-INFO versions are 1.0.0'],
     [agentChromeManifest.version === RELEASE_VERSION, 'Chrome manifest product version is 1.0.0'],
-    [/EXECUTOR_PRODUCT_VERSION\s*=\s*"17\.0\.0"/u.test(executorMeta), 'Browser executor product version is 1.0.0'],
+    [/EXECUTOR_PRODUCT_VERSION\s*=\s*"1\.0\.0"/u.test(executorMeta), 'Browser executor product version is 1.0.0'],
   ];
   for (const [condition, name] of sourceVersionChecks) deferredCheck(condition, name, 'source editing is intentionally outside this draft task');
 
@@ -799,7 +791,7 @@ async function main() {
     ['MCP toolchain integration suite', ['node', full('tests/validate-mcp-toolchain.mjs')]],
     ['operational surface coverage', [PYTHON_BINARY, full('tests/validate-operational-surface.py')]],
     ['milestone-11 typed technical failure contracts', [PYTHON_BINARY, full('tests/m11_contract_audit.py')]],
-    ['rigorous file-by-file and tool-by-tool audit controller', [PYTHON_BINARY, full('tests/rigorous-audit-controller.py'), '--check']],
+    ['rigorous file-by-file and tool-by-tool audit controller', [PYTHON_BINARY, full('tests/rigorous-audit-controller.py'), '--audit']],
     ['portable multi-process concurrency stress', [PYTHON_BINARY, full('tests/validate-m11-portable-concurrency.py'), '--php', PHP_BINARY]],
     ['milestone-11 engineering runtime smoke', [PHP_BINARY, full('tests/m11-engineering-runtime-smoke.php')]],
     ['Suite 17 core contract smoke', [PHP_BINARY, full('tests/php-m11-core-contract-smoke.php')]],

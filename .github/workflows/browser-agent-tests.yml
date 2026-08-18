@@ -33,6 +33,8 @@ jobs:
           node-version: '24'
       - name: ChatGPT connector / MCP tool-list drift check
         run: node .github/scripts/check-mcp-tool-drift.mjs
+      - name: BUILD-INFO.json capability/tool count drift check
+        run: node .github/scripts/check-build-info-counts.mjs
       - name: WordPress Plugin Check
         # Informational, not blocking: this tool is calibrated for WordPress.org
         # public-directory submission and flags things like raw fopen()/flock()

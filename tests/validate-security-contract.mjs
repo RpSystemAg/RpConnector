@@ -93,11 +93,11 @@ await check("release identity and stable wire protocol", () => {
   assert.equal(executorMeta.SUITE_VERSION, "1.0.0");
   assert.equal(executorMeta.EXECUTOR_PROTOCOL_VERSION, "3.0.0");
   assert.equal(executorMeta.LEGACY_PAIRING_COMPATIBILITY, "2.0.0");
-  assert.match(bootstrapSource, /\* Version:\s+17\.0\.0\b/);
+  assert.match(bootstrapSource, /\* Version:\s+1\.0\.0\b/);
   for (const constant of ["PRSTUDIO_UC_VERSION", "WPAIB_VERSION", "PRSTUDIO_BROWSER_RUNTIME_VERSION"]) {
-    assert.match(bootstrapSource, new RegExp(`define\\( '${constant}', '17\\.0\\.0' \\)`));
+    assert.match(bootstrapSource, new RegExp(`define\\( '${constant}', '1\\.0\\.0' \\)`));
   }
-  assert.match(mcpSource, /public const VERSION = '17\.0\.0';/);
+  assert.match(mcpSource, /public const VERSION = '1\.0\.0';/);
 });
 
 await check("Chrome manifest uses exact lowercase MV3 entrypoint", () => {

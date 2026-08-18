@@ -262,12 +262,16 @@ def dump_json(obj):return json.dumps(obj,ensure_ascii=False,sort_keys=True,inden
 def dump_lines(rows):return ''.join(json.dumps(r,ensure_ascii=False,sort_keys=True)+'\n' for r in rows)
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('--write',action='store_true');ap.add_argument('--check',action='store_true');a=ap.parse_args()
-    if not(a.write or a.check):ap.error('use --write or --check')
+    ap=argparse.ArgumentParser()
+    ap.add_argument('--write',action='store_true',help='persist RIGOROUS-AUDIT-*.json/ndjson snapshots (release-packaging step only; these are not committed source)')
+    ap.add_argument('--check',action='store_true',help='verify previously --write-n snapshots are still fresh (only meaningful once a release snapshot exists)')
+    ap.add_argument('--audit',action='store_true',help='recompute live and report hard_failure_count only, without requiring or writing any persisted snapshot file')
+    a=ap.parse_args()
+    if not(a.write or a.check or a.audit):ap.error('use --write, --check or --audit')
     summary,files,tools=generate(); s=dump_json(summary); f=dump_lines(files); t=dump_lines(tools)
     if a.write:
         OUT.write_text(s,encoding='utf-8');FILES_OUT.write_text(f,encoding='utf-8');TOOLS_OUT.write_text(t,encoding='utf-8')
-    else:
+    elif a.check:
         for p,expected in ((OUT,s),(FILES_OUT,f),(TOOLS_OUT,t)):
             if not p.is_file() or p.read_text(encoding='utf-8')!=expected:
                 print(f'STALE_OR_MISSING {rel(p)}',file=sys.stderr);return 3

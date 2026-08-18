@@ -114,7 +114,6 @@ final class PRSTUDIO_UC_Admin {
 		$ocr = PRSTUDIO_UC_OCR::status();
 		$registry = PRSTUDIO_UC_Capability_Registry::counts();
 		$registry_consistency = PRSTUDIO_UC_Capability_Registry::consistency();
-		$enterprise = class_exists( 'PRSTUDIO_UC_Enterprise_Audit' ) ? PRSTUDIO_UC_Enterprise_Audit::summary() : array();
 		$agency = class_exists( 'PRSTUDIO_UC_Agency_Runtime' ) && PRSTUDIO_UC_Store::schema_ready() ? PRSTUDIO_UC_Agency_Runtime::status() : array( 'enabled'=>false, 'schema_ready'=>false );
 		$online_count = count( array_filter( $devices, static fn( $device ) => 'online' === (string) ( $device['connection_status'] ?? '' ) ) );
 		$stale_count = count( array_filter( $devices, static fn( $device ) => 'stale' === (string) ( $device['connection_status'] ?? '' ) ) );
@@ -187,7 +186,6 @@ final class PRSTUDIO_UC_Admin {
 					<tr><th>OAuth Plugin</th><td><code><?php echo esc_html( wp_json_encode( $mcp_status ) ); ?></code></td></tr>
 					<tr><th>Agency runtime SQL</th><td><code><?php echo esc_html( wp_json_encode( $agency ) ); ?></code></td></tr>
 					<tr><th>GPT Actions 4.x</th><td>Compatibilità legacy, non necessaria per il Plugin 5.0.</td></tr>
-					<tr><th>Audit Enterprise</th><td><code><?php echo esc_html( wp_json_encode( $enterprise ) ); ?></code></td></tr>
 					<tr><th>Pacing responsabile</th><td><code><?php echo esc_html( wp_json_encode( array( 'default'=>$interaction['default_profile']??'', 'profiles'=>array_keys((array)($interaction['profiles']??array())), 'anti_bot_bypass'=>false ) ) ); ?></code></td></tr>
 					<tr><th>OCR</th><td><code><?php echo esc_html( wp_json_encode( $ocr ) ); ?></code></td></tr>
 					<tr><th>Screenshot</th><td>Evidence immutabile con artifact ID univoco + SHA-256; retention bounded per dispositivo; filesystem privato; nessun Base64 nel database.</td></tr>

@@ -43,7 +43,7 @@ return json_decode( '{
     "utente": "user",
     "utenti": "users"
   },
-  "contract_hash": "9176718abe2786d6aaff4cc42f5bb3c8907d6cf9e1ac1e1d7b16a716f3fa5bf0",
+  "contract_hash": "ea482d461434820111096ddc2bc937e5b717393450866ef6cd206ebb7b1269a1",
   "counts": {
     "callable_tools": 1275,
     "direct_tools": 199,
@@ -1350,7 +1350,7 @@ return json_decode( '{
     ]
   },
   "generated_at": "2026-08-07T10:22:00+02:00",
-  "hot_index_hash": "6b3e6bb7557efb2ef2295ef9a516f4737714853e3947e710906e08a44be1afa7",
+  "hot_index_hash": "b6890fde42bcd6f7c9612dee4f19a9434f9b23f7e85ace9d8fb11051f1c15d13",
   "modules": {
     "browser": {
       "class": "PRSTUDIO_Domain_Browser",
@@ -4995,7 +4995,7 @@ return json_decode( '{
       "rpconnector_widgets_manage_verify"
     ]
   },
-  "source_document_hash": "1750cc3e873a92bb4e87f65bc0f25fabeb26a3bf5362e06aa0893dacfb792ec1",
+  "source_document_hash": "ac8f8aad1e228b4c174cfbcfa14da6b23913225701dbb499303267c271a85e12",
   "suite_version": "2.0.0",
   "token_index": {
     "360": [

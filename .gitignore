@@ -1,1 +1,36 @@
 .prstudio-live-backup/
+
+# Generated component integrity/manifest documents -- pure functions of the
+# rest of the tree, produced deterministically by tests/build-release.py
+# --build. Shipped inside the release ZIP, never hand-edited, never a source
+# file: committing them just means they go stale the moment source changes
+# and nothing re-derives them. See docs on the release pipeline order.
+/prstudio-unified-control/FILE-INTEGRITY.json
+/prstudio-unified-control/MANIFEST.json
+/prstudio-unified-browser-agent/FILE-INTEGRITY.json
+/prstudio-unified-browser-agent/COMPONENT-MANIFEST.json
+
+# Release packaging output -- built by tests/build-release.py, not source.
+/*.zip
+/RELEASE-MANIFEST-*.json
+/COMPONENT-SHA256SUMS-*.txt
+
+# Python bytecode cache from running the tests/*.py scripts locally.
+__pycache__/
+*.pyc
+
+# Runtime/log/cache/screenshot/memory-state artifacts. None of this is
+# generated inside this repository during normal development, but nothing
+# should silently let it get committed if a local run (or a future runtime
+# feature) ever writes here by mistake -- the real runtime state lives under
+# WP_CONTENT_DIR/prstudio-unified-private/ on the actual WordPress install,
+# outside this repo entirely.
+*.log
+/logs/
+/log/
+/.cache/
+/cache/
+/screenshots/
+/artifacts/
+/prstudio-unified-private/
+node_modules/

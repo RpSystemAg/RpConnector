@@ -55,10 +55,9 @@ for p in runtime_files():
 # Generated contracts/audits are release behavior declarations, not historical docs.
 for rel in [
     'prstudio-unified-control/contract/capability-contract.json',
-    'prstudio-unified-control/capability-registry.json',
-    'prstudio-unified-control/capability-search-index.json',
-    'prstudio-unified-control/action-hot-index.json',
-    'prstudio-unified-control/reports/ENTERPRISE-TOOL-AUDIT.json',
+    'prstudio-unified-control/capabilities/capability-registry.json',
+    'prstudio-unified-control/capabilities/capability-search-index.json',
+    'prstudio-unified-control/contract/action-hot-index.json',
     'prstudio-unified-control/capabilities/agency-capabilities.json',
     'prstudio-unified-browser-agent/BUILD-INFO.json',
     'prstudio-unified-browser-agent/COMPONENT-MANIFEST.json',

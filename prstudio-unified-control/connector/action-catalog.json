@@ -4,7 +4,7 @@
   "generated_from": "rpconnector-admin-bridge-v3.1-enterprise-1000-audit-fix-google-integrations(1).yaml",
   "count": 1076,
   "unique_action_names": 900,
-  "registry_hash": "3416a1088bc06f1ff8ba42cd1975576b3277ee61ce2f44c0b85823f9d807d94f",
+  "registry_hash": "faa6e64966c939272ad4dc5702c9bcc6949a9b4e402065e76c50deb88a10f54e",
   "routes": [
     {
       "path": "/system-manage",
@@ -110309,6 +110309,6 @@
   "registry_hash_algorithm": "sha256 delle righe 'route|action|tool_name' ordinate",
   "suite_version": "2.0.0",
   "catalog_protocol_version": "2.0.0",
-  "contract_hash": "9176718abe2786d6aaff4cc42f5bb3c8907d6cf9e1ac1e1d7b16a716f3fa5bf0",
-  "document_hash": "1750cc3e873a92bb4e87f65bc0f25fabeb26a3bf5362e06aa0893dacfb792ec1"
+  "contract_hash": "ea482d461434820111096ddc2bc937e5b717393450866ef6cd206ebb7b1269a1",
+  "document_hash": "ac8f8aad1e228b4c174cfbcfa14da6b23913225701dbb499303267c271a85e12"
 }

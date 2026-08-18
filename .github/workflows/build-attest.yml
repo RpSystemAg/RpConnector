@@ -16,6 +16,21 @@ jobs:
       attestations: write
     steps:
       - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify generated capability/contract artifacts match source
+        run: python tests/regenerate-contract-artifacts.py --php-binary php --check
+
+      - name: Verify BUILD-INFO.json counts match the generated registry/catalog/contract
+        run: node .github/scripts/check-build-info-counts.mjs
+
+      - name: Generate component MANIFEST/FILE-INTEGRITY (release pipeline order, deterministic)
+        run: python tests/build-release.py --build
 
       - name: Package build artifacts
         run: |

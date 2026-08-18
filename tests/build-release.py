@@ -70,7 +70,6 @@ BROWSER_EXCLUSIONS = ("COMPONENT-MANIFEST.json", "FILE-INTEGRITY.json")
 
 FINAL_REPORTS = (
     f"INSTALL-CONNECTION-COMPATIBILITY-{VERSION}.json",
-    f"LIVE-ACCEPTANCE-{VERSION}.md",
     f"MCP-PLUGIN-PREFLIGHT-{VERSION}.json",
     f"PERFORMANCE-BENCHMARK-{VERSION}.json",
     f"QUALITY-GATE-{VERSION}.json",
@@ -78,11 +77,16 @@ FINAL_REPORTS = (
     f"TEST-REPORT-{VERSION}.json",
 )
 
+# LIVE-ACCEPTANCE is a maintained status document (an honest, human-updated
+# PENDING/PASS checklist), not a generated ceremony report -- it lives here,
+# not in FINAL_REPORTS, so its presence never forces check()/finalize() to
+# require the auto-generated JSON report battery to exist alongside it.
 FINAL_DOCUMENTS = (
     f"ARCHITECTURE-{VERSION}.md",
     f"H24-OPERATIONS-{VERSION}.md",
     f"SOCIAL-CONNECTORS-{VERSION}.md",
     f"VISIONE-E-DECISIONI-{VERSION}.md",
+    f"LIVE-ACCEPTANCE-{VERSION}.md",
     f"RP-STUDIO-CHATGPT-PLUGIN-{VERSION}.json",
     f"RP-STUDIO-CHATGPT-PLUGIN-INSTRUCTIONS-{VERSION}.txt",
     f"RP-STUDIO-CHATGPT-PLUGIN-SETUP-{VERSION}.md",
@@ -213,10 +217,10 @@ def validate_version_anchors() -> None:
     if not bootstrap_path.is_file():
         fail(f"Missing WordPress bootstrap: {bootstrap_path.relative_to(ROOT)}")
     bootstrap = bootstrap_path.read_text(encoding="utf-8")
-    if not re.search(r"^\s*\*\s*Version:\s+17\.0\.0\s*$", bootstrap, re.MULTILINE):
+    if not re.search(r"^\s*\*\s*Version:\s+1\.0\.0\s*$", bootstrap, re.MULTILINE):
         fail("WordPress plugin header is not 1.0.0")
     if not re.search(
-        r"define\(\s*'PRSTUDIO_UC_VERSION'\s*,\s*'17\.0\.0'\s*\)", bootstrap
+        r"define\(\s*'PRSTUDIO_UC_VERSION'\s*,\s*'1\.0\.0'\s*\)", bootstrap
     ):
         fail("PRSTUDIO_UC_VERSION is not 1.0.0")
 
@@ -242,7 +246,7 @@ def validate_version_anchors() -> None:
 
     executor_meta_path = browser / "lib" / "executor-meta.js"
     executor_meta = executor_meta_path.read_text(encoding="utf-8")
-    if not re.search(r'EXECUTOR_PRODUCT_VERSION\s*=\s*"17\.0\.0"', executor_meta):
+    if not re.search(r'EXECUTOR_PRODUCT_VERSION\s*=\s*"1\.0\.0"', executor_meta):
         fail("Browser executor product version is not 1.0.0")
     if not re.search(r'EXECUTOR_PROTOCOL_VERSION\s*=\s*"3\.0\.0"', executor_meta):
         fail("Browser wire protocol must remain 3.0.0")
