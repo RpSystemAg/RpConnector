@@ -1,0 +1,17 @@
+<?php
+declare(strict_types=1);
+define('PRSTUDIO_UC_TESTING', true);
+define('PRSTUDIO_UC_VERSION','17.0.0');
+function sanitize_key($value){$value=is_string($value)?$value:'';return strtolower((string)preg_replace('/[^a-z0-9_\-]/','',$value));}
+final class PRSTUDIO_UC_Idempotency {public static function canonical_json($value): string {return json_encode($value,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES) ?: '';}}
+require dirname(__DIR__) . '/prstudio-unified-control/includes/class-prstudio-uc-verifier.php';
+function vt(bool $ok,string $message):void{if(!$ok)throw new RuntimeException($message);}
+$task=['task_uuid'=>'task-1','action'=>'fill','arguments'=>[]];$tests=[];
+$tests['verified result remains verified and nonblocking']=static function()use($task){$r=PRSTUDIO_UC_Verifier::browser_result($task,['verified'=>true,'applicationAccepted'=>null,'stepType'=>'fill','verificationStrength'=>'dom_readback']);vt($r['ok']===true&&$r['blocking']===false,'verified evidence classification wrong');};
+$tests['unverified result is evidence degradation not veto']=static function()use($task){$r=PRSTUDIO_UC_Verifier::browser_result($task,['verified'=>false,'stepType'=>'fill']);vt($r['ok']===false&&$r['blocking']===false&&$r['reason']==='browser_result_missing_verified_evidence','unverified evidence became blocking');};
+$tests['application rejection changes evidence only']=static function()use($task){$r=PRSTUDIO_UC_Verifier::browser_result($task,['verified'=>true,'applicationAccepted'=>false,'stepType'=>'fill']);vt($r['ok']===false&&$r['blocking']===false&&$r['reason']==='browser_application_state_rejected','application evidence was not degraded');};
+$tests['required application evidence can remain unverified without blocking']=static function()use($task){$t=$task;$t['arguments']['postcondition']=['required'=>true];$r=PRSTUDIO_UC_Verifier::browser_result($t,['verified'=>true,'applicationAccepted'=>null,'stepType'=>'fill']);vt($r['ok']===false&&$r['blocking']===false&&$r['reason']==='browser_application_acceptance_not_observed','required evidence became authorization');};
+$tests['malformed acceptance is total and nonblocking']=static function()use($task){foreach([['x'],new stdClass(),2,'maybe'] as $bad){$r=PRSTUDIO_UC_Verifier::browser_result($task,['verified'=>true,'applicationAccepted'=>$bad,'stepType'=>'fill']);vt($r['ok']===false&&$r['blocking']===false,'malformed evidence became gate');}};
+$tests['control receipt accepts executed unverified as degraded']=static function(){ $r=PRSTUDIO_UC_Verifier::control_receipt('/x','update',['status'=>'completed','executed'=>true,'verified'=>false],[]);vt($r['ok']===true&&$r['executed']===true&&$r['verified']===false&&$r['degraded']===true&&$r['blocking']===false&&$r['reason']==='executed_evidence_unverified','executed/unverified did not remain successful degraded outcome');};
+$tests['control receipt does not require governance status']=static function(){ $r=PRSTUDIO_UC_Verifier::control_receipt('/x','update',['status'=>'technical_error','executed'=>false,'verified'=>false],['error'=>'network']);vt($r['ok']===true&&$r['executed']===false&&$r['degraded']===false&&$r['blocking']===false,'technical nonexecution was converted into verifier veto');};
+$pass=0;foreach($tests as $name=>$fn){try{$fn();echo "PASS: $name\n";$pass++;}catch(Throwable $e){fwrite(STDERR,"FAIL: $name :: ".get_class($e)." :: {$e->getMessage()}\n");exit(1);}}echo "PASS: verifier one-guard $pass/".count($tests)."\n";

@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0.0",
+  "base_url": "https://staging.example.test",
+  "metric_runs": 5,
+  "navigation_timeout_ms": 45000,
+  "settle_ms": 1000,
+  "read_only": true,
+  "max_difference_percent": 0.1,
+  "viewports": [
+    {"name": "mobile", "width": 360, "height": 800},
+    {"name": "mobile-large", "width": 430, "height": 932},
+    {"name": "tablet", "width": 768, "height": 1024},
+    {"name": "desktop", "width": 1440, "height": 1000},
+    {"name": "desktop-wide", "width": 1920, "height": 1080}
+  ],
+  "surfaces": [
+    {"name": "home", "path": "/", "full_page": true, "components": [{"name": "header", "selector": "header", "required": true}]},
+    {"name": "shop", "path": "/shop/", "full_page": true, "components": [{"name": "product-card", "selector": ".products .product:first-child", "required": true}]},
+    {"name": "product", "path": "/product/REPLACE-WITH-STAGING-SLUG/", "full_page": true, "components": [{"name": "rating", "selector": ".woocommerce-product-rating", "required": true}]},
+    {"name": "cart", "path": "/cart/", "full_page": true, "components": [{"name": "cart-summary", "selector": ".cart_totals", "required": true}]},
+    {"name": "checkout", "path": "/checkout/", "full_page": true, "components": [{"name": "checkout-summary", "selector": "#order_review", "required": true}]},
+    {"name": "account", "path": "/my-account/", "full_page": true, "components": [{"name": "account-panel", "selector": ".woocommerce-MyAccount-content", "required": true}]}
+  ],
+  "mask_selectors": ["time", "[data-visual-dynamic]"]
+}

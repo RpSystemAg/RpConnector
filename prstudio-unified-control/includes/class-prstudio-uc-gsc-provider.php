@@ -1,0 +1,98 @@
+<?php
+if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
+/** Deterministic GSC provider chain with dimension-integrity guarantees. */
+final class PRSTUDIO_UC_GSC_Provider {
+    public const VERSION='5.0.0';
+    private const DIMENSIONS=array('query','page','country','device','date','searchappearance','hour');
+
+    private static function dir(): string {
+        $base=class_exists('PRSTUDIO_UC_Memory')?PRSTUDIO_UC_Memory::site_dir():(defined('WP_CONTENT_DIR')?WP_CONTENT_DIR:sys_get_temp_dir());
+        $d=rtrim($base,'/').'/gsc';if(!is_dir($d)){function_exists('wp_mkdir_p')?wp_mkdir_p($d):@mkdir($d,0750,true);}return $d;
+    }
+    private static function normalize_dimensions(array $args): array {
+        $input=(array)($args['dimensions']??array('query','page'));$out=array();
+        foreach($input as $dim){$d=strtolower(preg_replace('/[^a-zA-Z]/','',(string)$dim));if('searchappearance'===$d)$canonical='searchAppearance';elseif(in_array($d,self::DIMENSIONS,true))$canonical=$d;else continue;if(!in_array($canonical,$out,true))$out[]=$canonical;}
+        return $out?:array('query','page');
+    }
+    private static function normalized_args(string $kind,array $args): array {
+        $out=$args;unset($out['allow_browser_fallback'],$out['sync_wait_seconds'],$out['device_id'],$out['collector_contract'],$out['require_dimension_integrity'],$out['provider_preference'],$out['lane_token'],$out['_prstudio_lane_id'],$out['_client_id']);
+        if('analytics'===$kind){$out['dimensions']=self::normalize_dimensions($args);$out['row_limit']=max(1,min(25000,(int)($args['row_limit']??1000)));}
+        $out['_provider_contract']=self::VERSION;ksort($out);return $out;
+    }
+    private static function key(string $kind,array $args): string {
+        $norm=self::normalized_args($kind,$args);$redacted=class_exists('PRSTUDIO_UC_Memory')?PRSTUDIO_UC_Memory::redact($norm):$norm;
+        return $kind.'-'.substr(hash('sha256',json_encode($redacted,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE)),0,24);
+    }
+    private static function path(string $prefix,string $kind,array $args): string {return self::dir().'/'.$prefix.'-'.self::key($kind,$args).'.json';}
+    private static function save(string $kind,array $args,array $data): void {
+        $payload=class_exists('PRSTUDIO_UC_Memory')?PRSTUDIO_UC_Memory::redact($data):$data;
+        $record=array('provider_contract'=>self::VERSION,'retrieved_at'=>gmdate('c'),'request'=>self::normalized_args($kind,$args),'payload'=>$payload);
+        $record['integrity_hash']=hash('sha256',json_encode($record['payload'],JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE));
+        foreach(array('sync','cache') as $prefix){@file_put_contents(self::path($prefix,$kind,$args),json_encode($record,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE)."\n",LOCK_EX);}
+    }
+    private static function decorate(array $data,string $provider,string $source,string $retrieved,bool $fallback,$completeness=true): array {
+        $data['provider_used']=$provider;$live=in_array($source,array('live','browser_runtime'),true);$data['freshness']=array('state'=>$live?'live':'fresh_cache','retrieved_at'=>$retrieved);$data['retrieved_at']=$retrieved;$data['source']=$source;$data['completeness']=$completeness;$data['fallback_used']=$fallback;$data['provider_contract']=self::VERSION;return $data;
+    }
+    private static function browser(string $kind,array $args){
+        if(array_key_exists('allow_browser_fallback',$args) && empty($args['allow_browser_fallback']))return new WP_Error('prstudio_gsc_browser_disabled','Browser provider disabled explicitly.',array('status'=>503,'retryable'=>true));
+        if(!class_exists('PRSTUDIO_UC_Search_Console_Browser'))return new WP_Error('prstudio_gsc_browser_unavailable','Browser GSC provider unavailable.',array('status'=>503,'retryable'=>true));
+        if('sites'===$kind)return PRSTUDIO_UC_Search_Console_Browser::sites($args);if('analytics'===$kind)return PRSTUDIO_UC_Search_Console_Browser::analytics($args);if('sitemaps'===$kind)return PRSTUDIO_UC_Search_Console_Browser::sitemaps($args);if('inspect'===$kind)return PRSTUDIO_UC_Search_Console_Browser::inspect_url($args);return new WP_Error('prstudio_gsc_kind_unknown','Unknown GSC browser request.',array('status'=>400));
+    }
+    private static function browser_payload(array $browser): array {
+        if(isset($browser['result'])&&is_array($browser['result']))return $browser['result'];
+        return $browser;
+    }
+    private static function browser_pending(array $browser): bool {return in_array(strtolower((string)($browser['status']??'')),array('queued','leased','running','waiting_for_browser'),true);}
+    private static function browser_terminal_error(array $browser) {
+        $status=strtolower((string)($browser['status']??''));
+        if(!in_array($status,array('failed','error','cancelled','canceled','expired','lease_lost','blocked','interrupted'),true))return null;
+        $error=is_array($browser['error']??null)?$browser['error']:array();
+        $code=sanitize_key((string)($error['code']??('gsc_browser_'.$status)));
+        $message=(string)($error['message']??$browser['reason']??('Browser GSC task ended with status '.$status.'.'));
+        return new WP_Error($code?:'prstudio_gsc_browser_terminal',$message,array('status'=>503,'retryable'=>in_array($status,array('expired','lease_lost','interrupted'),true),'browser_status'=>$status,'task_id'=>(string)($browser['task_id']??'')));
+    }
+    private static function normalize_browser_analytics(array $browser,array $args) {
+        if(self::browser_pending($browser))return $browser;
+        $payload=self::browser_payload($browser);$metrics=is_array($payload['structuredMetrics']??null)?$payload['structuredMetrics']:(is_array($payload['structured_metrics']??null)?$payload['structured_metrics']:$payload);
+        $integrity=(array)($metrics['dimension_integrity']??array());
+        if(($integrity['status']??'')!=='verified'){$metrics['degraded']=true;$metrics['blocking']=false;$metrics['verification_warning']='gsc_dimension_integrity_unverified';$metrics['dimension_integrity']=$integrity;}
+        $requested=self::normalize_dimensions($args);$metrics['requested_dimensions']=$requested;$metrics['browser_task_id']=$browser['task_id']??null;
+        return $metrics;
+    }
+    private static function run(string $kind,array $args){
+        // This suite is intentionally Browser-only for live Search Console work.
+        // provider_preference remains accepted for wire compatibility, but no
+        // official Google API or cache provider is attempted here.
+        $browser=self::browser($kind,$args);
+        if(is_wp_error($browser))return $browser;
+        if(is_array($browser)&&self::browser_pending($browser))return $browser;
+        if(is_array($browser)){$terminal=self::browser_terminal_error($browser);if(is_wp_error($terminal))return $terminal;}
+        if('analytics'===$kind&&is_array($browser)){
+            $browser=self::normalize_browser_analytics($browser,$args);
+            if(is_wp_error($browser))return $browser;
+        }
+        if(!is_array($browser))return new WP_Error('prstudio_gsc_browser_invalid','Browser GSC provider returned an invalid payload.',array('status'=>503,'retryable'=>true));
+        $complete=(bool)($browser['completeness']??$browser['verified']??true);
+        self::save($kind,$args,$browser);
+        return self::decorate($browser,'browser_agent_cdp','browser_runtime',gmdate('c'),false,$complete);
+    }
+    public static function sites(array $args=array()){return self::run('sites',$args);}
+    public static function analytics(array $args){return self::run('analytics',$args);}
+    public static function sitemaps(array $args){return self::run('sitemaps',$args);}
+    public static function inspect_url(array $args){return self::run('inspect',$args);}
+    public static function request_indexing(array $args){
+        if(empty($args['site_url'])||empty($args['inspection_url']))return new WP_Error('prstudio_gsc_request_indexing_args','site_url and inspection_url are required.',array('status'=>400));
+        if(!class_exists('PRSTUDIO_UC_Search_Console_Browser'))return new WP_Error('prstudio_gsc_browser_unavailable','Browser GSC provider unavailable.',array('status'=>503,'retryable'=>true));
+        $result=PRSTUDIO_UC_Search_Console_Browser::request_indexing($args);
+        if(is_wp_error($result))return $result;
+        if(is_array($result)){
+            $result['provider_used']='browser_agent_cdp';
+            $result['source']='browser_runtime';
+            $result['retrieved_at']=gmdate('c');
+            $result['fallback_used']=false;
+            $result['provider_contract']=self::VERSION;
+            $result['generic_indexing_api_used']=false;
+        }
+        return $result;
+    }
+}

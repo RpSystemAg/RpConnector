@@ -1,0 +1,1090 @@
+{
+  "comparisons": [
+    {
+      "artifact": [
+        "component",
+        "account-panel"
+      ],
+      "diff": "diffs/account--desktop--component--account-panel.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "account",
+      "viewport": "desktop"
+    },
+    {
+      "artifact": [
+        "full_page",
+        null
+      ],
+      "diff": "diffs/account--desktop--full_page--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "account",
+      "viewport": "desktop"
+    },
+    {
+      "artifact": [
+        "viewport",
+        null
+      ],
+      "diff": "diffs/account--desktop--viewport--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "account",
+      "viewport": "desktop"
+    },
+    {
+      "artifact": [
+        "component",
+        "account-panel"
+      ],
+      "diff": "diffs/account--desktop-wide--component--account-panel.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "account",
+      "viewport": "desktop-wide"
+    },
+    {
+      "artifact": [
+        "full_page",
+        null
+      ],
+      "diff": "diffs/account--desktop-wide--full_page--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "account",
+      "viewport": "desktop-wide"
+    },
+    {
+      "artifact": [
+        "viewport",
+        null
+      ],
+      "diff": "diffs/account--desktop-wide--viewport--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "account",
+      "viewport": "desktop-wide"
+    },
+    {
+      "artifact": [
+        "component",
+        "account-panel"
+      ],
+      "diff": "diffs/account--mobile--component--account-panel.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "account",
+      "viewport": "mobile"
+    },
+    {
+      "artifact": [
+        "full_page",
+        null
+      ],
+      "diff": "diffs/account--mobile--full_page--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "account",
+      "viewport": "mobile"
+    },
+    {
+      "artifact": [
+        "viewport",
+        null
+      ],
+      "diff": "diffs/account--mobile--viewport--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "account",
+      "viewport": "mobile"
+    },
+    {
+      "artifact": [
+        "component",
+        "account-panel"
+      ],
+      "diff": "diffs/account--mobile-large--component--account-panel.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "account",
+      "viewport": "mobile-large"
+    },
+    {
+      "artifact": [
+        "full_page",
+        null
+      ],
+      "diff": "diffs/account--mobile-large--full_page--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "account",
+      "viewport": "mobile-large"
+    },
+    {
+      "artifact": [
+        "viewport",
+        null
+      ],
+      "diff": "diffs/account--mobile-large--viewport--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "account",
+      "viewport": "mobile-large"
+    },
+    {
+      "artifact": [
+        "component",
+        "account-panel"
+      ],
+      "diff": "diffs/account--tablet--component--account-panel.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "account",
+      "viewport": "tablet"
+    },
+    {
+      "artifact": [
+        "full_page",
+        null
+      ],
+      "diff": "diffs/account--tablet--full_page--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "account",
+      "viewport": "tablet"
+    },
+    {
+      "artifact": [
+        "viewport",
+        null
+      ],
+      "diff": "diffs/account--tablet--viewport--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "account",
+      "viewport": "tablet"
+    },
+    {
+      "artifact": [
+        "component",
+        "cart-summary"
+      ],
+      "diff": "diffs/cart--desktop--component--cart-summary.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "cart",
+      "viewport": "desktop"
+    },
+    {
+      "artifact": [
+        "full_page",
+        null
+      ],
+      "diff": "diffs/cart--desktop--full_page--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "cart",
+      "viewport": "desktop"
+    },
+    {
+      "artifact": [
+        "viewport",
+        null
+      ],
+      "diff": "diffs/cart--desktop--viewport--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "cart",
+      "viewport": "desktop"
+    },
+    {
+      "artifact": [
+        "component",
+        "cart-summary"
+      ],
+      "diff": "diffs/cart--desktop-wide--component--cart-summary.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "cart",
+      "viewport": "desktop-wide"
+    },
+    {
+      "artifact": [
+        "full_page",
+        null
+      ],
+      "diff": "diffs/cart--desktop-wide--full_page--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "cart",
+      "viewport": "desktop-wide"
+    },
+    {
+      "artifact": [
+        "viewport",
+        null
+      ],
+      "diff": "diffs/cart--desktop-wide--viewport--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "cart",
+      "viewport": "desktop-wide"
+    },
+    {
+      "artifact": [
+        "component",
+        "cart-summary"
+      ],
+      "diff": "diffs/cart--mobile--component--cart-summary.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "cart",
+      "viewport": "mobile"
+    },
+    {
+      "artifact": [
+        "full_page",
+        null
+      ],
+      "diff": "diffs/cart--mobile--full_page--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "cart",
+      "viewport": "mobile"
+    },
+    {
+      "artifact": [
+        "viewport",
+        null
+      ],
+      "diff": "diffs/cart--mobile--viewport--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "cart",
+      "viewport": "mobile"
+    },
+    {
+      "artifact": [
+        "component",
+        "cart-summary"
+      ],
+      "diff": "diffs/cart--mobile-large--component--cart-summary.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "cart",
+      "viewport": "mobile-large"
+    },
+    {
+      "artifact": [
+        "full_page",
+        null
+      ],
+      "diff": "diffs/cart--mobile-large--full_page--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "cart",
+      "viewport": "mobile-large"
+    },
+    {
+      "artifact": [
+        "viewport",
+        null
+      ],
+      "diff": "diffs/cart--mobile-large--viewport--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "cart",
+      "viewport": "mobile-large"
+    },
+    {
+      "artifact": [
+        "component",
+        "cart-summary"
+      ],
+      "diff": "diffs/cart--tablet--component--cart-summary.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "cart",
+      "viewport": "tablet"
+    },
+    {
+      "artifact": [
+        "full_page",
+        null
+      ],
+      "diff": "diffs/cart--tablet--full_page--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "cart",
+      "viewport": "tablet"
+    },
+    {
+      "artifact": [
+        "viewport",
+        null
+      ],
+      "diff": "diffs/cart--tablet--viewport--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "cart",
+      "viewport": "tablet"
+    },
+    {
+      "artifact": [
+        "component",
+        "checkout-summary"
+      ],
+      "diff": "diffs/checkout--desktop--component--checkout-summary.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "checkout",
+      "viewport": "desktop"
+    },
+    {
+      "artifact": [
+        "full_page",
+        null
+      ],
+      "diff": "diffs/checkout--desktop--full_page--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "checkout",
+      "viewport": "desktop"
+    },
+    {
+      "artifact": [
+        "viewport",
+        null
+      ],
+      "diff": "diffs/checkout--desktop--viewport--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "checkout",
+      "viewport": "desktop"
+    },
+    {
+      "artifact": [
+        "component",
+        "checkout-summary"
+      ],
+      "diff": "diffs/checkout--desktop-wide--component--checkout-summary.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "checkout",
+      "viewport": "desktop-wide"
+    },
+    {
+      "artifact": [
+        "full_page",
+        null
+      ],
+      "diff": "diffs/checkout--desktop-wide--full_page--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "checkout",
+      "viewport": "desktop-wide"
+    },
+    {
+      "artifact": [
+        "viewport",
+        null
+      ],
+      "diff": "diffs/checkout--desktop-wide--viewport--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "checkout",
+      "viewport": "desktop-wide"
+    },
+    {
+      "artifact": [
+        "component",
+        "checkout-summary"
+      ],
+      "diff": "diffs/checkout--mobile--component--checkout-summary.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "checkout",
+      "viewport": "mobile"
+    },
+    {
+      "artifact": [
+        "full_page",
+        null
+      ],
+      "diff": "diffs/checkout--mobile--full_page--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "checkout",
+      "viewport": "mobile"
+    },
+    {
+      "artifact": [
+        "viewport",
+        null
+      ],
+      "diff": "diffs/checkout--mobile--viewport--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "checkout",
+      "viewport": "mobile"
+    },
+    {
+      "artifact": [
+        "component",
+        "checkout-summary"
+      ],
+      "diff": "diffs/checkout--mobile-large--component--checkout-summary.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "checkout",
+      "viewport": "mobile-large"
+    },
+    {
+      "artifact": [
+        "full_page",
+        null
+      ],
+      "diff": "diffs/checkout--mobile-large--full_page--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "checkout",
+      "viewport": "mobile-large"
+    },
+    {
+      "artifact": [
+        "viewport",
+        null
+      ],
+      "diff": "diffs/checkout--mobile-large--viewport--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "checkout",
+      "viewport": "mobile-large"
+    },
+    {
+      "artifact": [
+        "component",
+        "checkout-summary"
+      ],
+      "diff": "diffs/checkout--tablet--component--checkout-summary.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "checkout",
+      "viewport": "tablet"
+    },
+    {
+      "artifact": [
+        "full_page",
+        null
+      ],
+      "diff": "diffs/checkout--tablet--full_page--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "checkout",
+      "viewport": "tablet"
+    },
+    {
+      "artifact": [
+        "viewport",
+        null
+      ],
+      "diff": "diffs/checkout--tablet--viewport--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "checkout",
+      "viewport": "tablet"
+    },
+    {
+      "artifact": [
+        "component",
+        "header"
+      ],
+      "diff": "diffs/home--desktop--component--header.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "home",
+      "viewport": "desktop"
+    },
+    {
+      "artifact": [
+        "full_page",
+        null
+      ],
+      "diff": "diffs/home--desktop--full_page--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "home",
+      "viewport": "desktop"
+    },
+    {
+      "artifact": [
+        "viewport",
+        null
+      ],
+      "diff": "diffs/home--desktop--viewport--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "home",
+      "viewport": "desktop"
+    },
+    {
+      "artifact": [
+        "component",
+        "header"
+      ],
+      "diff": "diffs/home--desktop-wide--component--header.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "home",
+      "viewport": "desktop-wide"
+    },
+    {
+      "artifact": [
+        "full_page",
+        null
+      ],
+      "diff": "diffs/home--desktop-wide--full_page--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "home",
+      "viewport": "desktop-wide"
+    },
+    {
+      "artifact": [
+        "viewport",
+        null
+      ],
+      "diff": "diffs/home--desktop-wide--viewport--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "home",
+      "viewport": "desktop-wide"
+    },
+    {
+      "artifact": [
+        "component",
+        "header"
+      ],
+      "diff": "diffs/home--mobile--component--header.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "home",
+      "viewport": "mobile"
+    },
+    {
+      "artifact": [
+        "full_page",
+        null
+      ],
+      "diff": "diffs/home--mobile--full_page--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "home",
+      "viewport": "mobile"
+    },
+    {
+      "artifact": [
+        "viewport",
+        null
+      ],
+      "diff": "diffs/home--mobile--viewport--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "home",
+      "viewport": "mobile"
+    },
+    {
+      "artifact": [
+        "component",
+        "header"
+      ],
+      "diff": "diffs/home--mobile-large--component--header.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "home",
+      "viewport": "mobile-large"
+    },
+    {
+      "artifact": [
+        "full_page",
+        null
+      ],
+      "diff": "diffs/home--mobile-large--full_page--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "home",
+      "viewport": "mobile-large"
+    },
+    {
+      "artifact": [
+        "viewport",
+        null
+      ],
+      "diff": "diffs/home--mobile-large--viewport--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "home",
+      "viewport": "mobile-large"
+    },
+    {
+      "artifact": [
+        "component",
+        "header"
+      ],
+      "diff": "diffs/home--tablet--component--header.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "home",
+      "viewport": "tablet"
+    },
+    {
+      "artifact": [
+        "full_page",
+        null
+      ],
+      "diff": "diffs/home--tablet--full_page--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "home",
+      "viewport": "tablet"
+    },
+    {
+      "artifact": [
+        "viewport",
+        null
+      ],
+      "diff": "diffs/home--tablet--viewport--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "home",
+      "viewport": "tablet"
+    },
+    {
+      "artifact": [
+        "component",
+        "rating"
+      ],
+      "diff": "diffs/product--desktop--component--rating.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "product",
+      "viewport": "desktop"
+    },
+    {
+      "artifact": [
+        "full_page",
+        null
+      ],
+      "diff": "diffs/product--desktop--full_page--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "product",
+      "viewport": "desktop"
+    },
+    {
+      "artifact": [
+        "viewport",
+        null
+      ],
+      "diff": "diffs/product--desktop--viewport--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "product",
+      "viewport": "desktop"
+    },
+    {
+      "artifact": [
+        "component",
+        "rating"
+      ],
+      "diff": "diffs/product--desktop-wide--component--rating.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "product",
+      "viewport": "desktop-wide"
+    },
+    {
+      "artifact": [
+        "full_page",
+        null
+      ],
+      "diff": "diffs/product--desktop-wide--full_page--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "product",
+      "viewport": "desktop-wide"
+    },
+    {
+      "artifact": [
+        "viewport",
+        null
+      ],
+      "diff": "diffs/product--desktop-wide--viewport--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "product",
+      "viewport": "desktop-wide"
+    },
+    {
+      "artifact": [
+        "component",
+        "rating"
+      ],
+      "diff": "diffs/product--mobile--component--rating.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "product",
+      "viewport": "mobile"
+    },
+    {
+      "artifact": [
+        "full_page",
+        null
+      ],
+      "diff": "diffs/product--mobile--full_page--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "product",
+      "viewport": "mobile"
+    },
+    {
+      "artifact": [
+        "viewport",
+        null
+      ],
+      "diff": "diffs/product--mobile--viewport--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "product",
+      "viewport": "mobile"
+    },
+    {
+      "artifact": [
+        "component",
+        "rating"
+      ],
+      "diff": "diffs/product--mobile-large--component--rating.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "product",
+      "viewport": "mobile-large"
+    },
+    {
+      "artifact": [
+        "full_page",
+        null
+      ],
+      "diff": "diffs/product--mobile-large--full_page--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "product",
+      "viewport": "mobile-large"
+    },
+    {
+      "artifact": [
+        "viewport",
+        null
+      ],
+      "diff": "diffs/product--mobile-large--viewport--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "product",
+      "viewport": "mobile-large"
+    },
+    {
+      "artifact": [
+        "component",
+        "rating"
+      ],
+      "diff": "diffs/product--tablet--component--rating.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "product",
+      "viewport": "tablet"
+    },
+    {
+      "artifact": [
+        "full_page",
+        null
+      ],
+      "diff": "diffs/product--tablet--full_page--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "product",
+      "viewport": "tablet"
+    },
+    {
+      "artifact": [
+        "viewport",
+        null
+      ],
+      "diff": "diffs/product--tablet--viewport--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "product",
+      "viewport": "tablet"
+    },
+    {
+      "artifact": [
+        "component",
+        "product-card"
+      ],
+      "diff": "diffs/shop--desktop--component--product-card.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "shop",
+      "viewport": "desktop"
+    },
+    {
+      "artifact": [
+        "full_page",
+        null
+      ],
+      "diff": "diffs/shop--desktop--full_page--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "shop",
+      "viewport": "desktop"
+    },
+    {
+      "artifact": [
+        "viewport",
+        null
+      ],
+      "diff": "diffs/shop--desktop--viewport--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "shop",
+      "viewport": "desktop"
+    },
+    {
+      "artifact": [
+        "component",
+        "product-card"
+      ],
+      "diff": "diffs/shop--desktop-wide--component--product-card.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "shop",
+      "viewport": "desktop-wide"
+    },
+    {
+      "artifact": [
+        "full_page",
+        null
+      ],
+      "diff": "diffs/shop--desktop-wide--full_page--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "shop",
+      "viewport": "desktop-wide"
+    },
+    {
+      "artifact": [
+        "viewport",
+        null
+      ],
+      "diff": "diffs/shop--desktop-wide--viewport--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "shop",
+      "viewport": "desktop-wide"
+    },
+    {
+      "artifact": [
+        "component",
+        "product-card"
+      ],
+      "diff": "diffs/shop--mobile--component--product-card.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "shop",
+      "viewport": "mobile"
+    },
+    {
+      "artifact": [
+        "full_page",
+        null
+      ],
+      "diff": "diffs/shop--mobile--full_page--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "shop",
+      "viewport": "mobile"
+    },
+    {
+      "artifact": [
+        "viewport",
+        null
+      ],
+      "diff": "diffs/shop--mobile--viewport--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "shop",
+      "viewport": "mobile"
+    },
+    {
+      "artifact": [
+        "component",
+        "product-card"
+      ],
+      "diff": "diffs/shop--mobile-large--component--product-card.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "shop",
+      "viewport": "mobile-large"
+    },
+    {
+      "artifact": [
+        "full_page",
+        null
+      ],
+      "diff": "diffs/shop--mobile-large--full_page--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "shop",
+      "viewport": "mobile-large"
+    },
+    {
+      "artifact": [
+        "viewport",
+        null
+      ],
+      "diff": "diffs/shop--mobile-large--viewport--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "shop",
+      "viewport": "mobile-large"
+    },
+    {
+      "artifact": [
+        "component",
+        "product-card"
+      ],
+      "diff": "diffs/shop--tablet--component--product-card.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "shop",
+      "viewport": "tablet"
+    },
+    {
+      "artifact": [
+        "full_page",
+        null
+      ],
+      "diff": "diffs/shop--tablet--full_page--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "shop",
+      "viewport": "tablet"
+    },
+    {
+      "artifact": [
+        "viewport",
+        null
+      ],
+      "diff": "diffs/shop--tablet--viewport--page.png",
+      "difference_percent": 0.0,
+      "passed": true,
+      "size_changed": false,
+      "surface": "shop",
+      "viewport": "tablet"
+    }
+  ],
+  "failures": [],
+  "kind": "prstudio_visual_comparison",
+  "ok": true,
+  "production_proven": false,
+  "schema_version": "1.0.0",
+  "threshold_percent": 0.1
+}

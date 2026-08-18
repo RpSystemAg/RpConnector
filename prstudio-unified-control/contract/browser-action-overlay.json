@@ -1,0 +1,146 @@
+{
+  "schema_version": "1.0.0",
+  "overlay_id": "prstudio-agency-browser-v10",
+  "actions": [
+    {
+      "action": "playwright_flow",
+      "adapter_hook": "idealmarket_admin_execute_frontend_manage_playwright_flow",
+      "description": "Execute a bounded ordered browser flow as one Browser Agent task so deterministic multi-step UI work does not round-trip through the model between steps.",
+      "destructive": false,
+      "domain": "browser",
+      "executor": "browser_agent",
+      "idempotent": false,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "steps": {
+            "type": "array"
+          }
+        },
+        "required": [
+          "steps"
+        ],
+        "additionalProperties": true
+      },
+      "open_world": true,
+      "read_only": false,
+      "route": "/frontend-manage",
+      "strategy": "normalized_browser_command",
+      "tool_name": "idealmarket_frontend_manage_playwright_flow"
+    },
+    {
+      "action": "playwright_observation_bundle",
+      "adapter_hook": "idealmarket_admin_execute_frontend_manage_playwright_observation_bundle",
+      "description": "Secure redacted page, accessibility, network and console observation bundle.",
+      "destructive": false,
+      "domain": "browser",
+      "executor": "browser_agent",
+      "idempotent": true,
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true
+      },
+      "open_world": true,
+      "read_only": true,
+      "route": "/frontend-manage",
+      "strategy": "normalized_browser_command",
+      "tool_name": "idealmarket_frontend_manage_playwright_observation_bundle"
+    },
+    {
+      "action": "playwright_social_snapshot",
+      "adapter_hook": "idealmarket_admin_execute_frontend_manage_playwright_social_snapshot",
+      "description": "Best-effort visible social metric snapshot with explicit browser provenance.",
+      "destructive": false,
+      "domain": "browser",
+      "executor": "browser_agent",
+      "idempotent": true,
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true
+      },
+      "open_world": true,
+      "read_only": true,
+      "route": "/frontend-manage",
+      "strategy": "normalized_browser_command",
+      "tool_name": "idealmarket_frontend_manage_playwright_social_snapshot"
+    },
+    {
+      "action": "playwright_pointer_sequence",
+      "adapter_hook": "idealmarket_admin_execute_frontend_manage_playwright_pointer_sequence",
+      "description": "Locally approved bounded native CDP pointer, drag, wheel and touch sequence.",
+      "destructive": false,
+      "domain": "browser",
+      "executor": "browser_agent",
+      "idempotent": false,
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true
+      },
+      "open_world": true,
+      "read_only": false,
+      "route": "/frontend-manage",
+      "strategy": "normalized_browser_command",
+      "tool_name": "idealmarket_frontend_manage_playwright_pointer_sequence"
+    },
+    {
+      "action": "playwright_keyboard_sequence",
+      "adapter_hook": "idealmarket_admin_execute_frontend_manage_playwright_keyboard_sequence",
+      "description": "Locally approved bounded native CDP keyboard sequence.",
+      "destructive": false,
+      "domain": "browser",
+      "executor": "browser_agent",
+      "idempotent": false,
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true
+      },
+      "open_world": true,
+      "read_only": false,
+      "route": "/frontend-manage",
+      "strategy": "normalized_browser_command",
+      "tool_name": "idealmarket_frontend_manage_playwright_keyboard_sequence"
+    },
+    {
+      "action": "playwright_adopt_tabs",
+      "adapter_hook": "idealmarket_admin_execute_frontend_manage_playwright_adopt_tabs",
+      "description": "Explicitly adopt one or more already-open user HTTP(S) tabs into a ChatGPT execution lane without implicit active-tab fallback.",
+      "destructive": false,
+      "domain": "browser",
+      "executor": "browser_agent",
+      "idempotent": true,
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true
+      },
+      "open_world": false,
+      "read_only": false,
+      "route": "/frontend-manage",
+      "strategy": "normalized_browser_command",
+      "tool_name": "idealmarket_frontend_manage_playwright_adopt_tabs"
+    },
+    {
+      "action": "local_studio_run",
+      "adapter_hook": "idealmarket_admin_execute_frontend_manage_local_studio_run",
+      "description": "Run an allowlisted Local Studio workflow, monitor, baseline, diagnostic or recorder operation through an explicitly isolated remote lane.",
+      "destructive": false,
+      "domain": "browser",
+      "executor": "browser_agent",
+      "idempotent": true,
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true
+      },
+      "open_world": false,
+      "read_only": false,
+      "route": "/frontend-manage",
+      "strategy": "normalized_browser_command",
+      "tool_name": "idealmarket_frontend_manage_local_studio_run"
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "schema_version": "1.0.0",
+  "version": "17.0.0",
+  "generated_at_utc": "2026-08-11T09:00:00Z",
+  "production_proven": false,
+  "status": "local_release_candidate_live_acceptance_pending",
+  "endpoint": "https://idealmarket1987.com/wp-json/prstudio-unified/v1/mcp",
+  "display_name": "RP Studio Connector",
+  "transport": "streamable_http_json_rpc",
+  "advertised_protocols": [
+    "2026-07-28",
+    "2025-06-18",
+    "2025-03-26"
+  ],
+  "mcp_2026_primary": true,
+  "mandatory_tasks_extension_advertised": false,
+  "tool_catalog": {
+    "expected": 119,
+    "unique": 119,
+    "source_matched": true
+  },
+  "oauth_static_checks": {
+    "tls_required_for_remote_auth": true,
+    "oauth_pkce_s256": true,
+    "oauth_resource_binding": true,
+    "refresh_token_rotation": true,
+    "access_tokens_hashed_server_side": true,
+    "schema_validation_recursive": true,
+    "secret_redaction": true,
+    "owned_tab_isolation": true,
+    "no_auto_write_scope_escalation": true,
+    "generic_gateway_schema_annotations_required": true,
+    "browser_cookie_export_exposed": false,
+    "browser_arbitrary_js_exposed": false,
+    "browser_security_restricted_actions": []
+  },
+  "durable_operations": {
+    "lane_handle": true,
+    "jobs": true,
+    "schedules": true,
+    "correlation_id": true
+  },
+  "pending_live_checks": [
+    "MCP Inspector against deployed artifact",
+    "ChatGPT refresh",
+    "OAuth consent and token rotation"
+  ],
+  "extension_awareness": {
+    "build_identity": true,
+    "runtime_operation_count": 61,
+    "pairing_contract_unchanged": true
+  }
+}

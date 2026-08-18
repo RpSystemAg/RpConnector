@@ -1,0 +1,105 @@
+{
+  "architecture_delta": {
+    "forbidden_runtime_files": {
+      "after": 0,
+      "before": 33
+    },
+    "forbidden_runtime_hits": {
+      "after": 0,
+      "before": 150
+    },
+    "planner": {
+      "after_has_canary_gate": false,
+      "after_has_max_tool_calls": false,
+      "after_model_roundtrip_required_false": true,
+      "before_has_canary_gate": true,
+      "before_has_max_tool_calls": true
+    }
+  },
+  "case_A_context_open": {
+    "after": {
+      "evidence_class": "MEASURED_LOCAL",
+      "iterations": 100,
+      "lane_id": "lane_dcd79d825d649915950556c45b582eb9",
+      "ok": true,
+      "p95_ms": 0.00669,
+      "reused": true
+    },
+    "before": {
+      "evidence_class": "MEASURED_LOCAL",
+      "iterations": 100,
+      "lane_id": "lane_dcd79d825d649915950556c45b582eb9",
+      "ok": true,
+      "p95_ms": 0.006339,
+      "reused": true
+    },
+    "evidence": "MEASURED_LOCAL_100_ITERATIONS"
+  },
+  "case_B_browser_open": {
+    "after": {
+      "atomic_about_blank_claim_attach_navigate": true,
+      "legacy_ownership_gate_tokens": 0,
+      "same_lane_task_reuse": true
+    },
+    "before": {
+      "atomic_claim_contract": false,
+      "legacy_takeover_or_ownership_gate_tokens_present": true
+    },
+    "evidence": "STRUCTURAL_PLUS_BROWSER_TESTS"
+  },
+  "case_C_open_click_fill_submit": {
+    "after": {
+      "compiled_steps_write": 6,
+      "generic_browser_action_roundtrip_gate": false,
+      "local_batch_preferred": true,
+      "model_roundtrip_required": false,
+      "planner_mode": "quick"
+    },
+    "before": {
+      "canary_possible": true,
+      "evidence_stop": true,
+      "planner_mode": "risk_dependent_fast_standard_deep",
+      "planner_tool_call_budget_standard": 15
+    },
+    "evidence": "STRUCTURAL_CONTRACT"
+  },
+  "case_D_search_console_mission": {
+    "after": {
+      "browser_batch_supported": true,
+      "high_level_planner_steps": 6,
+      "human_takeover_non_auth": false,
+      "lane_scoped_controlled_session": true,
+      "verification_nonblocking": true
+    },
+    "before": {
+      "effect_verification_stage": true,
+      "evidence_stop_stage": true,
+      "high_level_planner_steps_for_search_console": 12,
+      "human_takeover_runtime_present": true,
+      "policy_stage": true
+    },
+    "evidence": "STRUCTURAL_PLUS_TESTS_NOT_LIVE_ACCOUNT",
+    "live_authenticated_gsc_run": false,
+    "reason": "no authenticated Search Console account/session is available in the local release container"
+  },
+  "case_E_100_deterministic_file_operations": {
+    "after_wall_ms": 3.118,
+    "before_suite_specific_comparison": "not meaningful: raw filesystem microbenchmark is independent of planner version",
+    "evidence": "MEASURED_LOCAL_SUBSTRATE",
+    "external_rpc_calls": 0,
+    "model_turns": 0,
+    "operations": 100,
+    "pattern": "write+read+delete in one local process"
+  },
+  "evidence_policy": "measured where locally reproducible; structural where live authenticated browser/provider access is unavailable",
+  "reference_date": "2026-08-17",
+  "suite_version": "17.0.0",
+  "targets": {
+    "approval_calls": 0,
+    "human_takeover_non_auth": 0,
+    "manual_resume": 0,
+    "review_calls": 0,
+    "same_lane_re_adoption": 0,
+    "verification_veto": 0
+  }
+}

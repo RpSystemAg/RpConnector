@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PR STUDIO Visual Fixture</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, sans-serif; color: #1f2933; background: #f5f7fa; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    header { display: flex; align-items: center; justify-content: space-between; min-height: 72px; padding: 16px clamp(18px,5vw,72px); color: white; background: #17324d; }
+    header strong { font-size: 1.2rem; }
+    nav { display: flex; gap: 18px; }
+    main { width: min(1180px, calc(100% - 32px)); margin: 32px auto 64px; }
+    .hero { padding: clamp(28px,8vw,92px) clamp(20px,6vw,72px); border-radius: 24px; background: linear-gradient(135deg,#dcecff,#f9e5d8); }
+    h1 { max-width: 16ch; margin: 0 0 12px; font-size: clamp(2rem,6vw,4.7rem); line-height: 1.02; }
+    .grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 20px; margin-top: 28px; }
+    .card, [data-test] { padding: 22px; border: 1px solid #d5dde5; border-radius: 18px; background: white; box-shadow: 0 8px 24px rgb(23 50 77 / .08); }
+    [data-test=rating] { display: inline-flex; gap: 5px; color: #a45508; font-weight: 700; }
+    .stack { display: grid; gap: 20px; margin-top: 28px; }
+    .amount { font-size: 1.5rem; font-weight: 750; }
+    footer { min-height: 180px; padding: 36px; color: #dbe7f3; background: #17324d; }
+    @media (max-width: 760px) { nav { display: none; } .grid { grid-template-columns: 1fr; } main { margin-top: 20px; } }
+  </style>
+</head>
+<body>
+  <header><strong>PR STUDIO</strong><nav><span>Negozio</span><span>Servizi</span><span>Account</span></nav></header>
+  <main>
+    <section class="hero"><p>Fixture deterministico</p><h1 data-route-title>Superficie visuale</h1><p>Serve a verificare il laboratorio, non sostituisce gli screenshot dello staging reale.</p></section>
+    <section class="grid">
+      <article class="card" data-test="product-card"><h2>Product card</h2><p>Gerarchia, prezzo e azione leggibile.</p><p class="amount">€ 29,00</p></article>
+      <article class="card"><h2>Contenuto</h2><p>Nessun dato remoto o mutazione.</p><span data-test="rating" aria-label="Valutazione 4 su 5">★ ★ ★ ★ ☆</span></article>
+      <article class="card" data-visual-dynamic><h2>Dato mascherato</h2><p>2026-08-11 00:00:00</p></article>
+    </section>
+    <section class="stack">
+      <article data-test="cart-summary"><h2>Riepilogo carrello</h2><p>Subtotale <strong>€ 29,00</strong></p></article>
+      <article data-test="checkout-summary"><h2>Riepilogo checkout</h2><p>Modalità di prova: nessun invio disponibile.</p></article>
+      <article data-test="account-panel"><h2>Area account</h2><p>Stato anonimo e non interattivo.</p></article>
+    </section>
+  </main>
+  <footer>PR STUDIO visual fixture</footer>
+  <script>document.querySelector('[data-route-title]').textContent = location.pathname === '/' ? 'Home' : location.pathname.replaceAll('/', ' ').trim();</script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0.0",
+  "benchmark": "PRSTUDIO-AGENT-BENCH",
+  "corpus_version": "uninitialized",
+  "ready": false,
+  "required_tasks": 500,
+  "registered_tasks": 0,
+  "splits": {
+    "public_core": {"required": 200, "registered": 0, "manifest_hash": null},
+    "private_holdout": {"required": 150, "registered": 0, "manifest_hash": null},
+    "procedural": {"required": 100, "registered": 0, "generator_hash": null},
+    "rotating_adversarial": {"required": 50, "registered": 0, "rotation_id": null, "manifest_hash": null}
+  },
+  "frozen_reference": {
+    "ready": false,
+    "model_id": null,
+    "reasoning_effort": null,
+    "harness_id": null,
+    "episode_bundle_hash": null
+  },
+  "blocking_reason": "A real 500-task corpus and same-model frontier reference have not been executed in this local source-only environment. No measured agent score may be emitted yet."
+}

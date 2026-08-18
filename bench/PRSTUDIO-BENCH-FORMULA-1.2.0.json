@@ -1,0 +1,64 @@
+{
+  "schema_version": "1.0.0",
+  "formula_id": "prstudio-system-bench",
+  "formula_version": "1.2.0",
+  "score_range": {
+    "minimum": 0.0,
+    "maximum": 100.0
+  },
+  "weights": {
+    "checkpoint_quality": 65.0,
+    "release_validation": 20.0,
+    "evidence_coverage": 8.0,
+    "critical_runtime_efficiency": 7.0
+  },
+  "checkpoint_status_points": {
+    "PASS": 1.0,
+    "WARN": 0.5,
+    "FAIL": 0.0,
+    "NA": null
+  },
+  "critical_runtime_reference": {
+    "capability_search_cold": {
+      "maximum_median_ms": 250.0,
+      "weight": 2.0
+    },
+    "capability_search_warm_p95": {
+      "maximum_median_ms": 5.0,
+      "weight": 2.0
+    },
+    "operational_twin_sync_500": {
+      "maximum_median_ms": 1500.0,
+      "weight": 3.0
+    },
+    "normalization": "for each metric: weight * min(1, maximum_median_ms / measured_median_ms)"
+  },
+  "integrity_rules": {
+    "required_questions": 250,
+    "minimum_timed_samples": 5,
+    "required_critical_samples": 5,
+    "fresh_audit_required": true,
+    "hard_failure_score_ceiling": 49.9999,
+    "release_validator_failure_score_ceiling": 69.9999,
+    "inventory_drop_requires_review": true,
+    "formula_change_breaks_comparability": true,
+    "one_canonical_record_per_local_day": true,
+    "history_hash_chain": "sha256 canonical JSON without record_sha256"
+  },
+  "evidence_coverage": {
+    "definition": "applicable_rule_cells / matrix_cells",
+    "note": "Matrix cells are rule applicability cells, not independent executions. NA is reported and affects coverage only; it is never relabeled as PASS."
+  },
+  "release_validation_status_points": {
+    "PASS": 1.0,
+    "WARN": 0.5,
+    "FAIL": 0.0,
+    "SKIP": null
+  },
+  "scope": {
+    "name": "infrastructure_and_contract_quality",
+    "agent_benchmark": false,
+    "production_proof": false,
+    "warning": "This score is not a Codex/agent capability score and does not imply live WordPress/Chrome production proof."
+  }
+}

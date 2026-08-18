@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0.0",
+  "benchmark": "PRSTUDIO-AGENT-BENCH",
+  "local_date": "2026-08-11",
+  "score": 2.0,
+  "score_kind": "owner_calibration_baseline",
+  "measured": false,
+  "canonical_history_record": false,
+  "reference": "Codex-class frontier coding/operations agent = 100",
+  "production_proven": false,
+  "note": "This value is the product owner's deliberately severe Day Zero calibration. It is not presented as an experimental result. The first measured score requires the complete frozen corpus, same-model reference episodes, and fresh candidate evidence."
+}

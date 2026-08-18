@@ -1,0 +1,4415 @@
+{
+  "schema_version": "17.0.0",
+  "suite_version": "17.0.0",
+  "capabilities": [
+    {
+      "id": "agency.status",
+      "version": "17.0.0",
+      "domain": "operations",
+      "description": "Legge runner, scheduler, lease, Browser Agent e requisiti H24 senza affermare continuità quando cron o Chrome non sono disponibili.",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Agency_Capabilities::agency_status",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_through",
+      "cache_policy": "none",
+      "verification_policy": "runtime_status",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "twin.sync",
+      "version": "17.0.0",
+      "domain": "operations",
+      "description": "Sincronizza una slice bounded del sito nel twin operativo privato, con provenienza e senza corpi pagina, ordini o dati cliente.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 8
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 1000
+          }
+        },
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Agency_Capabilities::twin_sync",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_compact_facts",
+      "cache_policy": "private_durable",
+      "verification_policy": "count_and_provenance",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "medium",
+      "concurrency_policy": "serialized_site_state",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "twin.query",
+      "version": "17.0.0",
+      "domain": "operations",
+      "description": "Interroga entità compatte del twin operativo distinguendo fatti WordPress, API, Browser live, derivazioni e raccomandazioni.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "type": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          }
+        },
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Agency_Capabilities::twin_query",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "private_durable",
+      "verification_policy": "provenance_required",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "social.metrics.ingest",
+      "version": "17.0.0",
+      "domain": "social",
+      "description": "Normalizza una snapshot di metriche social ottenuta da API, webhook, import o Browser Agent, con sorgente esplicita e senza credenziali.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "maxLength": 24
+          },
+          "account": {
+            "type": "string",
+            "maxLength": 190
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "browser_live",
+              "api",
+              "webhook",
+              "import"
+            ]
+          },
+          "observed_gmt": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "period_start": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "period_end": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "metrics": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "maxItems": 100
+          }
+        },
+        "required": [
+          "platform",
+          "account",
+          "metrics"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Agency_Capabilities::social_ingest",
+      "read_only": false,
+      "write": true,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_normalized_metrics",
+      "cache_policy": "private_durable",
+      "verification_policy": "schema_and_provenance",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "serialized_site_state",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "social.insights",
+      "version": "17.0.0",
+      "domain": "social",
+      "description": "Calcola trend, engagement, condivisioni, salvataggi, completamento e viralità su snapshot social realmente osservate.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "maxLength": 24
+          },
+          "account": {
+            "type": "string",
+            "maxLength": 190
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Agency_Capabilities::social_insights",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [
+        "social.metrics.ingest"
+      ],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "private_durable",
+      "verification_policy": "deterministic_formula",
+      "evidence_policy": "snapshot_ids",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "opportunity.rank",
+      "version": "17.0.0",
+      "domain": "intelligence",
+      "description": "Ordina opportunità da twin, metriche social e segnali espliciti tramite formula deterministica con confidence, effort, urgenza ed evidenza.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "filters": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "signals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "maxItems": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Agency_Capabilities::opportunity_rank",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [
+        "twin.query",
+        "social.insights"
+      ],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_summary_only",
+      "cache_policy": "bounded_ttl",
+      "verification_policy": "deterministic_formula",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "sentinel.scan",
+      "version": "17.0.0",
+      "domain": "operations",
+      "description": "Esegue una scansione bounded del sito e genera alert soltanto per cambiamenti o degradi osservati.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "deep": {
+            "type": "boolean"
+          },
+          "max_urls": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Agency_Capabilities::sentinel_scan",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [
+        "twin.sync"
+      ],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_changed_only",
+      "cache_policy": "private_durable",
+      "verification_policy": "signature_diff",
+      "evidence_policy": "changed_only",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "medium",
+      "concurrency_policy": "serialized_site_state",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "toolchain.status",
+      "version": "17.0.0",
+      "domain": "operations",
+      "description": "Rileva in modo zero-config le integrazioni MCP/native disponibili, senza avviare processi né cambiare installazione.",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_MCP_Toolchain::status",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "read_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native",
+        "tool_name": "native_toolchain"
+      }
+    },
+    {
+      "id": "toolchain.filesystem.inspect",
+      "version": "17.0.0",
+      "domain": "operations",
+      "description": "Filesystem locale sandboxato: stat, read, list e search soltanto dentro le radici WordPress/PR STUDIO.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "stat",
+              "read",
+              "list",
+              "search"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "description": "Path dentro le radici consentite.",
+            "maxLength": 4096
+          },
+          "query": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "max_files": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5000
+          },
+          "max_bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1048576
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_MCP_Toolchain::filesystem_inspect",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "read_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native",
+        "tool_name": "native_toolchain"
+      }
+    },
+    {
+      "id": "toolchain.filesystem.write",
+      "version": "17.0.0",
+      "domain": "operations",
+      "description": "Scrittura filesystem atomica e sandboxata; supporta write, replace esatto e mkdir senza delete.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "write",
+              "replace",
+              "mkdir"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          },
+          "content": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          },
+          "search": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          },
+          "replace": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          },
+          "expected_occurrences": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "expected_sha256": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "action",
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_MCP_Toolchain::filesystem_write",
+      "read_only": false,
+      "write": true,
+      "risk_level": "medium",
+      "destructive": false,
+      "idempotent": false,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_summary_only",
+      "cache_policy": "none",
+      "verification_policy": "executor_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "medium",
+      "concurrency_policy": "serialized_site_state",
+      "discoverable": true,
+      "source": {
+        "kind": "native",
+        "tool_name": "native_toolchain"
+      }
+    },
+    {
+      "id": "toolchain.git.inspect",
+      "version": "17.0.0",
+      "domain": "operations",
+      "description": "Git locale read-only senza shell: status, log, diff, show, branches e remotes su repository dentro le radici consentite.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "status",
+              "log",
+              "diff",
+              "show",
+              "branches",
+              "remotes"
+            ]
+          },
+          "repository": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          },
+          "ref": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          },
+          "file": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_MCP_Toolchain::git_inspect",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "read_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native",
+        "tool_name": "native_toolchain"
+      }
+    },
+    {
+      "id": "toolchain.sqlite.query",
+      "version": "17.0.0",
+      "domain": "operations",
+      "description": "SQLite locale read-only con query SELECT/WITH/EXPLAIN/PRAGMA allowlisted; sidecar opzionale se il driver PHP manca.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "database": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          },
+          "sql": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          },
+          "params": {
+            "type": "array",
+            "items": {}
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        },
+        "required": [
+          "database",
+          "sql"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_MCP_Toolchain::sqlite_query",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "read_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native",
+        "tool_name": "native_toolchain"
+      }
+    },
+    {
+      "id": "toolchain.postgres.query",
+      "version": "17.0.0",
+      "domain": "operations",
+      "description": "PostgreSQL restricted/read-only quando DATABASE_URI esiste già nell ambiente; nessuna nuova credenziale viene richiesta.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "sql": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          },
+          "params": {
+            "type": "array",
+            "items": {}
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        },
+        "required": [
+          "sql"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_MCP_Toolchain::postgres_query",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "read_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native",
+        "tool_name": "native_toolchain"
+      }
+    },
+    {
+      "id": "toolchain.wpcli.inspect",
+      "version": "17.0.0",
+      "domain": "operations",
+      "description": "WP-CLI locale read-only con allowlist deterministica; nessuna stringa shell arbitraria.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "core_version",
+              "plugin_list",
+              "theme_list",
+              "option_get",
+              "cron_list",
+              "db_size"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          },
+          "name": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_MCP_Toolchain::wpcli_inspect",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "read_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native",
+        "tool_name": "native_toolchain"
+      }
+    },
+    {
+      "id": "toolchain.image.optimize",
+      "version": "17.0.0",
+      "domain": "media",
+      "description": "Ottimizza immagini locali tramite WP_Image_Editor con resize/quality e output verificato, senza servizi esterni.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          },
+          "output_path": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          },
+          "max_width": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8192
+          },
+          "max_height": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8192
+          },
+          "quality": {
+            "type": "integer",
+            "minimum": 30,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_MCP_Toolchain::image_optimize",
+      "read_only": false,
+      "write": true,
+      "risk_level": "medium",
+      "destructive": false,
+      "idempotent": false,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_summary_only",
+      "cache_policy": "none",
+      "verification_policy": "executor_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "medium",
+      "concurrency_policy": "serialized_site_state",
+      "discoverable": true,
+      "source": {
+        "kind": "native",
+        "tool_name": "native_toolchain"
+      }
+    },
+    {
+      "id": "toolchain.pdf.read",
+      "version": "17.0.0",
+      "domain": "operations",
+      "description": "Legge PDF locali tramite pdftotext quando presente; fallback disponibile al sidecar PDF MCP fissato.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          },
+          "first_page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "last_page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "max_bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1048576
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_MCP_Toolchain::pdf_read",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "read_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native",
+        "tool_name": "native_toolchain"
+      }
+    },
+    {
+      "id": "toolchain.pandoc.convert",
+      "version": "17.0.0",
+      "domain": "content",
+      "description": "Converte documenti locali con Pandoc già installato; input/output restano dentro le radici consentite.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          },
+          "output": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          },
+          "from": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          },
+          "to": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "input",
+          "output"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_MCP_Toolchain::pandoc_convert",
+      "read_only": false,
+      "write": true,
+      "risk_level": "medium",
+      "destructive": false,
+      "idempotent": false,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_summary_only",
+      "cache_policy": "none",
+      "verification_policy": "executor_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "medium",
+      "concurrency_policy": "serialized_site_state",
+      "discoverable": true,
+      "source": {
+        "kind": "native",
+        "tool_name": "native_toolchain"
+      }
+    },
+    {
+      "id": "toolchain.sidecar.tools",
+      "version": "17.0.0",
+      "domain": "operations",
+      "description": "Avvia on-demand un sidecar MCP fissato e restituisce tools/list; nessun sidecar parte al bootstrap.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "string",
+            "enum": [
+              "filesystem",
+              "git",
+              "sqlite",
+              "postgres",
+              "accessibility",
+              "pdf",
+              "mermaid",
+              "osv",
+              "local_wp"
+            ]
+          },
+          "root": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          },
+          "repository": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          },
+          "database": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "profile"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_MCP_Toolchain::sidecar_tools",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "read_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native",
+        "tool_name": "native_toolchain"
+      }
+    },
+    {
+      "id": "toolchain.sidecar.read",
+      "version": "17.0.0",
+      "domain": "operations",
+      "description": "Chiama soltanto la lane read-only di un sidecar MCP fissato, con timeout e terminazione forzata del processo.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "string",
+            "enum": [
+              "filesystem",
+              "git",
+              "sqlite",
+              "postgres",
+              "accessibility",
+              "pdf",
+              "mermaid",
+              "osv",
+              "local_wp"
+            ]
+          },
+          "tool": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          },
+          "arguments": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "root": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          },
+          "repository": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          },
+          "database": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "profile",
+          "tool"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_MCP_Toolchain::sidecar_read",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "read_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native",
+        "tool_name": "native_toolchain"
+      }
+    },
+    {
+      "id": "toolchain.sidecar.call",
+      "version": "17.0.0",
+      "domain": "operations",
+      "description": "Chiama esplicitamente un tool di un sidecar MCP fissato. Operazione controllata perché alcuni sidecar possono mutare file o stato.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "string",
+            "enum": [
+              "filesystem",
+              "git",
+              "sqlite",
+              "postgres",
+              "accessibility",
+              "pdf",
+              "mermaid",
+              "osv",
+              "local_wp"
+            ]
+          },
+          "tool": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          },
+          "arguments": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "root": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          },
+          "repository": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          },
+          "database": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "profile",
+          "tool"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_MCP_Toolchain::sidecar_call",
+      "read_only": false,
+      "write": true,
+      "risk_level": "high",
+      "destructive": false,
+      "idempotent": false,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_summary_only",
+      "cache_policy": "none",
+      "verification_policy": "executor_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "medium",
+      "concurrency_policy": "serialized_site_state",
+      "discoverable": true,
+      "source": {
+        "kind": "native",
+        "tool_name": "native_toolchain"
+      }
+    },
+    {
+      "id": "toolchain.accessibility.axe_scan",
+      "version": "17.0.0",
+      "domain": "operations",
+      "description": "Scansione accessibilità WCAG tramite sidecar axe-core/Playwright fissato, avviato solo su richiesta e senza account/API key.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "",
+            "maxLength": 2048
+          },
+          "violationsTag": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32
+          },
+          "viewport": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "integer",
+                "minimum": 320,
+                "maximum": 8192
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 240,
+                "maximum": 8192
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_MCP_Toolchain::accessibility_axe_scan",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "read_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "medium",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native",
+        "tool_name": "mcp_toolchain_facade"
+      }
+    },
+    {
+      "id": "toolchain.mermaid.render",
+      "version": "17.0.0",
+      "domain": "content",
+      "description": "Render Mermaid in SVG/PNG tramite sidecar fissato; nessun servizio cloud o account richiesto.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "",
+            "maxLength": 262144
+          },
+          "outputFormat": {
+            "type": "string",
+            "enum": [
+              "svg",
+              "png"
+            ]
+          },
+          "theme": {
+            "type": "string",
+            "enum": [
+              "default",
+              "forest",
+              "dark",
+              "neutral"
+            ]
+          },
+          "backgroundColor": {
+            "type": "string",
+            "description": "",
+            "maxLength": 64
+          },
+          "name": {
+            "type": "string",
+            "description": "",
+            "maxLength": 190
+          },
+          "folder": {
+            "type": "string",
+            "description": "",
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_MCP_Toolchain::mermaid_render",
+      "read_only": false,
+      "write": true,
+      "risk_level": "medium",
+      "destructive": false,
+      "idempotent": false,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_summary_only",
+      "cache_policy": "none",
+      "verification_policy": "executor_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "medium",
+      "concurrency_policy": "serialized_site_state",
+      "discoverable": true,
+      "source": {
+        "kind": "native",
+        "tool_name": "mcp_toolchain_facade"
+      }
+    },
+    {
+      "id": "toolchain.dependencies.osv",
+      "version": "17.0.0",
+      "domain": "operations",
+      "description": "Audit dipendenze tramite sidecar OSV.dev keyless fissato: singolo pacchetto, batch, advisory o lista ecosistemi.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "query_package",
+              "query_batch",
+              "get_vulnerability",
+              "list_ecosystems"
+            ]
+          },
+          "arguments": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_MCP_Toolchain::osv_audit",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "read_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "medium",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native",
+        "tool_name": "mcp_toolchain_facade"
+      }
+    },
+    {
+      "id": "toolchain.pdf.evidence",
+      "version": "17.0.0",
+      "domain": "operations",
+      "description": "Lettura/search/evidence PDF locale tramite il sidecar @sylphx/pdf-reader-mcp fissato, con path locali sandboxati.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": [
+              "read",
+              "search",
+              "evidence"
+            ]
+          },
+          "arguments": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "operation"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_MCP_Toolchain::pdf_mcp_evidence",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "read_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "medium",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native",
+        "tool_name": "mcp_toolchain_facade"
+      }
+    },
+    {
+      "id": "toolchain.local_wp.read",
+      "version": "17.0.0",
+      "domain": "operations",
+      "description": "Compatibilità Local by Flywheel via local-wp-mcp fissato con WPCLI/MYSQL/FS writes forzati a false.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "tool": {
+            "type": "string",
+            "description": "",
+            "maxLength": 190
+          },
+          "arguments": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "tool"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_MCP_Toolchain::local_wp_read",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "read_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "medium",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native",
+        "tool_name": "mcp_toolchain_facade"
+      }
+    },
+    {
+      "id": "business.goal.registry",
+      "version": "17.0.0",
+      "domain": "intelligence",
+      "description": "Persist, list, evaluate or remove strategic goals and constraints used by the Director.",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Business_Intelligence::goal_registry",
+      "read_only": false,
+      "write": true,
+      "risk_level": "medium",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_private_state",
+      "cache_policy": "none",
+      "verification_policy": "durable_state_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "business.data_quality.resolve_conflicts",
+      "version": "17.0.0",
+      "domain": "intelligence",
+      "description": "Resolve contradictory facts by source authority, freshness and confidence.",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Business_Intelligence::data_quality_conflicts",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "deterministic_conflict_resolution",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "business.decision.journal",
+      "version": "17.0.0",
+      "domain": "intelligence",
+      "description": "Persist a bounded managerial decision journal with rationale, alternatives, evidence and expected outcome.",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Business_Intelligence::decision_journal",
+      "read_only": false,
+      "write": true,
+      "risk_level": "medium",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_private_state",
+      "cache_policy": "none",
+      "verification_policy": "durable_state_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "business.outcome.track",
+      "version": "17.0.0",
+      "domain": "intelligence",
+      "description": "Track baseline, intervention, observation window and measured outcome for learning.",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Business_Intelligence::outcome_tracker",
+      "read_only": false,
+      "write": true,
+      "risk_level": "medium",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_private_state",
+      "cache_policy": "none",
+      "verification_policy": "durable_state_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "commerce.unit_economics",
+      "version": "17.0.0",
+      "domain": "commerce",
+      "description": "Compute deterministic contribution margin from revenue and bounded variable-cost inputs.",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Business_Intelligence::unit_economics",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "deterministic_formula",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "business.scenario.simulate",
+      "version": "17.0.0",
+      "domain": "intelligence",
+      "description": "Run bounded non-executing linear what-if scenarios over supplied business metrics.",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Business_Intelligence::scenario_simulator",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "simulation_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "twin.semantic_blast_radius",
+      "version": "17.0.0",
+      "domain": "intelligence",
+      "description": "Traverse supplied semantic relations and quantify bounded downstream dependency impact.",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Business_Intelligence::semantic_blast_radius",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "deterministic_graph_traversal",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "commerce.replenishment.plan",
+      "version": "17.0.0",
+      "domain": "commerce",
+      "description": "Calculate reorder point, safety stock, stockout and overstock heuristics from supplied demand data.",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Business_Intelligence::demand_replenishment_planner",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "deterministic_formula",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "experiment.causal.evaluate",
+      "version": "17.0.0",
+      "domain": "intelligence",
+      "description": "Evaluate a two-variant experiment with confidence interval, significance and guardrails.",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Business_Intelligence::causal_experiment_evaluator",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "statistical_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "recommendation.feedback.calibrate",
+      "version": "17.0.0",
+      "domain": "intelligence",
+      "description": "Calibrate recommendation confidence from predicted versus measured impact.",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Business_Intelligence::recommendation_feedback_calibrator",
+      "read_only": false,
+      "write": true,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_private_state",
+      "cache_policy": "none",
+      "verification_policy": "durable_state_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "recommendation.expiry.revalidate",
+      "version": "17.0.0",
+      "domain": "intelligence",
+      "description": "Mark recommendations valid or stale from evidence age and bounded TTL.",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Business_Intelligence::recommendation_expiry_revalidator",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "deterministic_freshness",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "sequential.thinking",
+      "version": "17.0.0",
+      "domain": "intelligence",
+      "description": "Persist one explicit structured Sequential Thinking note; optionally federate to the pinned official MCP server. Hidden chain-of-thought is never stored.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "thought": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 12000
+          },
+          "nextThoughtNeeded": {
+            "type": "boolean"
+          },
+          "thoughtNumber": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 128
+          },
+          "totalThoughts": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 128
+          },
+          "session_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "isRevision": {
+            "type": "boolean"
+          },
+          "revisesThought": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 128
+          },
+          "branchFromThought": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 128
+          },
+          "branchId": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "needsMoreThoughts": {
+            "type": "boolean"
+          },
+          "prefer_sidecar": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "thought",
+          "nextThoughtNeeded",
+          "thoughtNumber",
+          "totalThoughts"
+        ]
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Sequential_Thinking::think",
+      "read_only": false,
+      "write": true,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_private_state",
+      "cache_policy": "none",
+      "verification_policy": "bounded_session_receipt",
+      "evidence_policy": "explicit_user_model_note",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "serialized_site_state",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "sequential.session",
+      "version": "17.0.0",
+      "domain": "intelligence",
+      "description": "Read one explicit bounded Sequential Thinking session.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "session_id"
+        ]
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Sequential_Thinking::session",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "read_receipt",
+      "evidence_policy": "explicit_user_model_note",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "sequential.status",
+      "version": "17.0.0",
+      "domain": "operations",
+      "description": "Inspect Sequential Thinking native/sidecar readiness and bounded-session metrics.",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Sequential_Thinking::status",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "runtime_status",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "skills.search",
+      "version": "17.0.0",
+      "domain": "intelligence",
+      "description": "Search verified learned procedures and known failed paths before retrying a task.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ]
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Procedural_Skills::search",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "read_receipt",
+      "evidence_policy": "verified_procedure",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "skills.get",
+      "version": "17.0.0",
+      "domain": "intelligence",
+      "description": "Read a verified procedural skill and its progressive-disclosure SKILL.md.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ]
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Procedural_Skills::get",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "read_receipt",
+      "evidence_policy": "verified_procedure",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "skills.status",
+      "version": "17.0.0",
+      "domain": "operations",
+      "description": "Inspect procedural-skill learning, reuse, validity and staleness metrics.",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Procedural_Skills::status",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "runtime_status",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "skills.invalidate",
+      "version": "17.0.0",
+      "domain": "operations",
+      "description": "Expire a learned procedure after an environment/application change while preserving history.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ]
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Procedural_Skills::invalidate",
+      "read_only": false,
+      "write": true,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_private_state",
+      "cache_policy": "none",
+      "verification_policy": "durable_state_receipt",
+      "evidence_policy": "verified_procedure",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "serialized_site_state",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "skills.curate",
+      "version": "17.0.0",
+      "domain": "operations",
+      "description": "Conservatively curate verified procedural memory: surface stale/failed-only/overlapping skills and optionally archive without deleting history or auto-merging variants.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "apply": {
+            "type": "boolean"
+          },
+          "force": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Procedural_Skills::curate",
+      "read_only": false,
+      "write": true,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_private_state",
+      "cache_policy": "none",
+      "verification_policy": "durable_state_receipt",
+      "evidence_policy": "curation_report",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "serialized_site_state",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "serp.configure",
+      "version": "17.0.0",
+      "domain": "seo",
+      "description": "Configure a bounded SerpBear endpoint/domain/GSC property and store the API key in the encrypted Secrets Vault.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "base_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "api_key": {
+            "type": "string",
+            "minLength": 1
+          },
+          "domain": {
+            "type": "string"
+          },
+          "site_url": {
+            "type": "string"
+          },
+          "allow_private_host": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "base_url",
+          "api_key"
+        ]
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Serp_Watch::configure",
+      "read_only": false,
+      "write": true,
+      "risk_level": "high",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_private_state",
+      "cache_policy": "none",
+      "verification_policy": "configuration_receipt",
+      "evidence_policy": "secret_redacted",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "serialized_site_state",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "serp.status",
+      "version": "17.0.0",
+      "domain": "seo",
+      "description": "Inspect SerpBear configuration and durable watcher status without exposing the API secret.",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Serp_Watch::status",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "runtime_status",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "serp.keywords",
+      "version": "17.0.0",
+      "domain": "seo",
+      "description": "Read configured SerpBear keywords and exact latest SERP positions via authenticated API.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Serp_Watch::keywords",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "remote_read_receipt",
+      "evidence_policy": "serpbear_api",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "medium",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "serp.refresh_all",
+      "version": "17.0.0",
+      "domain": "seo",
+      "description": "Trigger the documented SerpBear POST /api/cron refresh only when refresh_all=true.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "refresh_all": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "refresh_all"
+        ]
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Serp_Watch::refresh",
+      "read_only": false,
+      "write": true,
+      "risk_level": "medium",
+      "destructive": false,
+      "idempotent": false,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_summary_only",
+      "cache_policy": "none",
+      "verification_policy": "remote_action_receipt",
+      "evidence_policy": "serpbear_api",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "medium",
+      "concurrency_policy": "serialized_site_state",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "serp.watch.create",
+      "version": "17.0.0",
+      "domain": "seo",
+      "description": "Create a durable keyword watcher with first-page and target-position milestones and consecutive confirmations.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "keywords": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 500,
+            "items": {
+              "type": "string"
+            }
+          },
+          "domain": {
+            "type": "string"
+          },
+          "site_url": {
+            "type": "string"
+          },
+          "target_position": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "first_page_position": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "required_consecutive": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30
+          },
+          "interval_hours": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 168
+          },
+          "refresh_serpbear_before_check": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keywords"
+        ]
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Serp_Watch::watch_create",
+      "read_only": false,
+      "write": true,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": true,
+      "memory_policy": "write_private_state",
+      "cache_policy": "none",
+      "verification_policy": "durable_state_receipt",
+      "evidence_policy": "serpbear+gsc",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "serialized_site_state",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "serp.watch.run",
+      "version": "17.0.0",
+      "domain": "seo",
+      "description": "Run one bounded watcher check: exact SerpBear positions plus separate GSC query/page evidence.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "watch_id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "watch_id"
+        ]
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Serp_Watch::watch_run",
+      "read_only": false,
+      "write": true,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": true,
+      "memory_policy": "write_private_state",
+      "cache_policy": "none",
+      "verification_policy": "rank_and_gsc_receipt",
+      "evidence_policy": "serpbear+gsc",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "medium",
+      "concurrency_policy": "serialized_site_state",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "serp.watch.list",
+      "version": "17.0.0",
+      "domain": "seo",
+      "description": "List durable rank watchers without deleting history.",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Serp_Watch::watch_list",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "read_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "serp.watch.status",
+      "version": "17.0.0",
+      "domain": "seo",
+      "description": "Read one rank watcher, keyword milestones and bounded history.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "watch_id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "watch_id"
+        ]
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Serp_Watch::watch_status",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "read_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "serp.watch.cancel",
+      "version": "17.0.0",
+      "domain": "seo",
+      "description": "Cancel future checks while preserving watcher history and evidence.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "watch_id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "watch_id"
+        ]
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Serp_Watch::watch_cancel",
+      "read_only": false,
+      "write": true,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_private_state",
+      "cache_policy": "none",
+      "verification_policy": "durable_state_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "serialized_site_state",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "engineering.repo_map",
+      "version": "17.0.0",
+      "domain": "operations",
+      "description": "Build a bounded symbol/hash repo map for context-efficient code analysis inside the PR STUDIO plugin root.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5000
+          }
+        },
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Engineering_Workbench::repo_map",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "file_hash_receipt",
+      "evidence_policy": "local_files",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "medium",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "engineering.validate",
+      "version": "17.0.0",
+      "domain": "operations",
+      "description": "Run fixed anti-crash profiles: PHP lint, JSON validation and semantic no-stub scan. No arbitrary shell string is accepted.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "string",
+            "enum": [
+              "matrix",
+              "php_lint",
+              "json_validate",
+              "no_stub_scan"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Engineering_Workbench::validate",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "process_exit_receipt",
+      "evidence_policy": "local_files",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "medium",
+      "concurrency_policy": "serialized_site_state",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "engineering.terminal",
+      "version": "17.0.0",
+      "domain": "operations",
+      "description": "Run an allowlisted argv-based engineering operation (php_version, php_lint, json_validate, test_matrix, repo_map); arbitrary Bash is not exposed.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": [
+              "php_version",
+              "php_lint",
+              "json_validate",
+              "test_matrix",
+              "repo_map"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5000
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "operation"
+        ]
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Engineering_Workbench::terminal",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "process_exit_receipt",
+      "evidence_policy": "local_files",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "medium",
+      "concurrency_policy": "serialized_site_state",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "engineering.status",
+      "version": "17.0.0",
+      "domain": "operations",
+      "description": "Inspect bounded engineering-workbench limits and safe operation catalogue.",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Engineering_Workbench::status",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "runtime_status",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "serp.watch.create_all",
+      "version": "17.0.0",
+      "domain": "seo",
+      "description": "Create sharded durable daily watches for every keyword returned by the configured SerpBear domain, preserving first-page and target-position milestones.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "site_url": {
+            "type": "string"
+          },
+          "target_position": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "first_page_position": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "required_consecutive": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30
+          },
+          "interval_hours": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 168
+          },
+          "refresh_serpbear_before_check": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": []
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Serp_Watch::watch_create_all",
+      "read_only": false,
+      "write": true,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": true,
+      "memory_policy": "write_private_state",
+      "cache_policy": "none",
+      "verification_policy": "durable_state_receipt",
+      "evidence_policy": "serpbear+gsc",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "serialized_site_state",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "version": "17.0.0",
+      "domain": "content_seo",
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "destructive": false,
+      "dependencies": [],
+      "memory_policy": "verified_write_through",
+      "cache_policy": "invalidate_on_write",
+      "evidence_policy": "independent_postcondition",
+      "snapshot_policy": "before_write",
+      "estimated_cost": "medium",
+      "concurrency_policy": "serial_write",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      },
+      "id": "seo.gsc.request_indexing",
+      "description": "Richiede una nuova scansione tramite la UI Search Console autenticata dopo URL Inspection, selezionando e verificando la proprietà esatta e accettando il successo solo dopo conferma UI osservabile.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "site_url": {
+            "type": "string"
+          },
+          "inspection_url": {
+            "type": "string"
+          },
+          "force_request": {
+            "type": "boolean"
+          },
+          "request_timeout_ms": {
+            "type": "integer",
+            "minimum": 5000,
+            "maximum": 90000
+          },
+          "device_id": {
+            "type": "string"
+          },
+          "sync_wait_seconds": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 20
+          }
+        },
+        "required": [
+          "site_url",
+          "inspection_url"
+        ],
+        "additionalProperties": false
+      },
+      "executor": "PRSTUDIO_UC_GSC_Provider::request_indexing",
+      "read_only": false,
+      "write": true,
+      "risk_level": "medium",
+      "idempotent": true,
+      "browser_required": true,
+      "gsc_required": true,
+      "verification_policy": "visible_search_console_confirmation",
+      "rollback_capability": ""
+    },
+    {
+      "version": "17.0.0",
+      "domain": "content_seo",
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "destructive": false,
+      "dependencies": [],
+      "memory_policy": "verified_write_through",
+      "cache_policy": "invalidate_on_write",
+      "evidence_policy": "independent_postcondition",
+      "snapshot_policy": "before_write",
+      "estimated_cost": "medium",
+      "concurrency_policy": "serial_write",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      },
+      "id": "content.transaction.patch",
+      "description": "Modifica deterministica di un post/pagina WordPress esistente con optimistic lock, anchor-count, revisione, idempotenza, readback DB e verifica pubblica opzionale; evita l’editing Gutenberg per patch testuali precise.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "operation": {
+            "type": "string",
+            "enum": [
+              "replace_exact",
+              "insert_before",
+              "insert_after",
+              "append_once"
+            ]
+          },
+          "search": {
+            "type": "string"
+          },
+          "replacement": {
+            "type": "string"
+          },
+          "expected_before_sha256": {
+            "type": "string"
+          },
+          "expected_modified_gmt": {
+            "type": "string"
+          },
+          "expected_occurrences": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "idempotency_marker": {
+            "type": "string"
+          },
+          "public_verify": {
+            "type": "boolean"
+          },
+          "verify_contains": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "operation",
+          "replacement"
+        ],
+        "additionalProperties": false
+      },
+      "executor": "PRSTUDIO_UC_Content_Transaction::patch",
+      "read_only": false,
+      "write": true,
+      "risk_level": "medium",
+      "idempotent": true,
+      "browser_required": false,
+      "gsc_required": false,
+      "verification_policy": "db_hash_plus_optional_public_render",
+      "rollback_capability": "self_restore_on_persistence_mismatch_with_wordpress_revision"
+    },
+    {
+      "id": "render.source.resolve",
+      "version": "17.0.0",
+      "domain": "content_seo",
+      "description": "Resolve the authoritative WordPress render source for a public URL before mutation: front page/post, FSE template/template-part, theme files and page-specific stylesheet.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "include_theme_files": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "url"
+        ]
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Render_Source_Resolver::resolve",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "authoritative_source_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "seo.campaign.manager",
+      "version": "17.0.0",
+      "domain": "seo",
+      "description": "Persist and govern head-keyword campaigns (vino, ricette, ristoranti, Sicilia, bar), current metrics, satellites, do-not-do constraints and next best action.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": [
+              "bootstrap",
+              "list",
+              "get",
+              "upsert",
+              "progress",
+              "update_metrics",
+              "set_next_action"
+            ]
+          },
+          "campaign_id": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "primary_keyword": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "primary_url": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "target_position": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "satellites": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 300
+            },
+            "maxItems": 300
+          },
+          "metrics": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "next_best_action": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "do_not_do": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 300
+            },
+            "maxItems": 100
+          },
+          "lane_token": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Editorial_Autonomy::campaign_manager",
+      "read_only": false,
+      "write": true,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_private_state",
+      "cache_policy": "none",
+      "verification_policy": "persistent_state_readback",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "medium",
+      "concurrency_policy": "serialized_site_state",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "seo.keyword_url.registry",
+      "version": "17.0.0",
+      "domain": "seo",
+      "description": "Maintain a binding from keyword+intent to one dominant URL and reject silent competing primaries unless an explicit migration is requested.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": [
+              "lookup",
+              "list",
+              "assign",
+              "bind",
+              "migrate"
+            ]
+          },
+          "keyword": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "intent": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "campaign_id": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "force": {
+            "type": "boolean"
+          },
+          "lane_token": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Editorial_Autonomy::keyword_url_registry",
+      "read_only": false,
+      "write": true,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_private_state",
+      "cache_policy": "none",
+      "verification_policy": "persistent_state_readback",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "medium",
+      "concurrency_policy": "serialized_site_state",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "seo.serp_intent.observe",
+      "version": "17.0.0",
+      "domain": "seo",
+      "description": "Persist an observed SERP snapshot, classify intent/content types, hash it, cache it and avoid re-observing unchanged SERPs until TTL expiry.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "country": {
+            "type": "string",
+            "maxLength": 10
+          },
+          "language": {
+            "type": "string",
+            "maxLength": 10
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "maxItems": 50
+          },
+          "ttl_seconds": {
+            "type": "integer",
+            "minimum": 3600,
+            "maximum": 2592000
+          },
+          "force": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "lane_token": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "query"
+        ]
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Editorial_Autonomy::serp_intent_observer",
+      "read_only": false,
+      "write": true,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_private_state",
+      "cache_policy": "none",
+      "verification_policy": "persistent_state_readback",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "medium",
+      "concurrency_policy": "serialized_site_state",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "content.brief.compile",
+      "version": "17.0.0",
+      "domain": "content_seo",
+      "description": "Compile a deterministic editorial contract from campaign, dominant URL, SERP intent, entities, products, links, missing competitor topics, schema and forbidden overlap.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "intent": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "campaign_id": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "target_url": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "secondary_queries": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 300
+            },
+            "maxItems": 200
+          },
+          "search_intent": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "required_entities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 300
+            },
+            "maxItems": 200
+          },
+          "required_sections": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 200
+          },
+          "products_verified": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "maxItems": 200
+          },
+          "internal_links_in": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "maxItems": 200
+          },
+          "internal_links_out": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "maxItems": 200
+          },
+          "competitor_topics_missing": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 200
+          },
+          "original_information_required": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 100
+          },
+          "schema_type": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "image_requirements": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "maxItems": 100
+          },
+          "forbidden_overlap": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "maxItems": 200
+          },
+          "lane_token": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "keyword"
+        ]
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Editorial_Autonomy::brief_compiler",
+      "read_only": false,
+      "write": true,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_private_state",
+      "cache_policy": "none",
+      "verification_policy": "persistent_state_readback",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "medium",
+      "concurrency_policy": "serialized_site_state",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "content.publish.transaction",
+      "version": "17.0.0",
+      "domain": "content_seo",
+      "description": "Create and publish WordPress content server-side with idempotency, taxonomy/Rank Math/schema, DB readback and nonblocking public/sitemap evidence.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "slug": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "content": {
+            "type": "string"
+          },
+          "excerpt": {
+            "type": "string",
+            "maxLength": 5000
+          },
+          "post_type": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "publish",
+              "draft",
+              "pending",
+              "private"
+            ]
+          },
+          "publish_date": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "author": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "maxItems": 100
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "maxItems": 200
+          },
+          "taxonomies": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "featured_image": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "seo_title": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "seo_description": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "canonical": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "schema_json": {
+            "type": "string"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "verify_contains": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "required_claims": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 2000
+            },
+            "maxItems": 200
+          },
+          "primary_keyword": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "campaign_id": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "policy_id": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "allow_external_canonical": {
+            "type": "boolean"
+          },
+          "lane_token": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "content"
+        ]
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Publish_Transaction::create_publish",
+      "read_only": false,
+      "write": true,
+      "risk_level": "medium",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_private_state",
+      "cache_policy": "none",
+      "verification_policy": "db_public_sitemap_transaction_receipt",
+      "evidence_policy": "independent_postcondition",
+      "snapshot_policy": "before_write",
+      "rollback_capability": "",
+      "estimated_cost": "medium",
+      "concurrency_policy": "exclusive_entity_lease",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "content.claim.ledger",
+      "version": "17.0.0",
+      "domain": "content_seo",
+      "description": "Persist factual claim evidence with source authority, confidence and expiry for reporting; stale or missing evidence never authorizes or vetoes publishing.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": [
+              "list",
+              "check",
+              "upsert",
+              "invalidate"
+            ]
+          },
+          "claim": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "source_url": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "authority": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "unverified",
+              "stale",
+              "rejected"
+            ]
+          },
+          "ttl_seconds": {
+            "type": "integer",
+            "minimum": 60,
+            "maximum": 31536000
+          },
+          "entity": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "lane_token": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Editorial_Autonomy::claim_ledger",
+      "read_only": false,
+      "write": true,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_private_state",
+      "cache_policy": "none",
+      "verification_policy": "persistent_state_readback",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "medium",
+      "concurrency_policy": "serialized_site_state",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "seo.internal_link.graph",
+      "version": "17.0.0",
+      "domain": "seo",
+      "description": "Build a bounded internal-link authority graph with incoming/outgoing counts, orphan evidence and pillar-support inputs for editorial planning.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 1000
+          }
+        },
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Editorial_Autonomy::internal_link_graph",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "graph_read_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "seo.cannibalization.resolver",
+      "version": "17.0.0",
+      "domain": "seo",
+      "description": "Resolve or persist a decision for competing same-intent URLs using KEEP, REFRESH, MERGE, REDIRECT, NOINDEX, RETARGET or DIFFERENTIATE rather than publishing another duplicate.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": [
+              "analyze",
+              "decide",
+              "list"
+            ]
+          },
+          "keyword": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "intent": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "urls": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 2000
+            },
+            "maxItems": 50
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "keep",
+              "refresh",
+              "merge",
+              "redirect",
+              "noindex",
+              "retarget",
+              "differentiate"
+            ]
+          },
+          "target_url": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "evidence": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "lane_token": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Editorial_Autonomy::cannibalization_resolver",
+      "read_only": false,
+      "write": true,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_private_state",
+      "cache_policy": "none",
+      "verification_policy": "persistent_state_readback",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "medium",
+      "concurrency_policy": "serialized_site_state",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "seo.post_publish.watcher",
+      "version": "17.0.0",
+      "domain": "seo",
+      "description": "Track every new URL from public HTTP/indexability/canonical through GSC/SERP milestones and retain 180 observations before recommending refresh or diagnosis.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": [
+              "create",
+              "run",
+              "check",
+              "get",
+              "list",
+              "cancel"
+            ]
+          },
+          "url": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "keyword": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "campaign_id": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "watch_id": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "gsc": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "serp": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "lane_token": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Editorial_Autonomy::post_publish_watcher",
+      "read_only": false,
+      "write": true,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_private_state",
+      "cache_policy": "none",
+      "verification_policy": "persistent_state_readback",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "medium",
+      "concurrency_policy": "serialized_site_state",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "seo.refresh.prioritize",
+      "version": "17.0.0",
+      "domain": "seo",
+      "description": "Rank existing pages for refresh using ranking opportunity, impressions, business/campaign importance and modification risk.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "pages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "maxItems": 1000
+          }
+        },
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Editorial_Autonomy::refresh_prioritizer",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "deterministic_priority_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "schema.editorial.compile",
+      "version": "17.0.0",
+      "domain": "content_seo",
+      "description": "Compile and validate bounded editorial JSON-LD for Article, Recipe and BreadcrumbList before publication.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "data"
+        ]
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Editorial_Autonomy::schema_editorial_compiler",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "schema_validation_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "media.editorial.pipeline",
+      "version": "17.0.0",
+      "domain": "media_stories",
+      "description": "Validate editorial media assets and ALT metadata, optionally applying a bounded missing ALT update with persisted readback.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "attachment_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "maxItems": 50
+          },
+          "set_alt": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "lane_token": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Editorial_Autonomy::media_editorial_pipeline",
+      "read_only": false,
+      "write": true,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_private_state",
+      "cache_policy": "none",
+      "verification_policy": "persistent_state_readback",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "medium",
+      "concurrency_policy": "serialized_site_state",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "directory.entity.engine",
+      "version": "17.0.0",
+      "domain": "content_seo",
+      "description": "Maintain deduplicated structured Restaurant/Bar/Winery/Producer/Local entities with provenance and freshness for scalable directory hubs.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": [
+              "search",
+              "upsert"
+            ]
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "type": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "municipality": {
+            "type": "string",
+            "maxLength": 150
+          },
+          "province": {
+            "type": "string",
+            "maxLength": 150
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "lat": {
+            "type": "number"
+          },
+          "lon": {
+            "type": "number"
+          },
+          "website": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "social": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 2000
+            },
+            "maxItems": 30
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "cuisine": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "maxItems": 50
+          },
+          "source": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "lane_token": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Editorial_Autonomy::directory_entity_engine",
+      "read_only": false,
+      "write": true,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_private_state",
+      "cache_policy": "none",
+      "verification_policy": "persistent_state_readback",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "medium",
+      "concurrency_policy": "serialized_site_state",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "authority.outreach.engine",
+      "version": "17.0.0",
+      "domain": "seo",
+      "description": "Maintain a bounded SEO outreach/relationship CRM for producers, wineries, restaurants, bars, associations, events and editorial partners.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": [
+              "list",
+              "upsert"
+            ]
+          },
+          "domain": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "entity": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "contact": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "relationship": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "relevance": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "authority": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "link_status": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "last_contact_gmt": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "next_action": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "lane_token": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Editorial_Autonomy::authority_outreach_engine",
+      "read_only": false,
+      "write": true,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "write_private_state",
+      "cache_policy": "none",
+      "verification_policy": "persistent_state_readback",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "medium",
+      "concurrency_policy": "serialized_site_state",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    },
+    {
+      "id": "insights.first_party.publisher",
+      "version": "17.0.0",
+      "domain": "analytics",
+      "description": "Aggregate WooCommerce order/product/category demand above a privacy threshold into original first-party editorial insight candidates without exposing personal data.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer",
+            "minimum": 7,
+            "maximum": 730
+          },
+          "privacy_threshold": {
+            "type": "integer",
+            "minimum": 3,
+            "maximum": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "executor": "PRSTUDIO_UC_Editorial_Autonomy::first_party_publisher",
+      "read_only": true,
+      "write": false,
+      "risk_level": "low",
+      "destructive": false,
+      "idempotent": true,
+      "dependencies": [],
+      "browser_required": false,
+      "gsc_required": false,
+      "memory_policy": "read_only",
+      "cache_policy": "none",
+      "verification_policy": "aggregate_privacy_receipt",
+      "evidence_policy": "source_labels",
+      "snapshot_policy": "none",
+      "rollback_capability": "",
+      "estimated_cost": "low",
+      "concurrency_policy": "parallel_read",
+      "discoverable": true,
+      "source": {
+        "kind": "native"
+      }
+    }
+  ]
+}

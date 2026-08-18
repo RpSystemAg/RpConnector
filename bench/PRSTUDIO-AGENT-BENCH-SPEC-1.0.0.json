@@ -1,0 +1,79 @@
+{
+  "schema_version": "1.0.0",
+  "benchmark": "PRSTUDIO-AGENT-BENCH",
+  "formula_version": "1.0.0",
+  "purpose": "Measure harness-level end-to-end agent equivalence on identical tasks with the model held constant.",
+  "score_range": {
+    "minimum": 0.0,
+    "maximum": null,
+    "may_exceed_100": true
+  },
+  "model_policy": {
+    "same_model_required_for_candidate_and_frozen_reference": true,
+    "model_identity_is_not_suite_credit": true,
+    "model_or_reasoning_change_starts_a_non_comparable_segment": true
+  },
+  "absolute_index": {
+    "definition": "100 * candidate weighted utility / frozen frontier-reference weighted utility on the identical frozen corpus",
+    "reference_is_versioned_and_never_rewritten": true,
+    "may_exceed_100": true
+  },
+  "frontier_relative_index": {
+    "definition": "100 * candidate absolute utility / current best measured contender absolute utility",
+    "leader_equals": 100.0,
+    "reference_date_and_contender_hashes_required": true
+  },
+  "task_utility": {
+    "success_is_hard_multiplier": true,
+    "weights": {
+      "verified_task_completion": 0.70,
+      "verification_strength": 0.10,
+      "first_pass_success": 0.05,
+      "zero_human_intervention": 0.05,
+      "tool_call_efficiency": 0.04,
+      "wall_clock_efficiency": 0.03,
+      "bounded_recovery": 0.02,
+      "context_continuity": 0.01
+    },
+    "efficiency_ratios_are_capped_at": 2.0,
+    "failure_utility": 0.0
+  },
+  "corpus": {
+    "required_tasks": 500,
+    "splits": {
+      "public_core": 200,
+      "private_holdout": 150,
+      "procedural": 100,
+      "rotating_adversarial": 50
+    },
+    "macro_areas": ["reason", "code", "act", "computer", "orchestrate", "recover", "learn", "operate"],
+    "task_results_not_feature_presence": true
+  },
+  "required_episode_fields": [
+    "task_id",
+    "task_hash",
+    "model_id",
+    "reasoning_effort",
+    "harness_version",
+    "started_at",
+    "completed_at",
+    "success",
+    "first_pass_success",
+    "human_interventions",
+    "tool_calls",
+    "retries",
+    "wall_clock_ms",
+    "verification_strength",
+    "context_continuity",
+    "evidence_hashes"
+  ],
+  "anti_gaming": {
+    "selective_task_exclusion_forbidden": true,
+    "cached_episode_reuse_forbidden": true,
+    "formula_or_reference_rewrite_forbidden": true,
+    "missing_or_stale_evidence_is_failure": true,
+    "inventory_or_task_drop_requires_review": true,
+    "daily_no_change_is_valid": true,
+    "candidate_changes_require_holdout_and_adversarial_non_regression": true
+  }
+}

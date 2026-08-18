@@ -1,0 +1,81 @@
+{
+  "manifest_version": 3,
+  "name": "PR STUDIO Unified Browser Agent",
+  "version": "17.0.0",
+  "description": "Executor Browser PR STUDIO 17.0: sessione visuale controllata, input CDP nativo, screenshot percettivi, CWV, recovery Anti-Crash. Pairing e protocollo 3.0.0 restano compatibili.",
+  "minimum_chrome_version": "120",
+  "permissions": [
+    "tabs",
+    "scripting",
+    "storage",
+    "debugger",
+    "sidePanel",
+    "notifications",
+    "alarms",
+    "windows",
+    "system.display",
+    "activeTab",
+    "tabCapture",
+    "offscreen",
+    "contextMenus"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "service-worker.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "action": {
+    "default_title": "PR STUDIO Browser",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "lib/web-vitals-runtime.js",
+        "page-runtime-main.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true,
+      "world": "MAIN",
+      "match_about_blank": true,
+      "match_origin_as_fallback": true
+    },
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "page-runtime.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true,
+      "world": "ISOLATED",
+      "match_about_blank": true,
+      "match_origin_as_fallback": true
+    }
+  ]
+}

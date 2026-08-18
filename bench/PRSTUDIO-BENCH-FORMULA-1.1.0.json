@@ -1,0 +1,56 @@
+{
+  "schema_version": "1.0.0",
+  "formula_id": "prstudio-system-bench",
+  "formula_version": "1.1.0",
+  "score_range": {
+    "minimum": 0.0,
+    "maximum": 100.0
+  },
+  "weights": {
+    "checkpoint_quality": 65.0,
+    "release_validation": 20.0,
+    "checkpoint_efficiency": 8.0,
+    "critical_runtime_efficiency": 7.0
+  },
+  "checkpoint_status_points": {
+    "PASS": 1.0,
+    "WARN": 0.5,
+    "FAIL": 0.0,
+    "NA": null
+  },
+  "efficiency_reference": {
+    "release": "10.0.0",
+    "median_ms": 3864.466,
+    "items": 4952,
+    "questions_per_item": 150,
+    "milliseconds_per_million_evaluations": 5202.565967,
+    "normalization": "min(weight, weight * reference_ms_per_million / current_ms_per_million)"
+  },
+  "critical_runtime_reference": {
+    "capability_search_cold": {
+      "maximum_median_ms": 250.0,
+      "weight": 2.0
+    },
+    "capability_search_warm_p95": {
+      "maximum_median_ms": 5.0,
+      "weight": 2.0
+    },
+    "operational_twin_sync_500": {
+      "maximum_median_ms": 1500.0,
+      "weight": 3.0
+    },
+    "normalization": "for each metric: weight * min(1, maximum_median_ms / measured_median_ms)"
+  },
+  "integrity_rules": {
+    "required_questions": 250,
+    "minimum_timed_samples": 5,
+    "required_critical_samples": 5,
+    "fresh_audit_required": true,
+    "hard_failure_score_ceiling": 49.9999,
+    "release_validator_failure_score_ceiling": 69.9999,
+    "inventory_drop_requires_review": true,
+    "formula_change_breaks_comparability": true,
+    "one_canonical_record_per_local_day": true,
+    "history_hash_chain": "sha256 canonical JSON without record_sha256"
+  }
+}

@@ -1,0 +1,732 @@
+{
+  "schema_version": "1.0.0",
+  "algorithm": "SHA-256",
+  "component": "control",
+  "version": "17.0.0",
+  "generated_at_utc": "2026-08-11T09:00:00Z",
+  "source_date_epoch": 1786438800,
+  "exclusions": [
+    "FILE-INTEGRITY.json",
+    "MANIFEST.json"
+  ],
+  "file_count": 143,
+  "tree_digest": "5a9d292e66bcd021b3e297a4316c6f46fe2d58987a1e22a2e2f86d03ff873569",
+  "tree_digest_algorithm": "SHA-256 of sorted UTF-8 records: path NUL byte-count NUL file-sha256 LF",
+  "files": [
+    {
+      "path": ".htaccess",
+      "bytes": 200,
+      "sha256": "285583d965cb9bb8e9ee5b669f27ae49920c1a43d20b6f5787aa054efc394f89"
+    },
+    {
+      "path": "AGENTS.md",
+      "bytes": 2054,
+      "sha256": "b7906456fded4ec5cb867326d94353eb3c0f03485eb15262ab6a22be2e9fd073"
+    },
+    {
+      "path": "BUILD-INFO.json",
+      "bytes": 3790,
+      "sha256": "6a3da3f45d123c978b2c580a2f0a8cdd7d520182b03178bfb4416abc2ff6e7cb"
+    },
+    {
+      "path": "capabilities/agency-capabilities.json",
+      "bytes": 126047,
+      "sha256": "c32d43c8b87515a4f8270602c700cb83afbbe0e24f9b92b105e9beda71f04d64"
+    },
+    {
+      "path": "capabilities/capability-registry.json",
+      "bytes": 4385330,
+      "sha256": "28627e4ca12508621c73ea268cf301082994c0b0078ed94ea0e0967407600042"
+    },
+    {
+      "path": "capabilities/capability-search-index.json",
+      "bytes": 968050,
+      "sha256": "fc7f4880941260b920fe9637587f5c87249af00383f098f6a401f9a477c9a8ac"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "bytes": 24923,
+      "sha256": "13ce5d0a77428e992f6fcc1a288b56ea785de8ccfa54eff4d876bb60aafb744a"
+    },
+    {
+      "path": "connector/action-catalog.json",
+      "bytes": 3247975,
+      "sha256": "2f2442aec0da21b62ad9994c76edb504422855c55d6bbc13b21739db95012a06"
+    },
+    {
+      "path": "contract/action-hot-index.json",
+      "bytes": 2487957,
+      "sha256": "a9353b72c3fe89ed26337393dc34506436bf7046bdcf22c34b33664e5dd59414"
+    },
+    {
+      "path": "contract/action-hot-index.php",
+      "bytes": 2491415,
+      "sha256": "51469b33bfa45c86f9d206bc714a47b973d26878684058a9201f88a60b113cff"
+    },
+    {
+      "path": "contract/browser-action-overlay.json",
+      "bytes": 5250,
+      "sha256": "b015ab9b00dfc1ede14e84e854dd376afd21ed9615d5fb4392d2385e4da86512"
+    },
+    {
+      "path": "contract/capability-contract.json",
+      "bytes": 502581,
+      "sha256": "664dbcec250ac7286b60c66eb250ace628e566d1b2d5b5dd354d30fed793ea7e"
+    },
+    {
+      "path": "contract/concrete-execution-surface.json",
+      "bytes": 476923,
+      "sha256": "ed436d0f3e34738c765c8731e647d1079669fff4e9b3bcd31725e9249bfec874"
+    },
+    {
+      "path": "includes/class-prstudio-agency.php",
+      "bytes": 115823,
+      "sha256": "80f469eced63edb2e964bd79de006d006c41ac2e653819db599aa37bf1f70f30"
+    },
+    {
+      "path": "includes/class-prstudio-browser-runtime.php",
+      "bytes": 23688,
+      "sha256": "c7d7540638287995aa12155712d2570d54246148332605b68bfc270d0578f0e1"
+    },
+    {
+      "path": "includes/class-prstudio-report.php",
+      "bytes": 4000,
+      "sha256": "94ac5261e62a8f10f3ad70ed985f9e6373a1df45d112e4886bf1b1658d89a317"
+    },
+    {
+      "path": "includes/class-prstudio-uc-abilities.php",
+      "bytes": 3998,
+      "sha256": "670588323b397753de3376a4655143419f51d9752ae690025b4a6cb191f3c577"
+    },
+    {
+      "path": "includes/class-prstudio-uc-action-index.php",
+      "bytes": 9414,
+      "sha256": "0b7cc73b2801ce4b2a75b647578562c3ef3e17968022ab167e4b2021ac387f75"
+    },
+    {
+      "path": "includes/class-prstudio-uc-admin.php",
+      "bytes": 23506,
+      "sha256": "0351a33fe010f045ff2e808c7e05e7dd6b32d4becc3f63a847dc6f93e7178963"
+    },
+    {
+      "path": "includes/class-prstudio-uc-agency-action-executor.php",
+      "bytes": 83114,
+      "sha256": "0ff8b7fa1018f6e11db433038a34a7302ac505ada03d794d5d356babaee7813f"
+    },
+    {
+      "path": "includes/class-prstudio-uc-agency-capabilities.php",
+      "bytes": 1345,
+      "sha256": "28d64ff6ca329b9836292f97798d0d53a0fb4f062df5285488f6e7c3c502e86c"
+    },
+    {
+      "path": "includes/class-prstudio-uc-agency-runtime.php",
+      "bytes": 19389,
+      "sha256": "4151281b076467f28867b7976f01625c385f07e3bd348ebba28adb94bc8e6399"
+    },
+    {
+      "path": "includes/class-prstudio-uc-agency-state.php",
+      "bytes": 6306,
+      "sha256": "c0ecc0908f3a5dd7ca1c0c09dd2452b7ed619b9d5e351aa86eb625de67884c67"
+    },
+    {
+      "path": "includes/class-prstudio-uc-anti-crash-attestation.php",
+      "bytes": 2885,
+      "sha256": "cd1045e9272f675484eb76cff06ff4a8d9ed895f201b218b10b41a27d3b2194e"
+    },
+    {
+      "path": "includes/class-prstudio-uc-anti-crash.php",
+      "bytes": 24815,
+      "sha256": "8179eb45f308ec54457413682850e7ed4314e44dccb4396a359f0568c322e1a4"
+    },
+    {
+      "path": "includes/class-prstudio-uc-artifacts.php",
+      "bytes": 13746,
+      "sha256": "0fcef214777dadbca35b1fd7a65b2090b8a079ae2d82f1c219a9c18412a2c612"
+    },
+    {
+      "path": "includes/class-prstudio-uc-auth.php",
+      "bytes": 3600,
+      "sha256": "17940235e0d8fe08876897818ee9cecc6ddf96f3911cf889a0872341a9f1c0c6"
+    },
+    {
+      "path": "includes/class-prstudio-uc-autoload.php",
+      "bytes": 15512,
+      "sha256": "933c9c5b9aa6cbb4df20c2a9ea4f134d68f69eba055dcf536fda3f95fccee0a2"
+    },
+    {
+      "path": "includes/class-prstudio-uc-backend-executability.php",
+      "bytes": 12720,
+      "sha256": "13272e876e823c2375e4eead04338394a01bfbc5a5a5cabd506d108f69f64c26"
+    },
+    {
+      "path": "includes/class-prstudio-uc-bridge.php",
+      "bytes": 11630,
+      "sha256": "64e921c6052dc18feaf958fb5d65e432e04bac1e451059fcd4834fac34bf01a6"
+    },
+    {
+      "path": "includes/class-prstudio-uc-browser-live.php",
+      "bytes": 15747,
+      "sha256": "f7ca2b42b6b7b2e50e72aae8be5c646d910da21a77e3bde5ca28431c8dc82973"
+    },
+    {
+      "path": "includes/class-prstudio-uc-browser-orchestrator-v3.php",
+      "bytes": 3287,
+      "sha256": "426f870f433860d9c22613e79e573f52a7458f69c5df853bbe5d2fd9ff7ff646"
+    },
+    {
+      "path": "includes/class-prstudio-uc-browser-protocol.php",
+      "bytes": 4357,
+      "sha256": "60f854e50c623687bd9ef1f6388d0f2704f436f69fd0f4154ddde1da0c0605cc"
+    },
+    {
+      "path": "includes/class-prstudio-uc-business-intelligence.php",
+      "bytes": 13031,
+      "sha256": "03d28f2e9ba1a8b9725384acd1e9e4fd3d04dea528b9e970df4cc20585f2dcdf"
+    },
+    {
+      "path": "includes/class-prstudio-uc-capability-registry.php",
+      "bytes": 18079,
+      "sha256": "20ebee866b203be0392e0f183c131f283e76b9c8a42a4324bdc374c3ed6e9eef"
+    },
+    {
+      "path": "includes/class-prstudio-uc-catalog-profile.php",
+      "bytes": 9540,
+      "sha256": "a4e91612b33929aade3352ba6b6207c2c60258abcd5971e05b50e1111ca6027f"
+    },
+    {
+      "path": "includes/class-prstudio-uc-change-tracker.php",
+      "bytes": 5563,
+      "sha256": "140dff5affbcc5d22c1d43bda60b792ffcb6f4e9f37ce086f10bf6c86cb3cd4f"
+    },
+    {
+      "path": "includes/class-prstudio-uc-commerce-engine.php",
+      "bytes": 5174,
+      "sha256": "a944c6cb41655c5729d2658ff19e02e14b4cbedcb85d749acfee0f8e77621346"
+    },
+    {
+      "path": "includes/class-prstudio-uc-complete-action-executor.php",
+      "bytes": 244257,
+      "sha256": "48e4c700ee538cafee6adb944934c61da4f008b99ddd3039b1d927c9bba30d7a"
+    },
+    {
+      "path": "includes/class-prstudio-uc-content-transaction.php",
+      "bytes": 17935,
+      "sha256": "5c60691f22a2419a03aad41c1f1a76cf6bce09927a0f39d3ac3fa561d026e4c3"
+    },
+    {
+      "path": "includes/class-prstudio-uc-contract.php",
+      "bytes": 8805,
+      "sha256": "9ce3acaa42651c5da56366674cb3d143bfbef8d976e6708ffb4a4bedd804caad"
+    },
+    {
+      "path": "includes/class-prstudio-uc-database-backend.php",
+      "bytes": 63493,
+      "sha256": "93b1b1a66e1f56f5612bc9a1717ba2b9630b764d570db2cfdc90676641acc637"
+    },
+    {
+      "path": "includes/class-prstudio-uc-database-engine-v3.php",
+      "bytes": 2338,
+      "sha256": "abf43cdac47fab16c2d1919c0a6c9a25d1e61303ec50329e700f58212509cf91"
+    },
+    {
+      "path": "includes/class-prstudio-uc-do.php",
+      "bytes": 13320,
+      "sha256": "fed7f18692c4e3f0f246753b1d5c3b7f96a2c83d3d1af94de2a6402c1c7cf33a"
+    },
+    {
+      "path": "includes/class-prstudio-uc-editorial-autonomy.php",
+      "bytes": 48262,
+      "sha256": "c10a7232b500afda67d830ee9a9fef1e744637b52c4f9081b4049c8a763bdc04"
+    },
+    {
+      "path": "includes/class-prstudio-uc-engineering-workbench.php",
+      "bytes": 20926,
+      "sha256": "448800b0552713fc14b9623ecf279202abb869a3e4d5a2d2792ca5ca2a769513"
+    },
+    {
+      "path": "includes/class-prstudio-uc-enterprise-audit.php",
+      "bytes": 1349,
+      "sha256": "523582aaa8e0ddb900e62ce5a936ee8ce8be380952660c1681c65082b4a233d5"
+    },
+    {
+      "path": "includes/class-prstudio-uc-enterprise-engine.php",
+      "bytes": 5373,
+      "sha256": "3dfc82788f91eb43e539ef7cb2455753fcdf973248fc3908e4803a7143b7bb22"
+    },
+    {
+      "path": "includes/class-prstudio-uc-evidence-engine.php",
+      "bytes": 2937,
+      "sha256": "a19915d56236849cd408733892170d0150803d9a0794ed4234afd55d6182516c"
+    },
+    {
+      "path": "includes/class-prstudio-uc-execution-gateway.php",
+      "bytes": 17418,
+      "sha256": "84423f855868e3ae49b8605d1617b810223b72a2ff09082a50ecd937f3104458"
+    },
+    {
+      "path": "includes/class-prstudio-uc-execution-lanes.php",
+      "bytes": 24287,
+      "sha256": "8342baa2af7b05733c2500b532353b10cfca81d971735c9436308fa6c5c57d41"
+    },
+    {
+      "path": "includes/class-prstudio-uc-execution-router.php",
+      "bytes": 8468,
+      "sha256": "0feae648c9355c0b151021c43b0c33806d7ea1829e918547390d31ee1a06701f"
+    },
+    {
+      "path": "includes/class-prstudio-uc-file-engine.php",
+      "bytes": 1771,
+      "sha256": "920630208cac2be5aef0aafc0fd74e023ad13a7b0269c0b28f81196cc88dae3d"
+    },
+    {
+      "path": "includes/class-prstudio-uc-gc.php",
+      "bytes": 13177,
+      "sha256": "9a3e41fa2abb6a449b2f2132bbd46746a88723f44280765e5bbf798b8168bc46"
+    },
+    {
+      "path": "includes/class-prstudio-uc-gpt-actions-auth.php",
+      "bytes": 7559,
+      "sha256": "5db27463a71c01af3df5a8e3d99d8c8a86857bdc3d047fb8c3f7e027fad4153a"
+    },
+    {
+      "path": "includes/class-prstudio-uc-gpt-rest.php",
+      "bytes": 14066,
+      "sha256": "1057ebd668eeb804de83bae86ddec5cb9ac07bc4c3f0f8fa47e0e74f3e571e72"
+    },
+    {
+      "path": "includes/class-prstudio-uc-graph-engine.php",
+      "bytes": 7993,
+      "sha256": "5f72272ee78391b744ef6cfe172b9eaf1c7005e22fa2cc3fc49900f0ab18f60e"
+    },
+    {
+      "path": "includes/class-prstudio-uc-gsc-provider.php",
+      "bytes": 8829,
+      "sha256": "0669d378e865cb7062c4779d642cb411c7dd6b806d7e2188dd0d7a8dd9a510a0"
+    },
+    {
+      "path": "includes/class-prstudio-uc-health.php",
+      "bytes": 10391,
+      "sha256": "1fd4cc2315cb5e76fd5274b8a8f2976f66ffaad3737e1aad4f5b89339d3a5b8c"
+    },
+    {
+      "path": "includes/class-prstudio-uc-http-engine.php",
+      "bytes": 4265,
+      "sha256": "8ab0ae42ad7f881ed04ab817bd26caaa33479e4d4e7fe89465b9b3d801874776"
+    },
+    {
+      "path": "includes/class-prstudio-uc-idempotency.php",
+      "bytes": 2330,
+      "sha256": "a790547310d8c41b9848be7a061a6f454d09dbc2d0ca28386335ea2e87eb269f"
+    },
+    {
+      "path": "includes/class-prstudio-uc-impact-engine.php",
+      "bytes": 2148,
+      "sha256": "cf65eeae677a329edc3152c8c24a50eb407b0ae552b4c6970efa795880c90217"
+    },
+    {
+      "path": "includes/class-prstudio-uc-interventions.php",
+      "bytes": 12985,
+      "sha256": "1b3731871a2f4eafa77359c16ca4d07dd94037653403c25a3062bec19e115761"
+    },
+    {
+      "path": "includes/class-prstudio-uc-job-engine.php",
+      "bytes": 9424,
+      "sha256": "6860b59186715f130fc683f30f6cf7219bfbf85ee9182ee8d3f33a0c4cc62516"
+    },
+    {
+      "path": "includes/class-prstudio-uc-legacy-capability-executor.php",
+      "bytes": 2990,
+      "sha256": "c5a2f4a0dd99284a1b26d66255dcc7842d3e0c9346655142c078506f586a44fb"
+    },
+    {
+      "path": "includes/class-prstudio-uc-log-orchestrator.php",
+      "bytes": 10812,
+      "sha256": "e880bd3d089f0d1d15a2ea2b7d9777ba4d0f683965faa871292a2c4ed197114a"
+    },
+    {
+      "path": "includes/class-prstudio-uc-mcp-auth-v5.php",
+      "bytes": 31286,
+      "sha256": "02ea5a3e3cc5a433e359af36cad10b20e014075ce8189a3c0d56504a16994409"
+    },
+    {
+      "path": "includes/class-prstudio-uc-mcp-toolchain.php",
+      "bytes": 54452,
+      "sha256": "7e160fd0f209eebdf3e6d51d7864b590f659bca0b0e7e035223ec0ca39099d01"
+    },
+    {
+      "path": "includes/class-prstudio-uc-mcp-v5.php",
+      "bytes": 166464,
+      "sha256": "6b6e024cda9556bd3fee0a7549a0d4385ad0bf8f02c488a5ca8a3bcbe57a4612"
+    },
+    {
+      "path": "includes/class-prstudio-uc-memory.php",
+      "bytes": 21076,
+      "sha256": "3da29d105ec173646207cd2455676536d56a06eccfca592ccc8150b6ac4de72e"
+    },
+    {
+      "path": "includes/class-prstudio-uc-migration-v3.php",
+      "bytes": 3612,
+      "sha256": "eb811b0d047cded5116a4888bf8456c8015704ed25145e645800c10d47462270"
+    },
+    {
+      "path": "includes/class-prstudio-uc-migration-v4.php",
+      "bytes": 4133,
+      "sha256": "ede59f34ce112559cbfce80f57a1658f75c77ff956e3ea2ef43194a7e0f3936c"
+    },
+    {
+      "path": "includes/class-prstudio-uc-mission-engine.php",
+      "bytes": 1586,
+      "sha256": "89e8d4dc563b7e89df2977b4b450e4037fd8002487961619884b9790ccd0afa5"
+    },
+    {
+      "path": "includes/class-prstudio-uc-observability.php",
+      "bytes": 3358,
+      "sha256": "b28ed84236ade54e4c6e817190730f323fb226bdc0c2ede94dd23517d1f6dd60"
+    },
+    {
+      "path": "includes/class-prstudio-uc-observe.php",
+      "bytes": 15059,
+      "sha256": "1ad8f73cf0b94411b5c638c4d42668270fdeef3b3797800c8096d2e26b36c164"
+    },
+    {
+      "path": "includes/class-prstudio-uc-ocr.php",
+      "bytes": 6759,
+      "sha256": "5909763cb3887e5ecd10b07bfe0e5002c6a93241a22a910b56ac22c3b53337a4"
+    },
+    {
+      "path": "includes/class-prstudio-uc-one-guard-legacy-migration.php",
+      "bytes": 6453,
+      "sha256": "2242ccae7758f1f8a213fb98398577545dca93740389d1d3bc63f4fedaf163a7"
+    },
+    {
+      "path": "includes/class-prstudio-uc-openapi.php",
+      "bytes": 15016,
+      "sha256": "5b72382c6f107e1f16619f50e5d72009789851c6f5dceedfe360008f283cee67"
+    },
+    {
+      "path": "includes/class-prstudio-uc-operational-twin.php",
+      "bytes": 17186,
+      "sha256": "197c4f0e897c6806b5ce3dc8eaa939bc100c9375002fe3db88fe4a5c62d5adc4"
+    },
+    {
+      "path": "includes/class-prstudio-uc-opportunity-engine.php",
+      "bytes": 7752,
+      "sha256": "6d2bc5c13be1a8f5a2842c6ee36068058ef64042f6229592df4d8c557f4893af"
+    },
+    {
+      "path": "includes/class-prstudio-uc-performance-budget.php",
+      "bytes": 2716,
+      "sha256": "35332f47c85d5dfa9cacf21dea85caa695281dccd8b462762f506b82ce7c8ce5"
+    },
+    {
+      "path": "includes/class-prstudio-uc-planner-v3.php",
+      "bytes": 2053,
+      "sha256": "1537e9613687c86ce625680a37454bf6d07096163ea27e84e16a8c7f55a93874"
+    },
+    {
+      "path": "includes/class-prstudio-uc-playbook-engine.php",
+      "bytes": 4043,
+      "sha256": "6b215c62719b155f4bd1fb340b23f8c28cdd92d42bccf2770be2c4d95bfefd5f"
+    },
+    {
+      "path": "includes/class-prstudio-uc-procedural-skills.php",
+      "bytes": 18634,
+      "sha256": "e3990754678afec7b8b8d42846d394a7b51bb938754552e44500c7348b1a429b"
+    },
+    {
+      "path": "includes/class-prstudio-uc-product-audit.php",
+      "bytes": 8370,
+      "sha256": "fde6e551e340e734b8a8b43ed9e3f7b0c572a9d504e3ebad18d1bbb69483b091"
+    },
+    {
+      "path": "includes/class-prstudio-uc-public-crawl.php",
+      "bytes": 25701,
+      "sha256": "65d1a9760e22a4ebd12909ab221ae04209569a662f5bbc32f8305974dd82ded6"
+    },
+    {
+      "path": "includes/class-prstudio-uc-publish-transaction.php",
+      "bytes": 14005,
+      "sha256": "32c3233538761eeb180be098156d263deaf13ad7064f8f15a1e1c27d190a39a4"
+    },
+    {
+      "path": "includes/class-prstudio-uc-recovery-manager.php",
+      "bytes": 9049,
+      "sha256": "3981fba1929350e1141827f9d682fa4a5350a37c82bd1bbaebe9edab4c8e463c"
+    },
+    {
+      "path": "includes/class-prstudio-uc-render-source-resolver.php",
+      "bytes": 3396,
+      "sha256": "4acaa7090411d296edd6e59e1ae4f491f5c82ece89f83b8683490c5224002425"
+    },
+    {
+      "path": "includes/class-prstudio-uc-request-guard.php",
+      "bytes": 1332,
+      "sha256": "6793981ff2cabc8dfc00ec26604ccd86bdb47a4492980815667e91b198971abb"
+    },
+    {
+      "path": "includes/class-prstudio-uc-rest.php",
+      "bytes": 28322,
+      "sha256": "33913a4be71732326637af309f2bf23858d00e8e21c2b5816dd94e997f04b64c"
+    },
+    {
+      "path": "includes/class-prstudio-uc-risk-engine-v3.php",
+      "bytes": 735,
+      "sha256": "2965f0f172a39eea264d45b68ec0b274754212750f81d1ea8a766d64b6e3d963"
+    },
+    {
+      "path": "includes/class-prstudio-uc-safety-runtime.php",
+      "bytes": 6892,
+      "sha256": "e47e8849e16e9f7c79d106ddac8266f7c125151f8e351a85dab6cd26d783653d"
+    },
+    {
+      "path": "includes/class-prstudio-uc-schedule-clock.php",
+      "bytes": 3448,
+      "sha256": "3915ebd817cdd18e4c33af19fbfb8a5c50a8af197699784c232a50b73f82c795"
+    },
+    {
+      "path": "includes/class-prstudio-uc-schema-validator.php",
+      "bytes": 5324,
+      "sha256": "200e34e67629506793ee85d7c9e0ce428d2215b797d0bc7009266c9ba142c211"
+    },
+    {
+      "path": "includes/class-prstudio-uc-search-console-browser.php",
+      "bytes": 6166,
+      "sha256": "fc06fc035806be44d6c3566be8c96e04da6a49657d04a758ef2870cd9f828cec"
+    },
+    {
+      "path": "includes/class-prstudio-uc-seo-intelligence.php",
+      "bytes": 23550,
+      "sha256": "6ed954b317bf9e3afd286a28d08e2e5c56871f506e93ad284126752c536dd567"
+    },
+    {
+      "path": "includes/class-prstudio-uc-sequential-thinking.php",
+      "bytes": 6263,
+      "sha256": "fdb2b27827d404e54603e0d5e799fb4fd45b5fe1e11e83d816d962ac78402bf2"
+    },
+    {
+      "path": "includes/class-prstudio-uc-serp-watch.php",
+      "bytes": 23416,
+      "sha256": "6061247b3be6fd4271abc3ff42fc73d59666214999c18b0860afeb749c499b98"
+    },
+    {
+      "path": "includes/class-prstudio-uc-site-context.php",
+      "bytes": 1585,
+      "sha256": "05c0b6d83934b707745bf7d10e8402296bef582b9927120be4259b013601d617"
+    },
+    {
+      "path": "includes/class-prstudio-uc-site-sentinel.php",
+      "bytes": 7176,
+      "sha256": "e3eeaf69cc8e06602719df59e868a64504282c1d110abc438de8972c71fa4e78"
+    },
+    {
+      "path": "includes/class-prstudio-uc-snapshot-engine.php",
+      "bytes": 3743,
+      "sha256": "5ad357a78674c943e6d75b4b663868b3a3844fbab8c5c278ba09292dd84d1c4c"
+    },
+    {
+      "path": "includes/class-prstudio-uc-social-intelligence.php",
+      "bytes": 12421,
+      "sha256": "31f24a4bab60bc04874b9e84e73dcdf6716b8c259f10bc2a75d634fd25e7974f"
+    },
+    {
+      "path": "includes/class-prstudio-uc-state-machine.php",
+      "bytes": 2044,
+      "sha256": "f323630fcb2875dc0b828cf64a3e5bb0b7bde4796f1e477ce9ee2daf3b92a9da"
+    },
+    {
+      "path": "includes/class-prstudio-uc-store.php",
+      "bytes": 57107,
+      "sha256": "044ef9ac490accdfbb0090eb65192ca8a1f8ec70a17574e07ba6ae90c84a3dd3"
+    },
+    {
+      "path": "includes/class-prstudio-uc-turn.php",
+      "bytes": 14282,
+      "sha256": "cd1466c154ff83c8ef10cb9b1cdcd9add78b55dc53a09dfd12ad439712dafba5"
+    },
+    {
+      "path": "includes/class-prstudio-uc-verification-engine-v3.php",
+      "bytes": 5513,
+      "sha256": "f6612e12fb0df0363698ad82cf9f65a7bb2b173eac5fdbd3ead8ca4b6b8a1e5c"
+    },
+    {
+      "path": "includes/class-prstudio-uc-verifier.php",
+      "bytes": 6838,
+      "sha256": "36c86d70a769b0f27deb0f501bb381ad48961eb53e51db0c7af43d23ac9f6179"
+    },
+    {
+      "path": "includes/class-prstudio-uc-wait-channel.php",
+      "bytes": 17160,
+      "sha256": "238da93ad9ef5b0c645bc0e3cb33147ce346c1e283e4211595f7979513a3d3d3"
+    },
+    {
+      "path": "includes/class-prstudio-uc-work-session.php",
+      "bytes": 15401,
+      "sha256": "f41abaf3092303ec791f2db37bf78afd05b0bd67c05f5619f0cdf059877bc058"
+    },
+    {
+      "path": "includes/class-prstudio-uc-write-token.php",
+      "bytes": 9653,
+      "sha256": "9eb7616d48acdad80ffc46eb7be4742b6c870fdb17c41beb33ac6df58f0eea91"
+    },
+    {
+      "path": "includes/class-web-stories-manage.php",
+      "bytes": 52759,
+      "sha256": "b0bb4d8e8ad443ed4f42c43ba6dd34dea001d114c8ac1c1e8b0baaed8c3a11a1"
+    },
+    {
+      "path": "includes/class-wpaib-admin.php",
+      "bytes": 8099,
+      "sha256": "0fabceae70f77f3d740de99cd5633336bbe54488f1aaaeac0b9ec5aefdfbe4a8"
+    },
+    {
+      "path": "includes/class-wpaib-adtribes.php",
+      "bytes": 33443,
+      "sha256": "9aafac4a487654be2a74c232d1e5535375bfd4a327c991f084000e8262b44939"
+    },
+    {
+      "path": "includes/class-wpaib-audit.php",
+      "bytes": 4689,
+      "sha256": "0fd19129de41e828e39784de98c5f088eb5e3e4c68d25a9968eb617e130161dd"
+    },
+    {
+      "path": "includes/class-wpaib-auth.php",
+      "bytes": 42243,
+      "sha256": "ed03a16a3588aca1d9a0707d325ab4133287846034bff27529fcaebc6ce10012"
+    },
+    {
+      "path": "includes/class-wpaib-enterprise.php",
+      "bytes": 66969,
+      "sha256": "88f1915ffc27fb13a55803af6a01d066b6a812daf50813ec08454dca41b72dbe"
+    },
+    {
+      "path": "includes/class-wpaib-files.php",
+      "bytes": 31194,
+      "sha256": "8d66c084f39f0a7cc0de4ee6883d5a440a1fa71549465d90bd372e4c3063d2fb"
+    },
+    {
+      "path": "includes/class-wpaib-mcp.php",
+      "bytes": 119079,
+      "sha256": "c4bf1799a357a6b1ff043b07a088d63bf2b05217a92dcd770511c885f8465800"
+    },
+    {
+      "path": "includes/class-wpaib-media-upload-extension.php",
+      "bytes": 40642,
+      "sha256": "43c10e641bb80bad0b19e44bee1f28da3d8be79bfc9a308aad2427c316329404"
+    },
+    {
+      "path": "includes/class-wpaib-rest.php",
+      "bytes": 130165,
+      "sha256": "e0994673a64711a4e1a4c542e7c1d38ddf5421f6acc873674c7b83199421dcc6"
+    },
+    {
+      "path": "includes/class-wpaib-security-hardening.php",
+      "bytes": 5582,
+      "sha256": "d462f946a46f231015654f73e4986f7d714f34e62b53cffebcedf52974708eeb"
+    },
+    {
+      "path": "includes/class-wpaib-site.php",
+      "bytes": 10025,
+      "sha256": "38d877edf1c8e5b9df17758355c193fe43479fd1a06d6ecda734160ec9176bca"
+    },
+    {
+      "path": "includes/orchestrator/class-prstudio-uc-domain-abstract.php",
+      "bytes": 5150,
+      "sha256": "d805352ce711429d053562b167c93d1a14833e86d502d4dd3782c69b77ebd668"
+    },
+    {
+      "path": "includes/orchestrator/class-prstudio-uc-orchestrator.php",
+      "bytes": 22603,
+      "sha256": "be5788fe1b8c434f30d41cb89d20cddbedef62da579933c38409e5f6275065b7"
+    },
+    {
+      "path": "includes/orchestrator/domains/class-prstudio-domain-browser.php",
+      "bytes": 10760,
+      "sha256": "ee2ba67ad433858998a8954de39b83927069040027698d8263d2692dc737f22d"
+    },
+    {
+      "path": "includes/orchestrator/domains/class-prstudio-domain-catalog-commerce.php",
+      "bytes": 661,
+      "sha256": "01421f762386d86085aa5174c2254c47aae2492bd9f524a18e48772550c9ebe8"
+    },
+    {
+      "path": "includes/orchestrator/domains/class-prstudio-domain-content-seo.php",
+      "bytes": 3159,
+      "sha256": "d9702eba12ccfafc5550f9574f5be428677b24a28f1fe8fa36fd9b8c6f09d4c8"
+    },
+    {
+      "path": "includes/orchestrator/domains/class-prstudio-domain-data-storage.php",
+      "bytes": 1939,
+      "sha256": "c979e9b7bd737c63b24860d2176644a30facf9729506e01d9b71b0f3f2e41bb3"
+    },
+    {
+      "path": "includes/orchestrator/domains/class-prstudio-domain-experience-ui.php",
+      "bytes": 557,
+      "sha256": "408e54f84d6ef9246055dca28529cb436b837bc6e771759d4c9ba4bff8bb2200"
+    },
+    {
+      "path": "includes/orchestrator/domains/class-prstudio-domain-extensions-themes.php",
+      "bytes": 509,
+      "sha256": "a2a8e7f640d868d64f44ee59cea8a3fcbe5abf4d7dc124f06932c2778da27811"
+    },
+    {
+      "path": "includes/orchestrator/domains/class-prstudio-domain-media-stories.php",
+      "bytes": 519,
+      "sha256": "0312376037216461f02091f3e4c4216224f86e518c6dd57f77cd987f49582a82"
+    },
+    {
+      "path": "includes/orchestrator/domains/class-prstudio-domain-operations.php",
+      "bytes": 586,
+      "sha256": "8f4b4f91ca921b0b9883f25ef7bff6ced07099934f1fdee1d2d75b9cac9e3709"
+    },
+    {
+      "path": "includes/orchestrator/domains/class-prstudio-domain-orders-customers.php",
+      "bytes": 517,
+      "sha256": "2ac2f4eab7156186e783502dd56654dcd7ee40715b59bcda67e9dbac93aa032e"
+    },
+    {
+      "path": "includes/orchestrator/domains/class-prstudio-domain-security-identity.php",
+      "bytes": 557,
+      "sha256": "b753017d573186ae9aae7203f6cc80b49691da4b4241a99651bfd2aed98553d8"
+    },
+    {
+      "path": "LICENSE.txt",
+      "bytes": 474,
+      "sha256": "1de3dc2d6070f4a8021518cb2a8698cc783e652ac85de2a393ed70351ec11a9c"
+    },
+    {
+      "path": "prstudio-unified-control.php",
+      "bytes": 11594,
+      "sha256": "7e33ea9f6725cbc78b4bb3e622b48d938d422181a2491d0c545c0d8928cfb460"
+    },
+    {
+      "path": "README.md",
+      "bytes": 5518,
+      "sha256": "b1aa5d1427d1b0adc6bea44f66f71e078f212784c09526b2e7879614b6d807e7"
+    },
+    {
+      "path": "readme.txt",
+      "bytes": 4389,
+      "sha256": "4ce33ba31b38c2e1e60ea9e54fde003e6ef61abcdaeaaffcc7b16a17f03e5fd2"
+    },
+    {
+      "path": "reports/ENTERPRISE-TOOL-AUDIT.json",
+      "bytes": 1350229,
+      "sha256": "71392ed5a17582e539bee07f7067452d18f2a07c4e58234f2e4a32072b35469f"
+    },
+    {
+      "path": "runtime/playwright_handoff_smoke.py",
+      "bytes": 4713,
+      "sha256": "b0304faa7793265d46bc384c18a198b7c4792c0f0f69955854022563c1fb9884"
+    },
+    {
+      "path": "runtime/worker.py",
+      "bytes": 36342,
+      "sha256": "e70a8f1306278884f5222e9becb7055f0e6def6b4162e878b538f527be82685c"
+    },
+    {
+      "path": "uninstall.php",
+      "bytes": 512,
+      "sha256": "d587490be82e811af953df86cbb05e27f3a5192793b167108d1c5782da384e80"
+    }
+  ]
+}
