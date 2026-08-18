@@ -90,9 +90,8 @@
     "ARCHITECTURE-1.0.0.md"
   ],
   "validation_commands": [
-    "python tests/rigorous-audit-controller.py --check",
-    "verify PR-STUDIO-1.0.0-WEB-RESEARCH-5PASS.json covers five passes and every shipped file",
     "node tests/validate-release.mjs --strict --php-smoke",
+    "node .github/scripts/check-mcp-tool-drift.mjs",
     "python bench/prstudio-bench.py --mode preview --runs 5"
   ],
   "tool_names": [

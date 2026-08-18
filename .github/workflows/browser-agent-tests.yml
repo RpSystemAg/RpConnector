@@ -28,6 +28,11 @@ jobs:
         run: |
           cd prstudio-unified-control
           find . -name '*.php' -print0 | xargs -0 -n1 -P4 php -l
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: ChatGPT connector / MCP tool-list drift check
+        run: node .github/scripts/check-mcp-tool-drift.mjs
       - name: WordPress Plugin Check
         # Informational, not blocking: this tool is calibrated for WordPress.org
         # public-directory submission and flags things like raw fopen()/flock()
