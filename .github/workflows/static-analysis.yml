@@ -50,13 +50,35 @@ jobs:
             echo "::error::Plugin header declares PHP $declared but this job tests 8.0-. Update both together."
             exit 1
           fi
+      # Prove the check actually detects the defect class it exists for, rather
+      # than trusting that a green run means anything. array_is_list() is the
+      # real bug that shipped; if this fixture stops being flagged, the job has
+      # silently stopped protecting us.
+      - name: Self-test — the check must flag a PHP 8.1 function under 8.0
+        run: |
+          mkdir -p /tmp/compat-selftest
+          printf '<?php\nfunction probe(array $v): bool { return array_is_list($v); }\n' > /tmp/compat-selftest/probe.php
+          if phpcs -p /tmp/compat-selftest --standard=PHPCompatibilityWP \
+               --runtime-set testVersion 8.0- --extensions=php --report=full --warning-severity=0; then
+            echo "::error::Self-test failed: array_is_list() was NOT flagged under PHP 8.0. The compatibility gate is not working."
+            exit 1
+          fi
+          echo "Self-test passed: the gate detects PHP 8.1 functions used under an 8.0 floor."
+
       - name: Fail on any call the declared minimum cannot make
+        # RemovedExtensions is excluded because it matches on function-name
+        # prefix and cannot tell a class method from a global function: it flags
+        # PRSTUDIO_UC_MCP_Toolchain::sqlite_query() as the ext/sqlite function
+        # removed in PHP 5.4. That method uses SQLite3 and PDO, both current.
+        # The sniffs that matter here -- NewFunctions, NewClasses, RemovedFunctions
+        # -- are untouched, and the self-test above proves it.
         run: |
           phpcs -p prstudio-unified-control \
             --standard=PHPCompatibilityWP \
             --runtime-set testVersion 8.0- \
             --extensions=php \
             --ignore='*/vendor/*,*/node_modules/*' \
+            --exclude=PHPCompatibility.Extensions.RemovedExtensions \
             --report=full \
             --warning-severity=0
 
