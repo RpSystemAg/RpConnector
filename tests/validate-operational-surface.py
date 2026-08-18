@@ -123,7 +123,7 @@ def main():
     f,e=parse_agency();failures+=f;evidence['agency']=e
     f,e=global_checks();failures+=f;evidence['global']=e
     f,e=audit_contracts();failures+=f;evidence['milestone_11_contracts']=e
-    out={'suite_version':'17.0.0','ok':not failures,'failure_count':len(failures),'failures':failures,'evidence':evidence,'policy':'Every declared public action resolves to a concrete semantic executor. Defensive binding errors are release-defect sentinels, not normal implementation paths.'}
+    out={'suite_version':'1.0.0','ok':not failures,'failure_count':len(failures),'failures':failures,'evidence':evidence,'policy':'Every declared public action resolves to a concrete semantic executor. Defensive binding errors are release-defect sentinels, not normal implementation paths.'}
     print(json.dumps(out,ensure_ascii=False,indent=2,sort_keys=True))
     return 0 if not failures else 1
 if __name__=='__main__':raise SystemExit(main())

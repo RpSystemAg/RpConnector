@@ -48,7 +48,7 @@ final class PRSTUDIO_UC_Store {
     public static function claim_next_job($worker) { return null; }
 }
 final class PRSTUDIO_UC_Serp_Watch { public static int $last_limit=0; public static function tick(int $limit=1): array { self::$last_limit=$limit; return ['ok'=>true,'processed'=>0]; } }
-final class PRSTUDIO_UC_Playbook_Engine { public const VERSION='17.0.0'; public static function describe(): array { return []; } }
+final class PRSTUDIO_UC_Playbook_Engine { public const VERSION='1.0.0'; public static function describe(): array { return []; } }
 final class PRSTUDIO_UC_Site_Sentinel { public static function status(): array { return []; } }
 
 require_once dirname(__DIR__) . '/prstudio-unified-control/includes/class-prstudio-uc-agency-runtime.php';
@@ -61,7 +61,7 @@ PRSTUDIO_UC_Agency_Runtime::ensure_schedulers();
 $scheduled=array_values(array_filter($GLOBALS['as_actions'],fn($a)=>$a['hook']==='prstudio_uc_agency_action_scheduler_tick'&&$a['group']==='prstudio-unified-control'));
 check_v17(count($scheduled)===1,'v17 reconciles duplicate Action Scheduler recurring chains to exactly one');
 check_v17(!wp_next_scheduled('prstudio_uc_agency_worker_tick'),'Action Scheduler mode removes the parallel PR STUDIO WP-Cron worker');
-check_v17(($GLOBALS['opts']['prstudio_uc_scheduler_topology']??'')==='17.0.0-single-runner-v1|action_scheduler','scheduler topology migration is persisted');
+check_v17(($GLOBALS['opts']['prstudio_uc_scheduler_topology']??'')==='1.0.0-single-runner-v1|action_scheduler','scheduler topology migration is persisted');
 PRSTUDIO_UC_Agency_Runtime::ensure_schedulers();
 $scheduled=array_values(array_filter($GLOBALS['as_actions'],fn($a)=>$a['hook']==='prstudio_uc_agency_action_scheduler_tick'&&$a['group']==='prstudio-unified-control'));
 check_v17(count($scheduled)===1,'repeated ensure_schedulers remains idempotent');

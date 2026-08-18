@@ -28,7 +28,7 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
  * degrades to correct behaviour, never a dependency.
  */
 final class PRSTUDIO_UC_Wait_Channel {
-    public const VERSION = '17.0.0';
+    public const VERSION = '1.0.0';
 
     private const GENERATION_KEY = 'prstudio_uc_work_generation';
     private const GROUP = 'prstudio_uc_wait';

@@ -1,4 +1,4 @@
-# PR STUDIO Unified Browser Agent 17.0.0
+# PR STUDIO Unified Browser Agent 1.0.0
 
 Browser executor + Local Studio per PR STUDIO Unified Control. **Versione, installazione, pairing e wire protocol restano invariati**: stessa cartella unpacked `prstudio-unified-browser-agent`, stesso endpoint `/wp-json/prstudio-unified/v1/pair`, stesso storage `prstudioConfig`, stesso executor protocol `3.0.0`.
 

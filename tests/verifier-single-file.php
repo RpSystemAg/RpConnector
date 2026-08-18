@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 define('PRSTUDIO_UC_TESTING', true);
-define('PRSTUDIO_UC_VERSION','17.0.0');
+define('PRSTUDIO_UC_VERSION','1.0.0');
 function sanitize_key($value){$value=is_string($value)?$value:'';return strtolower((string)preg_replace('/[^a-z0-9_\-]/','',$value));}
 final class PRSTUDIO_UC_Idempotency {public static function canonical_json($value): string {return json_encode($value,JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES) ?: '';}}
 require dirname(__DIR__) . '/prstudio-unified-control/includes/class-prstudio-uc-verifier.php';

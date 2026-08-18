@@ -4,7 +4,7 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
 
 /** Bounded site/queue watchdog. It reports; repair is explicit and fail-safe. */
 final class PRSTUDIO_UC_Site_Sentinel {
-	public const VERSION='17.0.0';
+	public const VERSION='1.0.0';
 	private const STATE='site-sentinel';
 	private const EXTERNAL_HEARTBEAT='prstudio_uc_external_runner_heartbeat';
 

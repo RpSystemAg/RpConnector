@@ -8,7 +8,7 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
  * update never creates a second operational identity for the same WordPress site.
  */
 final class PRSTUDIO_UC_Agency_State {
-	public const VERSION = '17.0.0';
+	public const VERSION = '1.0.0';
 	private const MAX_BYTES = 8388608;
 	private const FILE_GUARD = "<?php defined( 'ABSPATH' ) || exit; ?>\n";
 

@@ -4,7 +4,7 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
 
 /** Deterministic opportunity ranking over the Operational Twin and social ledger. */
 final class PRSTUDIO_UC_Opportunity_Engine {
-	public const VERSION = '17.0.0';
+	public const VERSION = '1.0.0';
 
 	private static function text( $value, int $max = 500 ): string {
 		$value = is_scalar($value) ? trim((string)$value) : '';

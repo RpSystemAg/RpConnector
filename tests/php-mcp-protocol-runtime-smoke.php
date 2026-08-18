@@ -50,7 +50,7 @@ function modern_rpc(int $id,string $method,array $params=[]): array {
     $params['_meta']=[
         'io.modelcontextprotocol/protocolVersion'=>'2026-07-28',
         'io.modelcontextprotocol/clientCapabilities'=>[],
-        'io.modelcontextprotocol/clientInfo'=>['name'=>'prstudio-test','version'=>'17.0.0'],
+        'io.modelcontextprotocol/clientInfo'=>['name'=>'prstudio-test','version'=>'1.0.0'],
     ];
     return ['jsonrpc'=>'2.0','id'=>$id,'method'=>$method,'params'=>$params];
 }
@@ -70,7 +70,7 @@ $r=PRSTUDIO_UC_MCP_V5::handle(new WP_REST_Request('POST',modern_rpc(31,'server/d
 $data=$r->get_data();
 ok($r->get_status()===200&&($data['result']['ttlMs']??0)===300000&&($data['result']['cacheScope']??'')==='private'&&in_array('2026-07-28',(array)($data['result']['supportedVersions']??[]),true),'MCP 2026 server/discover returns stateless discovery plus private cache hints');
 ok(($data['result']['resultType']??'')==='complete','MCP 2026 results carry the required complete resultType');
-ok(($data['result']['_meta']['io.modelcontextprotocol/serverInfo']['version']??'')==='17.0.0','MCP 2026 result metadata carries serverInfo in _meta');
+ok(($data['result']['_meta']['io.modelcontextprotocol/serverInfo']['version']??'')==='1.0.0','MCP 2026 result metadata carries serverInfo in _meta');
 
 $r=PRSTUDIO_UC_MCP_V5::handle(new WP_REST_Request('POST',modern_rpc(32,'initialize',['protocolVersion'=>'2026-07-28']),'2026-07-28',['mcp-method'=>'initialize']));
 $data=$r->get_data();

@@ -1,6 +1,6 @@
-# PR STUDIO Unified Control 17.0.0
+# PR STUDIO Unified Control 1.0.0
 
-WordPress/WooCommerce control plane and durable source of truth for PR STUDIO Unified Suite 17.0.0.
+WordPress/WooCommerce control plane and durable source of truth for PR STUDIO Unified Suite 1.0.0.
 
 ## Installation contract
 

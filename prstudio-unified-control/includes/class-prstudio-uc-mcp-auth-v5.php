@@ -157,7 +157,7 @@ final class PRSTUDIO_UC_MCP_Auth_V5 {
         $response = wp_safe_remote_get( $client_id, array(
             'timeout' => 3, 'redirection' => 0, 'limit_response_size' => 65536,
             'headers' => array( 'Accept' => 'application/json' ),
-            'user-agent' => 'PR-STUDIO-MCP-CIMD/' . ( defined( 'PRSTUDIO_UC_VERSION' ) ? PRSTUDIO_UC_VERSION : '17.0.0' ),
+            'user-agent' => 'PR-STUDIO-MCP-CIMD/' . ( defined( 'PRSTUDIO_UC_VERSION' ) ? PRSTUDIO_UC_VERSION : '1.0.0' ),
         ) );
         if ( is_wp_error( $response ) || 200 !== (int) wp_remote_retrieve_response_code( $response ) ) { return null; }
         $body = json_decode( (string) wp_remote_retrieve_body( $response ), true );

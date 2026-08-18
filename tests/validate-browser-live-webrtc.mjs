@@ -14,7 +14,7 @@ const rest = await read('prstudio-unified-control/includes/class-prstudio-uc-res
 const mcp = await read('prstudio-unified-control/includes/class-prstudio-uc-mcp-v5.php');
 
 assert.equal(manifest.name, 'PR STUDIO Unified Browser Agent');
-assert.equal(manifest.version, '17.0.0');
+assert.equal(manifest.version, '1.0.0');
 assert.deepEqual(manifest.background, { service_worker:'service-worker.js', type:'module' });
 assert.equal(manifest.side_panel?.default_path, 'sidepanel.html');
 for (const permission of ['activeTab','tabCapture','offscreen','contextMenus']) assert.ok(manifest.permissions.includes(permission));

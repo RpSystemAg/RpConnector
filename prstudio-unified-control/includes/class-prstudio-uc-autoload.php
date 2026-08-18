@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
  * is cheap: it is one hash lookup.
  */
 final class PRSTUDIO_UC_Autoload {
-    public const VERSION = '17.0.0';
+    public const VERSION = '1.0.0';
 
     private static bool $registered = false;
     private static int $loaded = 0;

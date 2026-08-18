@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exhaustive 250-question semantic checkpoint for PR STUDIO Unified Suite 17.0.0.
+"""Exhaustive 250-question semantic checkpoint for PR STUDIO Unified Suite 1.0.0.
 
 Audits every published MCP tool, catalog action, capability and PHP/JS function.
 The checker is intentionally strict: every published catalog action/capability must
@@ -25,7 +25,7 @@ if hasattr(sys.stdout, 'reconfigure'):
 if hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(encoding='utf-8')
 
-VERSION='17.0.0'
+VERSION='1.0.0'
 ROOT=Path(__file__).resolve().parent.parent
 SURFACE=ROOT/'prstudio-unified-control/contract/concrete-execution-surface.json'
 SUMMARY=ROOT/f'EXHAUSTIVE-CHECKPOINT-{VERSION}.json'
@@ -557,7 +557,7 @@ def generate_surface():
     browser_ok=direct|handled
 
     # Complete action executor: additive concrete bindings for every action that
-    # the original 17.0.0 catalog exposed without an explicit native route branch.
+    # the original 1.0.0 catalog exposed without an explicit native route branch.
     complete_path=ROOT/'prstudio-unified-control/includes/class-prstudio-uc-complete-action-executor.php'
     complete_text=complete_path.read_text(encoding='utf-8') if complete_path.is_file() else ''
     complete=set()
@@ -570,7 +570,7 @@ def generate_surface():
     for a in catalog:
         key=f"{a['route']}::{a['action']}"; pair=(a['route'],a['action']); status='catalog_only';resolver='';reason='No concrete static executor was found.'
         if pair in complete:
-            status='complete_native';resolver='PRSTUDIO_UC_Complete_Action_Executor::execute';reason='Explicit bounded route/action implementation in the 17.0.0 complete executor.'
+            status='complete_native';resolver='PRSTUDIO_UC_Complete_Action_Executor::execute';reason='Explicit bounded route/action implementation in the 1.0.0 complete executor.'
         elif a.get('executor')=='browser_agent':
             if a['action'] in browser_ok: status='browser_agent';resolver='protocol.js + executeKnownContractAction/executeStep';reason='Concrete Browser Agent mapping.'
         elif a['route']=='/database-manage' and a['action'] in db_ok:
@@ -1004,30 +1004,30 @@ def main():
         'bench/FRONTIER-REFERENCE-HISTORY.ndjson',
     }
     generated_release_files={
-        'ARCHITECTURE-17.0.0.md',
-        'CHANGELOG-17.0.0.md',
-        'COMPONENT-SHA256SUMS-17.0.0.txt',
-        'H24-OPERATIONS-17.0.0.md',
-        'INSTALL-CONNECTION-COMPATIBILITY-17.0.0.json',
-        'LIVE-ACCEPTANCE-17.0.0.md',
-        'MCP-PLUGIN-PREFLIGHT-17.0.0.json',
-        'MCP-TOOLCHAIN-17.0.0.md',
-        'PERFORMANCE-BENCHMARK-17.0.0.json',
-        'QUALITY-GATE-17.0.0.json',
-        'RELEASE-MANIFEST-17.0.0.json',
-        'RP-STUDIO-CHATGPT-PLUGIN-17.0.0.json',
-        'RP-STUDIO-CHATGPT-PLUGIN-INSTRUCTIONS-17.0.0.txt',
-        'RP-STUDIO-CHATGPT-PLUGIN-SETUP-17.0.0.md',
-        'SECURITY-HARDENING-17.0.0.json',
-        'SOCIAL-CONNECTORS-17.0.0.md',
-        'TEST-REPORT-17.0.0.json',
-        'VISIONE-E-DECISIONI-17.0.0.md',
-        'prstudio-unified-browser-agent-17.0.0.zip',
-        'prstudio-unified-control-17.0.0.zip',
+        'ARCHITECTURE-1.0.0.md',
+        'CHANGELOG-1.0.0.md',
+        'COMPONENT-SHA256SUMS-1.0.0.txt',
+        'H24-OPERATIONS-1.0.0.md',
+        'INSTALL-CONNECTION-COMPATIBILITY-1.0.0.json',
+        'LIVE-ACCEPTANCE-1.0.0.md',
+        'MCP-PLUGIN-PREFLIGHT-1.0.0.json',
+        'MCP-TOOLCHAIN-1.0.0.md',
+        'PERFORMANCE-BENCHMARK-1.0.0.json',
+        'QUALITY-GATE-1.0.0.json',
+        'RELEASE-MANIFEST-1.0.0.json',
+        'RP-STUDIO-CHATGPT-PLUGIN-1.0.0.json',
+        'RP-STUDIO-CHATGPT-PLUGIN-INSTRUCTIONS-1.0.0.txt',
+        'RP-STUDIO-CHATGPT-PLUGIN-SETUP-1.0.0.md',
+        'SECURITY-HARDENING-1.0.0.json',
+        'SOCIAL-CONNECTORS-1.0.0.md',
+        'TEST-REPORT-1.0.0.json',
+        'VISIONE-E-DECISIONI-1.0.0.md',
+        'prstudio-unified-browser-agent-1.0.0.zip',
+        'prstudio-unified-control-1.0.0.zip',
     }
     sources=[]
     for p in ROOT.rglob('*'):
-        if not p.is_file() or p.name in {SUMMARY.name,DETAIL.name,SURFACE.name,'RELEASE-MANIFEST-17.0.0.json','COMPONENT-SHA256SUMS-17.0.0.txt'}:
+        if not p.is_file() or p.name in {SUMMARY.name,DETAIL.name,SURFACE.name,'RELEASE-MANIFEST-1.0.0.json','COMPONENT-SHA256SUMS-1.0.0.txt'}:
             continue
         relative=rel(p)
         if (

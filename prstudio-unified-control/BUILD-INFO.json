@@ -1,6 +1,6 @@
 {
   "component": "control",
-  "version": "17.0.0",
+  "version": "1.0.0",
   "architecture": "durable-wordpress-execution-agency-with-owned-tab-browser-executor",
   "built_at_utc": "2026-08-17T06:40:00Z",
   "installation_contract": "same WordPress plugin folder, bootstrap and normal ZIP update mode",

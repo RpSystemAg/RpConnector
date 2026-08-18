@@ -2,7 +2,7 @@
 declare(strict_types=1);
 define('ABSPATH', __DIR__ . '/');
 define('PRSTUDIO_UC_DIR', dirname(__DIR__) . '/prstudio-unified-control/');
-define('PRSTUDIO_UC_VERSION', '17.0.0');
+define('PRSTUDIO_UC_VERSION', '1.0.0');
 require PRSTUDIO_UC_DIR . 'includes/class-prstudio-uc-health.php';
 function fail_health(string $m): void { fwrite(STDERR,"FAIL {$m}\n"); exit(1); }
 $integrity = new ReflectionMethod(PRSTUDIO_UC_Health::class, 'integrity_status');

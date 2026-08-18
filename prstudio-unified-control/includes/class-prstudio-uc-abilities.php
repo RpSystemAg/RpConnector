@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
  * AI/tooling discover PR STUDIO without creating a parallel mutation path.
  */
 final class PRSTUDIO_UC_Abilities {
-    public const VERSION = '17.0.0';
+    public const VERSION = '1.0.0';
     private const CATEGORY = 'pr-studio-observability';
 
     public static function register_category(): void {

@@ -1,0 +1,35 @@
+{
+  "ONE_GUARD_STATUS": {
+    "ANTI_CRASH": "PRESENT",
+    "OTHER_MUTATION_GUARDS": "ZERO"
+  },
+  "anti_crash_present": true,
+  "application_canary_engine_absent": true,
+  "budget_block": false,
+  "critical_approval": false,
+  "forbidden_runtime_files_after": 0,
+  "forbidden_runtime_files_before": 33,
+  "forbidden_runtime_hits_after": 0,
+  "forbidden_runtime_hits_before": 150,
+  "generic_browser_action_model_roundtrip_gate": false,
+  "human_takeover_non_auth": false,
+  "manual_resume": false,
+  "needs_review": false,
+  "other_mutation_guards": 0,
+  "planner_quick_compiler": true,
+  "policy_block": false,
+  "reference_date": "2026-08-17",
+  "risk_approval": false,
+  "runtime_classification_counts": {
+    "ANTI-CRASH": 58,
+    "TECHNICAL CORRECTNESS": 1699,
+    "TELEMETRY": 644,
+    "UNWANTED CONSERVATISM": 0
+  },
+  "same_lane_task_binding_block": false,
+  "suite_version": "1.0.0",
+  "transient_failure_retries": true,
+  "unwanted_conservatism_matches": 0,
+  "verification_gate": false,
+  "verification_is_nonblocking": true
+}

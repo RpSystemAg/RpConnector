@@ -2,7 +2,7 @@
 if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
 
 /**
- * Local/sidecar MCP toolchain federation for PR STUDIO 17.0.0.
+ * Local/sidecar MCP toolchain federation for PR STUDIO 1.0.0.
  *
  * Design invariants:
  * - no new account/API-key requirement;
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
  * - Browser Agent remains the only Chrome/Playwright executor to avoid profile/session races.
  */
 final class PRSTUDIO_UC_MCP_Toolchain {
-    public const VERSION = '17.0.0';
+    public const VERSION = '1.0.0';
     private const MCP_PROTOCOL = '2025-06-18';
     private const PROCESS_OUTPUT_LIMIT = 2097152;
     private const SIDECAR_TIMEOUT = 120;

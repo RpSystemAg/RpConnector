@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
  * entity, which is how a session avoids re-proposing work that is done.
  */
 final class PRSTUDIO_UC_Observe {
-    public const VERSION = '17.0.0';
+    public const VERSION = '1.0.0';
 
     private const MAX_CONTENT_BYTES = 262144;
     private const MAX_ANCHORS = 25;

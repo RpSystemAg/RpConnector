@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
  * Small explicit surface, Browser-first execution, typed common operations.
  */
 final class PRSTUDIO_UC_MCP_V5 {
-    public const VERSION = '17.0.0';
+    public const VERSION = '1.0.0';
     public const MCP_PROTOCOL = '2026-07-28';
     private const LEGACY_DEFAULT_PROTOCOL = '2025-06-18';
     private const ACCEPTED_MCP_PROTOCOLS = array( '2026-07-28', '2025-06-18', '2025-03-26' );

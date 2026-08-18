@@ -25,7 +25,7 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
  * it binds them to one entity, one OAuth client and one short expiry.
  */
 final class PRSTUDIO_UC_Write_Token {
-    public const VERSION = '17.0.0';
+    public const VERSION = '1.0.0';
 
     private const PREFIX = 'wt1';
     private const DEFAULT_TTL = 900;

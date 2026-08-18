@@ -4,14 +4,14 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
 
 /** SQL-backed, bounded agency worker. The option-array legacy Agency stays off. */
 final class PRSTUDIO_UC_Agency_Runtime {
-	public const VERSION='17.0.0';
+	public const VERSION='1.0.0';
 	public const CRON_HOOK='prstudio_uc_agency_worker_tick';
 	private const AS_HOOK='prstudio_uc_agency_action_scheduler_tick';
 	private const FAST_HOOK='prstudio_uc_agency_fast_tick';
 	private const CRON_INTERVAL='prstudio_uc_every_minute';
 	private const GROUP='prstudio-unified-control';
 	private const SCHEDULER_TOPOLOGY_OPTION='prstudio_uc_scheduler_topology';
-	private const SCHEDULER_TOPOLOGY_VERSION='17.0.0-single-runner-v1';
+	private const SCHEDULER_TOPOLOGY_VERSION='1.0.0-single-runner-v1';
 	private static bool $registered=false;
 
 	private static function uuid(): string {

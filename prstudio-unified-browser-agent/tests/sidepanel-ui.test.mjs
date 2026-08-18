@@ -92,7 +92,7 @@ globalThis.chrome = {
   runtime: {
     async sendMessage(message) {
       calls.push(message);
-      if (message.type === 'local_status') return { ok: true, version: '17.0.0', tab: {}, workflows: [], workspaces: [], schedules: [], scheduledResults: [], baselines: [], flight: [] };
+      if (message.type === 'local_status') return { ok: true, version: '1.0.0', tab: {}, workflows: [], workspaces: [], schedules: [], scheduledResults: [], baselines: [], flight: [] };
       if (message.type === 'status') return { paired: false, logs: [] };
       if (message.type === 'local_page_health') return { ok: true, result: { score: 100, h1Count: 1, imagesMissingAlt: 0, unlabeledControls: 0, duplicateIdCount: 0, badLinkCount: 0, schemaParseErrors: 0, resourceCount: 1, mixedContentCount: 0, navigation: {} } };
       if (message.type === 'pair') return { ok: true };

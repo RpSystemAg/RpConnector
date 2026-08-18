@@ -131,7 +131,7 @@ test("sensitive browser executor is exact, telemetry-classified, and raw CDP rem
 test("service worker statically preserves pairing/protocol and checkpoint security order", async () => {
   const worker = await readFile(new URL("../service-worker.js", import.meta.url), "utf8");
   const manifest = JSON.parse(await readFile(new URL("../COMPONENT-MANIFEST.json", import.meta.url), "utf8"));
-  assert.equal(manifest.version, "17.0.0");
+  assert.equal(manifest.version, "1.0.0");
   assert.match(worker, /CONFIG:\s*"prstudioConfig"/);
   assert.match(worker, /wp-json\/prstudio-unified\/v1\/pair/);
   assert.match(worker, /credentials:\s*"omit"/);

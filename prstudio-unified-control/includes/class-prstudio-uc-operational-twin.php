@@ -7,7 +7,7 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
  * never page bodies, customer/order records or authentication material.
  */
 final class PRSTUDIO_UC_Operational_Twin {
-	public const VERSION = '17.0.0';
+	public const VERSION = '1.0.0';
 	private const STATE = 'operational-twin';
 	private const MAX_ENTITIES = 10000;
 	private const MAX_RELATIONS = 20000;

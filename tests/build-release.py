@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reproducible PR STUDIO 17.0.0 component builder and finalizer.
+"""Reproducible PR STUDIO 1.0.0 component builder and finalizer.
 
 This script never creates test, quality, performance, security, preflight or
 live-acceptance reports. Those files must be produced by their real test flows.
@@ -17,8 +17,8 @@ Modes (exactly one is required):
 
   python tests/build-release.py --finalize
       Requires the exact component manifests/ZIPs and every final report/document
-      to exist and validate. It then writes RELEASE-MANIFEST-17.0.0.json and,
-      last, COMPONENT-SHA256SUMS-17.0.0.txt. Neither file includes itself.
+      to exist and validate. It then writes RELEASE-MANIFEST-1.0.0.json and,
+      last, COMPONENT-SHA256SUMS-1.0.0.txt. Neither file includes itself.
 
 Reproducibility:
 
@@ -48,7 +48,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Sequence
 
 
-VERSION = "17.0.0"
+VERSION = "1.0.0"
 SUITE_FOLDER = f"PR-STUDIO-Unified-Suite-{VERSION}"
 CONTROL_FOLDER = "prstudio-unified-control"
 BROWSER_FOLDER = "prstudio-unified-browser-agent"
@@ -214,15 +214,15 @@ def validate_version_anchors() -> None:
         fail(f"Missing WordPress bootstrap: {bootstrap_path.relative_to(ROOT)}")
     bootstrap = bootstrap_path.read_text(encoding="utf-8")
     if not re.search(r"^\s*\*\s*Version:\s+17\.0\.0\s*$", bootstrap, re.MULTILINE):
-        fail("WordPress plugin header is not 17.0.0")
+        fail("WordPress plugin header is not 1.0.0")
     if not re.search(
         r"define\(\s*'PRSTUDIO_UC_VERSION'\s*,\s*'17\.0\.0'\s*\)", bootstrap
     ):
-        fail("PRSTUDIO_UC_VERSION is not 17.0.0")
+        fail("PRSTUDIO_UC_VERSION is not 1.0.0")
 
     control_build = load_json(control / "BUILD-INFO.json")
     if control_build.get("version") != VERSION:
-        fail("Control BUILD-INFO.json version is not 17.0.0")
+        fail("Control BUILD-INFO.json version is not 1.0.0")
 
     browser_entries = {entry.name: entry for entry in browser.iterdir()}
     chrome_manifest_path = browser_entries.get("manifest.json")
@@ -234,16 +234,16 @@ def validate_version_anchors() -> None:
     if chrome_manifest.get("manifest_version") != 3:
         fail("Browser manifest.json must remain Chrome Manifest V3")
     if chrome_manifest.get("version") != VERSION:
-        fail("Browser manifest.json product version is not 17.0.0")
+        fail("Browser manifest.json product version is not 1.0.0")
 
     browser_build = load_json(browser / "BUILD-INFO.json")
     if browser_build.get("version") != VERSION or browser_build.get("product_version") != VERSION:
-        fail("Browser BUILD-INFO.json version/product_version is not 17.0.0")
+        fail("Browser BUILD-INFO.json version/product_version is not 1.0.0")
 
     executor_meta_path = browser / "lib" / "executor-meta.js"
     executor_meta = executor_meta_path.read_text(encoding="utf-8")
     if not re.search(r'EXECUTOR_PRODUCT_VERSION\s*=\s*"17\.0\.0"', executor_meta):
-        fail("Browser executor product version is not 17.0.0")
+        fail("Browser executor product version is not 1.0.0")
     if not re.search(r'EXECUTOR_PROTOCOL_VERSION\s*=\s*"3\.0\.0"', executor_meta):
         fail("Browser wire protocol must remain 3.0.0")
 
@@ -569,19 +569,19 @@ def validate_final_reports() -> None:
         if legacy.is_file() and sha256_file(current) == sha256_file(legacy):
             fail(f"Final report is a byte-for-byte renamed legacy report: {name}")
         if f"{VERSION}" not in current.read_text(encoding="utf-8"):
-            fail(f"Final report lacks the active 17.0.0 anchor: {name}")
+            fail(f"Final report lacks the active 1.0.0 anchor: {name}")
 
     for name in JSON_REPORTS_REQUIRING_GENERATION_TIME:
         report = load_json(ROOT / name)
         if report.get("version") != VERSION:
-            fail(f"Final JSON report version is not 17.0.0: {name}")
+            fail(f"Final JSON report version is not 1.0.0: {name}")
         generated = report.get("generated_at_utc")
         if not isinstance(generated, str) or not generated.strip():
             fail(f"Final JSON report lacks generated_at_utc: {name}")
 
     descriptor = load_json(ROOT / f"RP-STUDIO-CHATGPT-PLUGIN-{VERSION}.json")
     if descriptor.get("version") != VERSION:
-        fail("ChatGPT deployment descriptor version is not 17.0.0")
+        fail("ChatGPT deployment descriptor version is not 1.0.0")
 
     quality = load_json(ROOT / f"QUALITY-GATE-{VERSION}.json")
     if not isinstance(quality.get("status"), str) or not quality["status"].strip():
@@ -610,7 +610,7 @@ def root_artifact_records(names: Sequence[str]) -> list[dict[str, Any]]:
 def read_component_manifest(spec: ComponentSpec) -> dict[str, Any]:
     manifest = load_json(ROOT / spec.folder / spec.manifest_name)
     if manifest.get("version") != VERSION:
-        fail(f"{spec.manifest_name} version is not 17.0.0 for {spec.folder}")
+        fail(f"{spec.manifest_name} version is not 1.0.0 for {spec.folder}")
     if manifest.get("top_level_folder") != spec.folder:
         fail(f"{spec.manifest_name} top-level folder mismatch for {spec.folder}")
     if manifest.get("integrity_exclusions") != list(spec.exclusions):
@@ -655,9 +655,9 @@ def release_manifest_document(epoch: int) -> dict[str, Any]:
         "components": components,
         "artifacts": artifacts,
         "notes": [
-            "This manifest contains only exact 17.0.0 artifacts and does not hash itself.",
+            "This manifest contains only exact 1.0.0 artifacts and does not hash itself.",
             "Component tree digests exclude their own integrity/manifest documents as declared.",
-            "COMPONENT-SHA256SUMS-17.0.0.txt is generated after this manifest and excludes itself.",
+            "COMPONENT-SHA256SUMS-1.0.0.txt is generated after this manifest and excludes itself.",
         ],
     }
 
@@ -743,7 +743,7 @@ def check(epoch: int) -> None:
 
     final_markers = [ROOT / name for name in (*FINAL_REPORTS, RELEASE_MANIFEST, CHECKSUM_FILE)]
     if not any(path.exists() for path in final_markers):
-        print("Component check complete; no 17.0.0 final reports/manifest detected.")
+        print("Component check complete; no 1.0.0 final reports/manifest detected.")
         return
 
     missing_reports = [name for name in FINAL_REPORTS if not (ROOT / name).is_file()]
@@ -764,7 +764,7 @@ def build(epoch: int) -> None:
 
 def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Build/check deterministic PR STUDIO 17.0.0 component packages or finalize root metadata.",
+        description="Build/check deterministic PR STUDIO 1.0.0 component packages or finalize root metadata.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"

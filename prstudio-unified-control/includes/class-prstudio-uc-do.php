@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
  * pick, because a wrong guess that writes is far more expensive than a question.
  */
 final class PRSTUDIO_UC_Do {
-    public const VERSION = '17.0.0';
+    public const VERSION = '1.0.0';
 
     /**
      * Direct intent synonyms. Order matters only for readability; matching is

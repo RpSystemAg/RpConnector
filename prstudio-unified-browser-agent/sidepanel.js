@@ -219,7 +219,7 @@ async function handleCardAction(event) {
 
 $("exportButton").addEventListener("click", async () => {
   const result = await send("local_export_state"); if (!result?.ok) return show(`Errore: ${errText(result)}`, true);
-  downloadJson(`PR-STUDIO-Local-Studio-17.0.0-${Date.now()}.json`, result.export); show("Configurazione locale esportata.");
+  downloadJson(`PR-STUDIO-Local-Studio-1.0.0-${Date.now()}.json`, result.export); show("Configurazione locale esportata.");
 });
 $("importButton").addEventListener("click", () => $("importFile").click());
 $("importFile").addEventListener("change", async () => {

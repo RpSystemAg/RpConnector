@@ -3,7 +3,7 @@
  * Plugin Name: PR STUDIO Unified Control Plane
  * Plugin URI:  https://prstudio.ai/
  * Description: PR STUDIO 17.0 execution agency: Codex-style turn contract, long-poll agent channel, interventions ledger, durable missions, H24 sentinel, operational twin, OAuth MCP and an owned-tab native-input Browser Agent.
- * Version:     17.0.0
+ * Version:     1.0.0
  * Author:      PR STUDIO
  * License:     GPL-2.0-or-later
  * Text Domain: pr-studio-unified-control
@@ -14,7 +14,7 @@
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 // Unique unified constants are always safe, including during migration activation.
-define( 'PRSTUDIO_UC_VERSION', '17.0.0' );
+define( 'PRSTUDIO_UC_VERSION', '1.0.0' );
 define( 'PRSTUDIO_UC_FILE', __FILE__ );
 define( 'PRSTUDIO_UC_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PRSTUDIO_UC_URL', plugin_dir_url( __FILE__ ) );
@@ -29,13 +29,13 @@ $prstudio_legacy_bridge_loaded = defined( 'WPAIB_DIR' ) || class_exists( 'PRSTUD
 $prstudio_legacy_runtime_loaded = defined( 'PRSTUDIO_BROWSER_RUNTIME_DIR' ) || class_exists( 'PRSTUDIO_Browser_Runtime', false );
 
 // Keep legacy constant names so existing connector routes, options and adapters remain compatible.
-if ( ! defined( 'WPAIB_VERSION' ) ) define( 'WPAIB_VERSION', '17.0.0' );
+if ( ! defined( 'WPAIB_VERSION' ) ) define( 'WPAIB_VERSION', '1.0.0' );
 if ( ! defined( 'WPAIB_FILE' ) ) define( 'WPAIB_FILE', __FILE__ );
 if ( ! defined( 'WPAIB_DIR' ) ) define( 'WPAIB_DIR', PRSTUDIO_UC_DIR );
 if ( ! defined( 'WPAIB_URL' ) ) define( 'WPAIB_URL', PRSTUDIO_UC_URL );
 if ( ! defined( 'WPAIB_BASENAME' ) ) define( 'WPAIB_BASENAME', PRSTUDIO_UC_BASENAME );
 if ( ! defined( 'PRSTUDIO_BRIDGE_NAME' ) ) define( 'PRSTUDIO_BRIDGE_NAME', 'PR STUDIO Unified Control Plane' );
-if ( ! defined( 'PRSTUDIO_BROWSER_RUNTIME_VERSION' ) ) define( 'PRSTUDIO_BROWSER_RUNTIME_VERSION', '17.0.0' );
+if ( ! defined( 'PRSTUDIO_BROWSER_RUNTIME_VERSION' ) ) define( 'PRSTUDIO_BROWSER_RUNTIME_VERSION', '1.0.0' );
 if ( ! defined( 'PRSTUDIO_BROWSER_RUNTIME_FILE' ) ) define( 'PRSTUDIO_BROWSER_RUNTIME_FILE', __FILE__ );
 if ( ! defined( 'PRSTUDIO_BROWSER_RUNTIME_DIR' ) ) define( 'PRSTUDIO_BROWSER_RUNTIME_DIR', PRSTUDIO_UC_DIR );
 if ( ! defined( 'PRSTUDIO_BROWSER_RUNTIME_BASENAME' ) ) define( 'PRSTUDIO_BROWSER_RUNTIME_BASENAME', PRSTUDIO_UC_BASENAME );

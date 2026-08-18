@@ -99,7 +99,7 @@ final class PRSTUDIO_UC_Backend_Executability {
 			$binding['metadata_only'] = false;
 			$binding['provider'] = 'prstudio_complete_native';
 			$binding['resolver'] = 'PRSTUDIO_UC_Complete_Action_Executor::execute';
-			$binding['reason'] = 'Concrete bounded 17.0.0 executor with explicit route/action semantics.';
+			$binding['reason'] = 'Concrete bounded 1.0.0 executor with explicit route/action semantics.';
 			return $binding;
 		}
 

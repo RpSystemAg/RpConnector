@@ -1,10 +1,10 @@
 {
-  "schema_version": "17.0.0",
-  "suite_version": "17.0.0",
+  "schema_version": "1.0.0",
+  "suite_version": "1.0.0",
   "capabilities": [
     {
       "id": "agency.status",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "operations",
       "description": "Legge runner, scheduler, lease, Browser Agent e requisiti H24 senza affermare continuità quando cron o Chrome non sono disponibili.",
       "input_schema": {
@@ -40,7 +40,7 @@
     },
     {
       "id": "twin.sync",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "operations",
       "description": "Sincronizza una slice bounded del sito nel twin operativo privato, con provenienza e senza corpi pagina, ordini o dati cliente.",
       "input_schema": {
@@ -89,7 +89,7 @@
     },
     {
       "id": "twin.query",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "operations",
       "description": "Interroga entità compatte del twin operativo distinguendo fatti WordPress, API, Browser live, derivazioni e raccomandazioni.",
       "input_schema": {
@@ -139,7 +139,7 @@
     },
     {
       "id": "social.metrics.ingest",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "social",
       "description": "Normalizza una snapshot di metriche social ottenuta da API, webhook, import o Browser Agent, con sorgente esplicita e senza credenziali.",
       "input_schema": {
@@ -223,7 +223,7 @@
     },
     {
       "id": "social.insights",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "social",
       "description": "Calcola trend, engagement, condivisioni, salvataggi, completamento e viralità su snapshot social realmente osservate.",
       "input_schema": {
@@ -275,7 +275,7 @@
     },
     {
       "id": "opportunity.rank",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "intelligence",
       "description": "Ordina opportunità da twin, metriche social e segnali espliciti tramite formula deterministica con confidence, effort, urgenza ed evidenza.",
       "input_schema": {
@@ -332,7 +332,7 @@
     },
     {
       "id": "sentinel.scan",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "operations",
       "description": "Esegue una scansione bounded del sito e genera alert soltanto per cambiamenti o degradi osservati.",
       "input_schema": {
@@ -379,7 +379,7 @@
     },
     {
       "id": "toolchain.status",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "operations",
       "description": "Rileva in modo zero-config le integrazioni MCP/native disponibili, senza avviare processi né cambiare installazione.",
       "input_schema": {
@@ -417,7 +417,7 @@
     },
     {
       "id": "toolchain.filesystem.inspect",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "operations",
       "description": "Filesystem locale sandboxato: stat, read, list e search soltanto dentro le radici WordPress/PR STUDIO.",
       "input_schema": {
@@ -492,7 +492,7 @@
     },
     {
       "id": "toolchain.filesystem.write",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "operations",
       "description": "Scrittura filesystem atomica e sandboxata; supporta write, replace esatto e mkdir senza delete.",
       "input_schema": {
@@ -572,7 +572,7 @@
     },
     {
       "id": "toolchain.git.inspect",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "operations",
       "description": "Git locale read-only senza shell: status, log, diff, show, branches e remotes su repository dentro le radici consentite.",
       "input_schema": {
@@ -644,7 +644,7 @@
     },
     {
       "id": "toolchain.sqlite.query",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "operations",
       "description": "SQLite locale read-only con query SELECT/WITH/EXPLAIN/PRAGMA allowlisted; sidecar opzionale se il driver PHP manca.",
       "input_schema": {
@@ -705,7 +705,7 @@
     },
     {
       "id": "toolchain.postgres.query",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "operations",
       "description": "PostgreSQL restricted/read-only quando DATABASE_URI esiste già nell ambiente; nessuna nuova credenziale viene richiesta.",
       "input_schema": {
@@ -760,7 +760,7 @@
     },
     {
       "id": "toolchain.wpcli.inspect",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "operations",
       "description": "WP-CLI locale read-only con allowlist deterministica; nessuna stringa shell arbitraria.",
       "input_schema": {
@@ -822,7 +822,7 @@
     },
     {
       "id": "toolchain.image.optimize",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "media",
       "description": "Ottimizza immagini locali tramite WP_Image_Editor con resize/quality e output verificato, senza servizi esterni.",
       "input_schema": {
@@ -888,7 +888,7 @@
     },
     {
       "id": "toolchain.pdf.read",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "operations",
       "description": "Legge PDF locali tramite pdftotext quando presente; fallback disponibile al sidecar PDF MCP fissato.",
       "input_schema": {
@@ -949,7 +949,7 @@
     },
     {
       "id": "toolchain.pandoc.convert",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "content",
       "description": "Converte documenti locali con Pandoc già installato; input/output restano dentro le radici consentite.",
       "input_schema": {
@@ -1011,7 +1011,7 @@
     },
     {
       "id": "toolchain.sidecar.tools",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "operations",
       "description": "Avvia on-demand un sidecar MCP fissato e restituisce tools/list; nessun sidecar parte al bootstrap.",
       "input_schema": {
@@ -1081,7 +1081,7 @@
     },
     {
       "id": "toolchain.sidecar.read",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "operations",
       "description": "Chiama soltanto la lane read-only di un sidecar MCP fissato, con timeout e terminazione forzata del processo.",
       "input_schema": {
@@ -1161,7 +1161,7 @@
     },
     {
       "id": "toolchain.sidecar.call",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "operations",
       "description": "Chiama esplicitamente un tool di un sidecar MCP fissato. Operazione controllata perché alcuni sidecar possono mutare file o stato.",
       "input_schema": {
@@ -1241,7 +1241,7 @@
     },
     {
       "id": "toolchain.accessibility.axe_scan",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "operations",
       "description": "Scansione accessibilità WCAG tramite sidecar axe-core/Playwright fissato, avviato solo su richiesta e senza account/API key.",
       "input_schema": {
@@ -1310,7 +1310,7 @@
     },
     {
       "id": "toolchain.mermaid.render",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "content",
       "description": "Render Mermaid in SVG/PNG tramite sidecar fissato; nessun servizio cloud o account richiesto.",
       "input_schema": {
@@ -1387,7 +1387,7 @@
     },
     {
       "id": "toolchain.dependencies.osv",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "operations",
       "description": "Audit dipendenze tramite sidecar OSV.dev keyless fissato: singolo pacchetto, batch, advisory o lista ecosistemi.",
       "input_schema": {
@@ -1441,7 +1441,7 @@
     },
     {
       "id": "toolchain.pdf.evidence",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "operations",
       "description": "Lettura/search/evidence PDF locale tramite il sidecar @sylphx/pdf-reader-mcp fissato, con path locali sandboxati.",
       "input_schema": {
@@ -1494,7 +1494,7 @@
     },
     {
       "id": "toolchain.local_wp.read",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "operations",
       "description": "Compatibilità Local by Flywheel via local-wp-mcp fissato con WPCLI/MYSQL/FS writes forzati a false.",
       "input_schema": {
@@ -1544,7 +1544,7 @@
     },
     {
       "id": "business.goal.registry",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "intelligence",
       "description": "Persist, list, evaluate or remove strategic goals and constraints used by the Director.",
       "input_schema": {
@@ -1580,7 +1580,7 @@
     },
     {
       "id": "business.data_quality.resolve_conflicts",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "intelligence",
       "description": "Resolve contradictory facts by source authority, freshness and confidence.",
       "input_schema": {
@@ -1616,7 +1616,7 @@
     },
     {
       "id": "business.decision.journal",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "intelligence",
       "description": "Persist a bounded managerial decision journal with rationale, alternatives, evidence and expected outcome.",
       "input_schema": {
@@ -1652,7 +1652,7 @@
     },
     {
       "id": "business.outcome.track",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "intelligence",
       "description": "Track baseline, intervention, observation window and measured outcome for learning.",
       "input_schema": {
@@ -1688,7 +1688,7 @@
     },
     {
       "id": "commerce.unit_economics",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "commerce",
       "description": "Compute deterministic contribution margin from revenue and bounded variable-cost inputs.",
       "input_schema": {
@@ -1724,7 +1724,7 @@
     },
     {
       "id": "business.scenario.simulate",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "intelligence",
       "description": "Run bounded non-executing linear what-if scenarios over supplied business metrics.",
       "input_schema": {
@@ -1760,7 +1760,7 @@
     },
     {
       "id": "twin.semantic_blast_radius",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "intelligence",
       "description": "Traverse supplied semantic relations and quantify bounded downstream dependency impact.",
       "input_schema": {
@@ -1796,7 +1796,7 @@
     },
     {
       "id": "commerce.replenishment.plan",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "commerce",
       "description": "Calculate reorder point, safety stock, stockout and overstock heuristics from supplied demand data.",
       "input_schema": {
@@ -1832,7 +1832,7 @@
     },
     {
       "id": "experiment.causal.evaluate",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "intelligence",
       "description": "Evaluate a two-variant experiment with confidence interval, significance and guardrails.",
       "input_schema": {
@@ -1868,7 +1868,7 @@
     },
     {
       "id": "recommendation.feedback.calibrate",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "intelligence",
       "description": "Calibrate recommendation confidence from predicted versus measured impact.",
       "input_schema": {
@@ -1904,7 +1904,7 @@
     },
     {
       "id": "recommendation.expiry.revalidate",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "intelligence",
       "description": "Mark recommendations valid or stale from evidence age and bounded TTL.",
       "input_schema": {
@@ -1940,7 +1940,7 @@
     },
     {
       "id": "sequential.thinking",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "intelligence",
       "description": "Persist one explicit structured Sequential Thinking note; optionally federate to the pinned official MCP server. Hidden chain-of-thought is never stored.",
       "input_schema": {
@@ -2028,7 +2028,7 @@
     },
     {
       "id": "sequential.session",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "intelligence",
       "description": "Read one explicit bounded Sequential Thinking session.",
       "input_schema": {
@@ -2071,7 +2071,7 @@
     },
     {
       "id": "sequential.status",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "operations",
       "description": "Inspect Sequential Thinking native/sidecar readiness and bounded-session metrics.",
       "input_schema": {
@@ -2107,7 +2107,7 @@
     },
     {
       "id": "skills.search",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "intelligence",
       "description": "Search verified learned procedures and known failed paths before retrying a task.",
       "input_schema": {
@@ -2159,7 +2159,7 @@
     },
     {
       "id": "skills.get",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "intelligence",
       "description": "Read a verified procedural skill and its progressive-disclosure SKILL.md.",
       "input_schema": {
@@ -2202,7 +2202,7 @@
     },
     {
       "id": "skills.status",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "operations",
       "description": "Inspect procedural-skill learning, reuse, validity and staleness metrics.",
       "input_schema": {
@@ -2238,7 +2238,7 @@
     },
     {
       "id": "skills.invalidate",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "operations",
       "description": "Expire a learned procedure after an environment/application change while preserving history.",
       "input_schema": {
@@ -2285,7 +2285,7 @@
     },
     {
       "id": "skills.curate",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "operations",
       "description": "Conservatively curate verified procedural memory: surface stale/failed-only/overlapping skills and optionally archive without deleting history or auto-merging variants.",
       "input_schema": {
@@ -2328,7 +2328,7 @@
     },
     {
       "id": "serp.configure",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "seo",
       "description": "Configure a bounded SerpBear endpoint/domain/GSC property and store the API key in the encrypted Secrets Vault.",
       "input_schema": {
@@ -2386,7 +2386,7 @@
     },
     {
       "id": "serp.status",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "seo",
       "description": "Inspect SerpBear configuration and durable watcher status without exposing the API secret.",
       "input_schema": {
@@ -2422,7 +2422,7 @@
     },
     {
       "id": "serp.keywords",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "seo",
       "description": "Read configured SerpBear keywords and exact latest SERP positions via authenticated API.",
       "input_schema": {
@@ -2462,7 +2462,7 @@
     },
     {
       "id": "serp.refresh_all",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "seo",
       "description": "Trigger the documented SerpBear POST /api/cron refresh only when refresh_all=true.",
       "input_schema": {
@@ -2505,7 +2505,7 @@
     },
     {
       "id": "serp.watch.create",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "seo",
       "description": "Create a durable keyword watcher with first-page and target-position milestones and consecutive confirmations.",
       "input_schema": {
@@ -2582,7 +2582,7 @@
     },
     {
       "id": "serp.watch.run",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "seo",
       "description": "Run one bounded watcher check: exact SerpBear positions plus separate GSC query/page evidence.",
       "input_schema": {
@@ -2625,7 +2625,7 @@
     },
     {
       "id": "serp.watch.list",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "seo",
       "description": "List durable rank watchers without deleting history.",
       "input_schema": {
@@ -2661,7 +2661,7 @@
     },
     {
       "id": "serp.watch.status",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "seo",
       "description": "Read one rank watcher, keyword milestones and bounded history.",
       "input_schema": {
@@ -2704,7 +2704,7 @@
     },
     {
       "id": "serp.watch.cancel",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "seo",
       "description": "Cancel future checks while preserving watcher history and evidence.",
       "input_schema": {
@@ -2751,7 +2751,7 @@
     },
     {
       "id": "engineering.repo_map",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "operations",
       "description": "Build a bounded symbol/hash repo map for context-efficient code analysis inside the PR STUDIO plugin root.",
       "input_schema": {
@@ -2797,7 +2797,7 @@
     },
     {
       "id": "engineering.validate",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "operations",
       "description": "Run fixed anti-crash profiles: PHP lint, JSON validation and semantic no-stub scan. No arbitrary shell string is accepted.",
       "input_schema": {
@@ -2847,7 +2847,7 @@
     },
     {
       "id": "engineering.terminal",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "operations",
       "description": "Run an allowlisted argv-based engineering operation (php_version, php_lint, json_validate, test_matrix, repo_map); arbitrary Bash is not exposed.",
       "input_schema": {
@@ -2906,7 +2906,7 @@
     },
     {
       "id": "engineering.status",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "operations",
       "description": "Inspect bounded engineering-workbench limits and safe operation catalogue.",
       "input_schema": {
@@ -2942,7 +2942,7 @@
     },
     {
       "id": "serp.watch.create_all",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "seo",
       "description": "Create sharded durable daily watches for every keyword returned by the configured SerpBear domain, preserving first-page and target-position milestones.",
       "input_schema": {
@@ -3008,7 +3008,7 @@
       }
     },
     {
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "content_seo",
       "output_schema": {
         "type": "object",
@@ -3071,7 +3071,7 @@
       "rollback_capability": ""
     },
     {
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "content_seo",
       "output_schema": {
         "type": "object",
@@ -3153,7 +3153,7 @@
     },
     {
       "id": "render.source.resolve",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "content_seo",
       "description": "Resolve the authoritative WordPress render source for a public URL before mutation: front page/post, FSE template/template-part, theme files and page-specific stylesheet.",
       "input_schema": {
@@ -3200,7 +3200,7 @@
     },
     {
       "id": "seo.campaign.manager",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "seo",
       "description": "Persist and govern head-keyword campaigns (vino, ricette, ristoranti, Sicilia, bar), current metrics, satellites, do-not-do constraints and next best action.",
       "input_schema": {
@@ -3294,7 +3294,7 @@
     },
     {
       "id": "seo.keyword_url.registry",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "seo",
       "description": "Maintain a binding from keyword+intent to one dominant URL and reject silent competing primaries unless an explicit migration is requested.",
       "input_schema": {
@@ -3364,7 +3364,7 @@
     },
     {
       "id": "seo.serp_intent.observe",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "seo",
       "description": "Persist an observed SERP snapshot, classify intent/content types, hash it, cache it and avoid re-observing unchanged SERPs until TTL expiry.",
       "input_schema": {
@@ -3440,7 +3440,7 @@
     },
     {
       "id": "content.brief.compile",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "content_seo",
       "description": "Compile a deterministic editorial contract from campaign, dominant URL, SERP intent, entities, products, links, missing competitor topics, schema and forbidden overlap.",
       "input_schema": {
@@ -3588,7 +3588,7 @@
     },
     {
       "id": "content.publish.transaction",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "content_seo",
       "description": "Create and publish WordPress content server-side with idempotency, taxonomy/Rank Math/schema, DB readback and nonblocking public/sitemap evidence.",
       "input_schema": {
@@ -3739,7 +3739,7 @@
     },
     {
       "id": "content.claim.ledger",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "content_seo",
       "description": "Persist factual claim evidence with source authority, confidence and expiry for reporting; stale or missing evidence never authorizes or vetoes publishing.",
       "input_schema": {
@@ -3824,7 +3824,7 @@
     },
     {
       "id": "seo.internal_link.graph",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "seo",
       "description": "Build a bounded internal-link authority graph with incoming/outgoing counts, orphan evidence and pillar-support inputs for editorial planning.",
       "input_schema": {
@@ -3866,7 +3866,7 @@
     },
     {
       "id": "seo.cannibalization.resolver",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "seo",
       "description": "Resolve or persist a decision for competing same-intent URLs using KEEP, REFRESH, MERGE, REDIRECT, NOINDEX, RETARGET or DIFFERENTIATE rather than publishing another duplicate.",
       "input_schema": {
@@ -3951,7 +3951,7 @@
     },
     {
       "id": "seo.post_publish.watcher",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "seo",
       "description": "Track every new URL from public HTTP/indexability/canonical through GSC/SERP milestones and retain 180 observations before recommending refresh or diagnosis.",
       "input_schema": {
@@ -4027,7 +4027,7 @@
     },
     {
       "id": "seo.refresh.prioritize",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "seo",
       "description": "Rank existing pages for refresh using ranking opportunity, impressions, business/campaign importance and modification risk.",
       "input_schema": {
@@ -4072,7 +4072,7 @@
     },
     {
       "id": "schema.editorial.compile",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "content_seo",
       "description": "Compile and validate bounded editorial JSON-LD for Article, Recipe and BreadcrumbList before publication.",
       "input_schema": {
@@ -4121,7 +4121,7 @@
     },
     {
       "id": "media.editorial.pipeline",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "media_stories",
       "description": "Validate editorial media assets and ALT metadata, optionally applying a bounded missing ALT update with persisted readback.",
       "input_schema": {
@@ -4174,7 +4174,7 @@
     },
     {
       "id": "directory.entity.engine",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "content_seo",
       "description": "Maintain deduplicated structured Restaurant/Bar/Winery/Producer/Local entities with provenance and freshness for scalable directory hubs.",
       "input_schema": {
@@ -4280,7 +4280,7 @@
     },
     {
       "id": "authority.outreach.engine",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "seo",
       "description": "Maintain a bounded SEO outreach/relationship CRM for producers, wineries, restaurants, bars, associations, events and editorial partners.",
       "input_schema": {
@@ -4366,7 +4366,7 @@
     },
     {
       "id": "insights.first_party.publisher",
-      "version": "17.0.0",
+      "version": "1.0.0",
       "domain": "analytics",
       "description": "Aggregate WooCommerce order/product/category demand above a privacy threshold into original first-party editorial insight candidates without exposing personal data.",
       "input_schema": {

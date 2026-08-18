@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
  * reported position is aggregated and is not treated as an exact live rank.
  */
 final class PRSTUDIO_UC_Serp_Watch {
-    public const VERSION = '17.0.0';
+    public const VERSION = '1.0.0';
     private const STATE = 'serp-watch';
     private const SECRET = 'serpbear_api_key';
     private const MAX_WATCHES = 250;

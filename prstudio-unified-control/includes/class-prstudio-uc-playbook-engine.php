@@ -4,7 +4,7 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
 
 /** Deterministic, versioned mission plans for the SQL agency runtime. */
 final class PRSTUDIO_UC_Playbook_Engine {
-	public const VERSION = '17.0.0';
+	public const VERSION = '1.0.0';
 	private const TYPES = array( 'site_guardian','social_growth','commerce_growth','browser_deep_audit' );
 
 	public static function types(): array { return self::TYPES; }

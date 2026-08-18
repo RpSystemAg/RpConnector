@@ -2,10 +2,10 @@
 Contributors: prstudio
 Requires at least: 6.5
 Requires PHP: 8.0
-Stable tag: 17.0.0
+Stable tag: 1.0.0
 License: GPLv2 or later
 
-PR STUDIO Unified Control 17.0.0 is the WordPress/WooCommerce source of truth and durable execution agency for the unchanged RP Studio Connector and paired Browser Agent.
+PR STUDIO Unified Control 1.0.0 is the WordPress/WooCommerce source of truth and durable execution agency for the unchanged RP Studio Connector and paired Browser Agent.
 
 == Installation ==
 1. Install or update the ZIP as a normal WordPress plugin. Keep the `prstudio-unified-control` folder and `prstudio-unified-control.php` bootstrap.
@@ -27,7 +27,7 @@ For reliable wall-clock execution configure the documented external runner. PR S
 
 == Changelog ==
 
-= 17.0.0 =
+= 1.0.0 =
 * Added the single SQL-backed Agency Runtime with owned jobs, leases, idempotency, checkpoints, schedules, dead-letter handling and Browser correlation.
 * Added Operational Twin, Social Intelligence, Opportunity Engine and changed-only Site Sentinel services.
 * Expanded the bounded MCP surface to 123 typed tools backed by 1,376 capabilities; MCP 2026-07-28 is the primary stateless core with 2025 compatibility, while Tasks remains an optional client opt-in extension rather than a core dependency.

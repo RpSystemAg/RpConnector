@@ -1,4 +1,4 @@
-export const LOCAL_STUDIO_VERSION = "17.0.0";
+export const LOCAL_STUDIO_VERSION = "1.0.0";
 
 export const LOCAL_STUDIO_FEATURES = Object.freeze([
   "standalone_mode",

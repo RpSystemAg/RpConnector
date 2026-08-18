@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0.0",
+  "version": "1.0.0",
+  "generated_at_utc": "2026-08-11T09:00:00Z",
+  "production_proven": false,
+  "status": "local_release_candidate_live_acceptance_pending",
+  "gates": {
+    "strict_release_validator": {
+      "command": "node tests/validate-release.mjs --strict --php-smoke",
+      "evidence_file": "test-environment/release-evidence/strict-validator.txt",
+      "evidence_sha256": "f3160c58a1d76c6a341e86ae45e43a8f7702a9dc71117e88925c9c86bf4cb912",
+      "counts": {
+        "passed": 346,
+        "warnings": 0,
+        "skipped": 0,
+        "failed": 0
+      },
+      "passed": true
+    },
+    "five_pass_web_research": {
+      "passed": true,
+      "passes": 5,
+      "hard_failure_count": 0
+    },
+    "rigorous_file_tool_audit": {
+      "passed": true,
+      "hard_failure_count": 0
+    },
+    "generated_contract_parity": true,
+    "browser_tests": "covered by strict validator evidence",
+    "visual_fixture_lab": {
+      "fixture_only": true,
+      "baseline_captures": 30,
+      "candidate_captures": 30,
+      "comparisons": 90,
+      "comparison_failures": 0,
+      "live_staging_matrix_pending": true
+    },
+    "live_acceptance": false
+  },
+  "release_decision": "ready_for_live_acceptance"
+}

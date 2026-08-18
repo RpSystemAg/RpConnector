@@ -24,7 +24,7 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
  *             so it resurfaces only when explicitly asked for.
  */
 final class PRSTUDIO_UC_Interventions {
-    public const VERSION = '17.0.0';
+    public const VERSION = '1.0.0';
 
     public const APPLIED = 'applied';
     public const REJECTED = 'rejected';

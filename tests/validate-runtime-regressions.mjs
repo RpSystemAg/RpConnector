@@ -31,7 +31,7 @@ for (const [route,action] of [["/commerce-settings-manage","get_settings"],["/se
   const a=catalog.actions.find(x=>x.route===route&&x.action===action); assert.equal(a?.read_only,true,`${route} ${action} catalog read-only`);
   const c=caps.capabilities.find(x=>x.source?.route===route&&x.source?.action===action); assert.equal(c?.read_only,true,`${route} ${action} capability read-only`); assert.equal(c?.write,false);
 }
-assert.equal(caps.suite_version,"17.0.0");
+assert.equal(caps.suite_version,"1.0.0");
 console.log("runtime-regressions: PASS");
 
 const taskStore=await read("prstudio-unified-control/includes/class-prstudio-uc-store.php");

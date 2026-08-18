@@ -7,7 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inflateRawSync } from 'node:zlib';
 
-const RELEASE_VERSION = '17.0.0';
+const RELEASE_VERSION = '1.0.0';
 const SUITE_FOLDER = `PR-STUDIO-Unified-Suite-${RELEASE_VERSION}`;
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const STRICT = process.argv.includes('--strict');
@@ -571,7 +571,7 @@ async function main() {
   for (const relative of REQUIRED_DRAFT_FILES.filter((name) => name.includes(RELEASE_VERSION))) {
     if (!await exists(relative)) continue;
     const content = await readFile(full(relative), 'utf8');
-    requireCheck(content.includes(RELEASE_VERSION), `${relative}: 17.0.0 anchor present`);
+    requireCheck(content.includes(RELEASE_VERSION), `${relative}: 1.0.0 anchor present`);
     requireCheck(!/\b5\.0\.[01]\b/u.test(content), `${relative}: no stale 5.0.0/5.0.1 anchor`);
   }
 
@@ -756,7 +756,7 @@ async function main() {
 
   for (const entry of rootEntries.filter((item) => !item.isDirectory && item.relative.endsWith(`-${RELEASE_VERSION}.json`))) {
     const problems = collectVersionProblems(await loadJson(entry.relative));
-    requireCheck(problems.length === 0, `${entry.relative}: active version fields are 17.0.0`, problems.join('; '));
+    requireCheck(problems.length === 0, `${entry.relative}: active version fields are 1.0.0`, problems.join('; '));
     const legacy = entry.relative.replace(`-${RELEASE_VERSION}.json`, '-5.0.0.json');
     if (await exists(legacy)) {
       const [currentPayload, legacyPayload] = await Promise.all([readFile(full(entry.relative)), readFile(full(legacy))]);
@@ -773,14 +773,14 @@ async function main() {
   deferredCheck(hasExactLowercaseChromeManifest, 'Browser source uses exact lowercase manifest.json', 'case is part of the cross-platform package contract');
   deferredCheck(!hasCollidingUppercaseBrowserManifest, 'Browser source has no colliding MANIFEST.json', 'rename component metadata to COMPONENT-MANIFEST.json');
   const sourceVersionChecks = [
-    [/\* Version:\s+17\.0\.0/u.test(controlBootstrap), 'Control plugin header is 17.0.0'],
-    [/PRSTUDIO_UC_VERSION',\s*'17\.0\.0'/u.test(controlBootstrap), 'Control product constant is 17.0.0'],
-    [/public const VERSION = '17\.0\.0'/u.test(mcpSource), 'MCP server version is 17.0.0'],
-    [controlBuildInfo.version === RELEASE_VERSION, 'Control BUILD-INFO version is 17.0.0'],
-    [controlComponentManifest.version === RELEASE_VERSION, 'Control component manifest version is 17.0.0'],
-    [agentBuildInfo.version === RELEASE_VERSION && agentBuildInfo.product_version === RELEASE_VERSION, 'Browser BUILD-INFO versions are 17.0.0'],
-    [agentChromeManifest.version === RELEASE_VERSION, 'Chrome manifest product version is 17.0.0'],
-    [/EXECUTOR_PRODUCT_VERSION\s*=\s*"17\.0\.0"/u.test(executorMeta), 'Browser executor product version is 17.0.0'],
+    [/\* Version:\s+17\.0\.0/u.test(controlBootstrap), 'Control plugin header is 1.0.0'],
+    [/PRSTUDIO_UC_VERSION',\s*'17\.0\.0'/u.test(controlBootstrap), 'Control product constant is 1.0.0'],
+    [/public const VERSION = '17\.0\.0'/u.test(mcpSource), 'MCP server version is 1.0.0'],
+    [controlBuildInfo.version === RELEASE_VERSION, 'Control BUILD-INFO version is 1.0.0'],
+    [controlComponentManifest.version === RELEASE_VERSION, 'Control component manifest version is 1.0.0'],
+    [agentBuildInfo.version === RELEASE_VERSION && agentBuildInfo.product_version === RELEASE_VERSION, 'Browser BUILD-INFO versions are 1.0.0'],
+    [agentChromeManifest.version === RELEASE_VERSION, 'Chrome manifest product version is 1.0.0'],
+    [/EXECUTOR_PRODUCT_VERSION\s*=\s*"17\.0\.0"/u.test(executorMeta), 'Browser executor product version is 1.0.0'],
   ];
   for (const [condition, name] of sourceVersionChecks) deferredCheck(condition, name, 'source editing is intentionally outside this draft task');
 

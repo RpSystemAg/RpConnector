@@ -8,7 +8,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
  */
 final class PRSTUDIO_UC_One_Guard_Legacy_Migration {
     private const OPTION = 'prstudio_uc_one_guard_migration';
-    private const VERSION = '17.0.0-one-guard-4';
+    private const VERSION = '1.0.0-one-guard-4';
 
     public static function run(): void {
         if ( self::VERSION === (string) get_option( self::OPTION, '' ) ) { return; }

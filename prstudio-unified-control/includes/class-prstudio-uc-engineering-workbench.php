@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
  * It intentionally exposes a bounded operation catalogue rather than arbitrary shell strings.
  */
 final class PRSTUDIO_UC_Engineering_Workbench {
-    public const VERSION = '17.0.0';
+    public const VERSION = '1.0.0';
     private const MAX_FILES = 5000;
     private const MAX_FILE_BYTES = 2097152;
     private const MAX_OUTPUT = 1048576;

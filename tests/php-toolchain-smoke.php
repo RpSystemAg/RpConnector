@@ -67,7 +67,7 @@ if ($outsidePath === false) {
 }
 try {
     $status = PRSTUDIO_UC_MCP_Toolchain::status();
-    assert_true(($status['version'] ?? '') === '17.0.0', 'toolchain version');
+    assert_true(($status['version'] ?? '') === '1.0.0', 'toolchain version');
     assert_true(($status['installation_changed'] ?? true) === false, 'installation unchanged');
     assert_true(($status['configuration_changed'] ?? true) === false, 'configuration unchanged');
     assert_true(count((array)($status['profiles'] ?? [])) >= 15, 'requested integration profiles advertised');

@@ -1696,7 +1696,7 @@ function capabilities(serverCapabilities = null) {
     durableJobs: true,
     idempotentCompletion: true,
     verificationReceipts: true,
-    recoveryVersion: "17.0.0",
+    recoveryVersion: "1.0.0",
     selectorStrategies: ["target_ref", "accessibility", "label", "text", "css", "xpath", "coordinates"],
     nativeInput: true,
     pointerSequence: true,
@@ -2777,7 +2777,7 @@ async function executeStep(state, step) {
       await sleep(Number(step.ms || 1000));
       return { waitedMs: Number(step.ms || 1000) };
     default:
-      throw codedError("contract_executor_missing", `Passaggio ${step.type} non presente nel runtime Browser Agent 17.0.0.`);
+      throw codedError("contract_executor_missing", `Passaggio ${step.type} non presente nel runtime Browser Agent 1.0.0.`);
   }
 }
 
@@ -6796,7 +6796,7 @@ async function executeKnownContractAction(state, step) {
     return executeSearchConsoleStep(state, { type: "search_console", mode: gscModes[action], ...args });
   }
   if (!hasRuntimeContractAction(action)) {
-    throw codedError("contract_executor_not_registered", `Azione avanzata non registrata nel Browser Agent 17.0.0: ${action}`, { action, executorProtocolVersion: EXECUTOR_PROTOCOL_VERSION });
+    throw codedError("contract_executor_not_registered", `Azione avanzata non registrata nel Browser Agent 1.0.0: ${action}`, { action, executorProtocolVersion: EXECUTOR_PROTOCOL_VERSION });
   }
   let requestedTab = Number(args.tab_id || args.tabId || state.tabId || 0);
 
@@ -7294,7 +7294,7 @@ async function executeKnownContractAction(state, step) {
     return { tabId, action, selectors, restored: false, masked, restoredCount: 0, autoRestoreAtTaskEnd: masked > 0 };
   }
 
-  throw codedError("contract_executor_unreachable", `Azione registrata ma non raggiunta dal Browser Agent 17.0.0: ${action}`, { action, executorProtocolVersion: EXECUTOR_PROTOCOL_VERSION });
+  throw codedError("contract_executor_unreachable", `Azione registrata ma non raggiunta dal Browser Agent 1.0.0: ${action}`, { action, executorProtocolVersion: EXECUTOR_PROTOCOL_VERSION });
 }
 
 async function screenshotStorageStatus(force = false, timeoutMs = SCREENSHOT_PREFLIGHT_TIMEOUT_MS) {

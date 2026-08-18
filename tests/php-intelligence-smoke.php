@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 define('PRSTUDIO_UC_TESTING', true);
-define('PRSTUDIO_UC_VERSION', '17.0.0');
+define('PRSTUDIO_UC_VERSION', '1.0.0');
 define('DAY_IN_SECONDS', 86400);
 $test_root = sys_get_temp_dir() . '/prstudio-intelligence-' . bin2hex(random_bytes(8));
 define('WP_CONTENT_DIR', $test_root);

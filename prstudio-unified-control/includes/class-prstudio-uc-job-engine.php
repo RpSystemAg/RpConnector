@@ -4,7 +4,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 /** Durable job facade: retry-safe creation, nonblocking evidence and deterministic recovery. */
 final class PRSTUDIO_UC_Job_Engine {
-	public const VERSION = '17.0.0';
+	public const VERSION = '1.0.0';
 
 	public static function create_browser_task( string $action, array $arguments, ?string $device_uuid = null, string $job_uuid = '' ): array {
 		$explicit = PRSTUDIO_UC_Idempotency::explicit_key( $arguments );

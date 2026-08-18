@@ -1,5 +1,5 @@
 # Changelog
-## 17.0.0
+## 1.0.0
 
 - Added MCP 2026-07-28 stateless core with 2025 compatibility fallback, per-result server metadata and cache hints.
 - Added lazy read-only WordPress Abilities API bridge; mutation surface remains MCP-only.

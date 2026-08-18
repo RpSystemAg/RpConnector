@@ -24,7 +24,7 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
  * nothing here resurrects work the caller is still waiting on.
  */
 final class PRSTUDIO_UC_Turn {
-    public const VERSION = '17.0.0';
+    public const VERSION = '1.0.0';
 
     /** Terminal: the work finished and the effect was verified. */
     public const COMPLETED = 'completed';

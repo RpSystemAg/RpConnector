@@ -159,7 +159,7 @@ final class WPAIB_REST {
 				$result = self::native_control_action( $route, $action, $arguments );
 			}
 		}
-		/* Complete 17.0.0 executor: every catalog action that historically had only
+		/* Complete 1.0.0 executor: every catalog action that historically had only
 		 * metadata now resolves to a concrete bounded implementation. Existing native
 		 * branches and registered adapters keep precedence to preserve compatibility. */
 		if ( null === $result && class_exists( 'PRSTUDIO_UC_Complete_Action_Executor' ) && PRSTUDIO_UC_Complete_Action_Executor::supports( $route, $action ) ) {

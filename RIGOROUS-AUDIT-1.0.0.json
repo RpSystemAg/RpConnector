@@ -1,0 +1,28 @@
+{
+  "controller_version": "2.0.0",
+  "files": {
+    "browser_extension": 64,
+    "connector_tagged": 8,
+    "hard_failures": 0,
+    "total": 209,
+    "wordpress_plugin": 145
+  },
+  "hard_failure_count": 0,
+  "hard_failures": [],
+  "policy": "no deployable file and no published tool may be omitted; file research evidence comes from the current SHA-bound five-pass web-research ledger; the retired 250-checkpoint matrix is not executed",
+  "research_5pass": {
+    "file_count": 633,
+    "ledger": "PR-STUDIO-1.0.0-WEB-RESEARCH-5PASS.json",
+    "ok": true,
+    "old_250_checkpoint_executed": false,
+    "pass_count": 5
+  },
+  "suite_version": "1.0.0",
+  "tools": {
+    "capabilities": 1371,
+    "connector_actions": 1076,
+    "hard_failures": 0,
+    "mcp_tools": 123,
+    "total_rows": 2570
+  }
+}

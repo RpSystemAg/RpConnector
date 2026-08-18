@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PR STUDIO Unified Browser Agent",
-  "version": "17.0.0",
+  "version": "1.0.0",
   "description": "Executor Browser PR STUDIO 17.0: sessione visuale controllata, input CDP nativo, screenshot percettivi, CWV, recovery Anti-Crash. Pairing e protocollo 3.0.0 restano compatibili.",
   "minimum_chrome_version": "120",
   "permissions": [

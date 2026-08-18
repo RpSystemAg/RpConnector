@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
  * polling it.
  */
 final class PRSTUDIO_UC_GC {
-    public const VERSION = '17.0.0';
+    public const VERSION = '1.0.0';
     public const HOOK = 'prstudio_uc_gc';
     public const OPTION = 'prstudio_uc_retention';
     public const LAST_RUN_OPTION = 'prstudio_uc_gc_last_run';

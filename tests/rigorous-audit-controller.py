@@ -4,7 +4,7 @@ import argparse, ast, hashlib, html.parser, json, os, re, shutil, struct, subpro
 from collections import Counter
 from pathlib import Path
 
-VERSION='17.0.0'
+VERSION='1.0.0'
 ROOT=Path(__file__).resolve().parent.parent
 EXT=ROOT/'prstudio-unified-browser-agent'
 CTRL=ROOT/'prstudio-unified-control'

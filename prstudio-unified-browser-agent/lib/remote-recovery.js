@@ -1,4 +1,4 @@
-export const REMOTE_RECOVERY_POLICY_VERSION = "17.0.0";
+export const REMOTE_RECOVERY_POLICY_VERSION = "1.0.0";
 export const REMOTE_MAX_STEP_ATTEMPTS = 2;
 export const REMOTE_MAX_FRESH_RESTARTS = 1;
 

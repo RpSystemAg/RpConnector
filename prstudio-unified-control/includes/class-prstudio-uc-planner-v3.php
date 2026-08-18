@@ -11,7 +11,7 @@ final class PRSTUDIO_UC_Planner_V3 {
         if(empty($cap['read_only']))$steps[]='anti_crash';
         $steps=array_merge($steps,array('execute','observe','report'));
         return array(
-            'version'=>'17.0.0-one-guard',
+            'version'=>'1.0.0-one-guard',
             'capability'=>$cap['id']??'',
             'mode'=>'quick',
             'steps'=>$steps,

@@ -14,7 +14,7 @@ interface PRSTUDIO_UC_Social_Provider_Interface {
  * Browser-Agent observations, but never pretends that an OAuth connector exists.
  */
 final class PRSTUDIO_UC_Social_Intelligence {
-	public const VERSION = '17.0.0';
+	public const VERSION = '1.0.0';
 	private const STATE = 'social-intelligence';
 	private const MAX_SNAPSHOTS = 500;
 	private const MAX_CONTENT_ITEMS = 100;

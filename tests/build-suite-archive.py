@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build and verify the deterministic PR STUDIO 17.0.0 suite archive."""
+"""Build and verify the deterministic PR STUDIO 1.0.0 suite archive."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
 
-VERSION = "17.0.0"
+VERSION = "1.0.0"
 FOLDER = f"PR-STUDIO-Unified-Suite-{VERSION}"
 SCRIPT = Path(__file__).resolve()
 ROOT = SCRIPT.parent.parent.resolve()

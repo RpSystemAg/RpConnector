@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 
-VERSION = "17.0.0"
+VERSION = "1.0.0"
 ROOT = Path(__file__).resolve().parent.parent
 EVIDENCE = ROOT / "test-environment" / "release-evidence"
 DEFAULT_RELEASE_EPOCH = int(datetime(2026, 8, 11, 9, 0, tzinfo=timezone.utc).timestamp())
@@ -335,7 +335,7 @@ RP Studio Connector — istruzioni operative {VERSION}
 
 Carica `prstudio-unified-control-{VERSION}.zip` come normale aggiornamento plugin WordPress. Il pacchetto deve aprirsi nella cartella `prstudio-unified-control` con bootstrap `prstudio-unified-control.php`.
 
-Ricarica come estensione unpacked la cartella `prstudio-unified-browser-agent`. La 17.0.0 usa anche `system.display` per le trasformazioni screenshot↔CSS↔screen; `prstudioConfig` e pairing restano invariati e l'upgrade normale non richiede nuovo pairing. Il pairing resta `/wp-json/prstudio-unified/v1/pair`; wire protocol 3.0.0, rolling acceptance 4.0.0.
+Ricarica come estensione unpacked la cartella `prstudio-unified-browser-agent`. La 1.0.0 usa anche `system.display` per le trasformazioni screenshot↔CSS↔screen; `prstudioConfig` e pairing restano invariati e l'upgrade normale non richiede nuovo pairing. Il pairing resta `/wp-json/prstudio-unified/v1/pair`; wire protocol 3.0.0, rolling acceptance 4.0.0.
 
 ## ChatGPT
 
@@ -482,7 +482,7 @@ Il laboratorio fixture ha {visual['baseline_captures']} baseline, {visual['candi
     write_text(f"CHANGELOG-{VERSION}.md", f"""
 # PR STUDIO Unified Suite {VERSION}
 
-- Convergenza diretta alla sola release installabile 17.0.0; milestone 11–14 conservate come gate interni.
+- Convergenza diretta alla sola release installabile 1.0.0; milestone 11–14 conservate come gate interni.
 - Corretto il contratto `lane_handle`, gli executor legacy, `browser_verify_url`, metadata read/write, PHP lint e path errors.
 - Semplificati service worker, ownership lane/session, screenshot perception-first, GSC, esecuzione locale/remota e cleanup tecnico Suite 17; eliminati takeover, approval/review e gate di verification.
 - Aggiunti scheduling DST-safe, correlation ID end-to-end, identità build e dashboard WordPress in linguaggio semplice.

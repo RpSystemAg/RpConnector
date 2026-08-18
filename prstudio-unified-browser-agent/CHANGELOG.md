@@ -1,5 +1,5 @@
 # Changelog
-## 17.0.0
+## 1.0.0
 
 - Replaced the Core Web Vitals Performance.getMetrics surrogate with a document_start PerformanceObserver collector following web-vitals 6.0.1 metric semantics for LCP, CLS and INP.
 - Added BFCache and browser-supported soft-navigation metric segmentation.

@@ -15,7 +15,7 @@ const overlay = JSON.parse(await read('prstudio-unified-control/capabilities/age
 const manifest = JSON.parse(await read('prstudio-unified-browser-agent/manifest.json'));
 
 assert.match(toolchain, /public const VERSION = '17\.0\.0'/);
-assert.equal(manifest.version, '17.0.0');
+assert.equal(manifest.version, '1.0.0');
 assert.deepEqual(manifest.permissions, ['tabs','scripting','storage','debugger','sidePanel','notifications','alarms','windows','system.display','activeTab','tabCapture','offscreen','contextMenus']);
 
 const requiredCaps = [
@@ -27,7 +27,7 @@ const requiredCaps = [
 for (const id of requiredCaps) {
   const cap = overlay.capabilities.find((row) => row.id === id);
   assert.ok(cap, `missing capability ${id}`);
-  assert.equal(cap.version, '17.0.0', `${id} version drift`);
+  assert.equal(cap.version, '1.0.0', `${id} version drift`);
   assert.match(cap.executor, /^PRSTUDIO_UC_MCP_Toolchain::/);
 }
 assert.equal(overlay.capabilities.find((row) => row.id === 'toolchain.sidecar.call')?.risk_level, 'high');
@@ -107,7 +107,7 @@ assert.match(sidepanel, /mcp_toolchain_profiles/);
 
 // Do not add a second remote contract just for toolchain federation.
 assert.doesNotMatch(rest, /register_rest_route[\s\S]{0,160}toolchain/i);
-assert.equal(overlay.schema_version, '17.0.0');
-assert.equal(overlay.suite_version, '17.0.0');
+assert.equal(overlay.schema_version, '1.0.0');
+assert.equal(overlay.suite_version, '1.0.0');
 
-console.log('PASS MCP toolchain integration: native-first, pinned optional sidecars, sandboxed processes, unchanged 17.0.0 install/pairing with audited WebRTC Chrome permission expansion.');
+console.log('PASS MCP toolchain integration: native-first, pinned optional sidecars, sandboxed processes, unchanged 1.0.0 install/pairing with audited WebRTC Chrome permission expansion.');

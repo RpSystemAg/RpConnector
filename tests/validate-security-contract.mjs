@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * PR STUDIO Unified Suite 17.0.0 security contract gate.
+ * PR STUDIO Unified Suite 1.0.0 security contract gate.
  *
  * This test deliberately combines executable unit checks for the Browser Agent
  * pure modules with focused source-contract checks for Chrome/WordPress code
@@ -90,7 +90,7 @@ const protocol = await importModule(
 );
 
 await check("release identity and stable wire protocol", () => {
-  assert.equal(executorMeta.SUITE_VERSION, "17.0.0");
+  assert.equal(executorMeta.SUITE_VERSION, "1.0.0");
   assert.equal(executorMeta.EXECUTOR_PROTOCOL_VERSION, "3.0.0");
   assert.equal(executorMeta.LEGACY_PAIRING_COMPATIBILITY, "2.0.0");
   assert.match(bootstrapSource, /\* Version:\s+17\.0\.0\b/);
@@ -108,7 +108,7 @@ await check("Chrome manifest uses exact lowercase MV3 entrypoint", () => {
   assert.ok(existsSync(manifestPath));
   const manifest = JSON.parse(read(manifestPath));
   assert.equal(manifest.manifest_version, 3);
-  assert.equal(manifest.version, "17.0.0");
+  assert.equal(manifest.version, "1.0.0");
   assert.deepEqual(manifest.background, { service_worker: "service-worker.js", type: "module" });
   for (const permission of ["alarms", "debugger", "sidePanel", "storage", "tabs", "windows"]) {
     assert.ok(manifest.permissions.includes(permission), `missing Chrome permission: ${permission}`);
@@ -508,7 +508,7 @@ await check("bounded browser runtime and public execution credentials", () => {
 
 const failed = results.filter((result) => !result.ok);
 const summary = {
-  suiteVersion: "17.0.0",
+  suiteVersion: "1.0.0",
   test: "validate-security-contract-stable-mcp",
   mcpProfile: "2026-07-28+2025-compat/no-mandatory-tasks",
   passed: results.length - failed.length,

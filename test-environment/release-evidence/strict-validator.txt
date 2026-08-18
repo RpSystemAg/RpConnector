@@ -1,14 +1,14 @@
-PR STUDIO 17.0.0 release validator (strict mode)
-Root: /mnt/data/prstudio_work/PR-STUDIO-Unified-Suite-17.0.0
+PR STUDIO 1.0.0 release validator (strict mode)
+Root: /mnt/data/prstudio_work/PR-STUDIO-Unified-Suite-1.0.0
 
 
-PASS required draft artifact: ARCHITECTURE-17.0.0.md
-PASS required draft artifact: H24-OPERATIONS-17.0.0.md
-PASS required draft artifact: MCP-TOOLCHAIN-17.0.0.md
-PASS required draft artifact: SOCIAL-CONNECTORS-17.0.0.md
-PASS required draft artifact: RP-STUDIO-CHATGPT-PLUGIN-17.0.0.json
-PASS required draft artifact: RP-STUDIO-CHATGPT-PLUGIN-INSTRUCTIONS-17.0.0.txt
-PASS required draft artifact: RP-STUDIO-CHATGPT-PLUGIN-SETUP-17.0.0.md
+PASS required draft artifact: ARCHITECTURE-1.0.0.md
+PASS required draft artifact: H24-OPERATIONS-1.0.0.md
+PASS required draft artifact: MCP-TOOLCHAIN-1.0.0.md
+PASS required draft artifact: SOCIAL-CONNECTORS-1.0.0.md
+PASS required draft artifact: RP-STUDIO-CHATGPT-PLUGIN-1.0.0.json
+PASS required draft artifact: RP-STUDIO-CHATGPT-PLUGIN-INSTRUCTIONS-1.0.0.txt
+PASS required draft artifact: RP-STUDIO-CHATGPT-PLUGIN-SETUP-1.0.0.md
 PASS required draft artifact: tests/php-intelligence-smoke.php
 PASS required draft artifact: tests/php-toolchain-smoke.php
 PASS required draft artifact: tests/php-operational-completeness-smoke.php
@@ -39,45 +39,45 @@ PASS required draft artifact: tests/validate-browser-enterprise-hardening.mjs
 PASS required draft artifact: tests/validate-mcp-toolchain.mjs
 PASS required draft artifact: tests/rigorous-audit-controller.py
 PASS required draft artifact: tests/php-health-integrity-smoke.php
-PASS required draft artifact: RIGOROUS-AUDIT-17.0.0.json
-PASS required draft artifact: RIGOROUS-AUDIT-FILES-17.0.0.ndjson
-PASS required draft artifact: RIGOROUS-AUDIT-TOOLS-17.0.0.ndjson
+PASS required draft artifact: RIGOROUS-AUDIT-1.0.0.json
+PASS required draft artifact: RIGOROUS-AUDIT-FILES-1.0.0.ndjson
+PASS required draft artifact: RIGOROUS-AUDIT-TOOLS-1.0.0.ndjson
 PASS required draft artifact: prstudio-unified-browser-agent/tests/sidepanel-ui.test.mjs
 PASS required draft artifact: tests/validate-release.mjs
-PASS final artifact present: INSTALL-CONNECTION-COMPATIBILITY-17.0.0.json
-PASS final artifact present: LIVE-ACCEPTANCE-17.0.0.md
-PASS final artifact present: MCP-PLUGIN-PREFLIGHT-17.0.0.json
-PASS final artifact present: PERFORMANCE-BENCHMARK-17.0.0.json
-PASS final artifact present: QUALITY-GATE-17.0.0.json
-PASS final artifact present: RELEASE-MANIFEST-17.0.0.json
-PASS final artifact present: SECURITY-HARDENING-17.0.0.json
-PASS final artifact present: TEST-REPORT-17.0.0.json
-PASS final artifact present: COMPONENT-SHA256SUMS-17.0.0.txt
-PASS final artifact present: prstudio-unified-control-17.0.0.zip
-PASS final artifact present: prstudio-unified-browser-agent-17.0.0.zip
+PASS final artifact present: INSTALL-CONNECTION-COMPATIBILITY-1.0.0.json
+PASS final artifact present: LIVE-ACCEPTANCE-1.0.0.md
+PASS final artifact present: MCP-PLUGIN-PREFLIGHT-1.0.0.json
+PASS final artifact present: PERFORMANCE-BENCHMARK-1.0.0.json
+PASS final artifact present: QUALITY-GATE-1.0.0.json
+PASS final artifact present: RELEASE-MANIFEST-1.0.0.json
+PASS final artifact present: SECURITY-HARDENING-1.0.0.json
+PASS final artifact present: TEST-REPORT-1.0.0.json
+PASS final artifact present: COMPONENT-SHA256SUMS-1.0.0.txt
+PASS final artifact present: prstudio-unified-control-1.0.0.zip
+PASS final artifact present: prstudio-unified-browser-agent-1.0.0.zip
 PASS filesystem paths are unique case-insensitively
 PASS strict JSON parse with duplicate-key detection
 PASS JSON Schema properties are objects, never arrays
-PASS ARCHITECTURE-17.0.0.md: 17.0.0 anchor present
-PASS ARCHITECTURE-17.0.0.md: no stale 5.0.0/5.0.1 anchor
-PASS H24-OPERATIONS-17.0.0.md: 17.0.0 anchor present
-PASS H24-OPERATIONS-17.0.0.md: no stale 5.0.0/5.0.1 anchor
-PASS MCP-TOOLCHAIN-17.0.0.md: 17.0.0 anchor present
-PASS MCP-TOOLCHAIN-17.0.0.md: no stale 5.0.0/5.0.1 anchor
-PASS SOCIAL-CONNECTORS-17.0.0.md: 17.0.0 anchor present
-PASS SOCIAL-CONNECTORS-17.0.0.md: no stale 5.0.0/5.0.1 anchor
-PASS RP-STUDIO-CHATGPT-PLUGIN-17.0.0.json: 17.0.0 anchor present
-PASS RP-STUDIO-CHATGPT-PLUGIN-17.0.0.json: no stale 5.0.0/5.0.1 anchor
-PASS RP-STUDIO-CHATGPT-PLUGIN-INSTRUCTIONS-17.0.0.txt: 17.0.0 anchor present
-PASS RP-STUDIO-CHATGPT-PLUGIN-INSTRUCTIONS-17.0.0.txt: no stale 5.0.0/5.0.1 anchor
-PASS RP-STUDIO-CHATGPT-PLUGIN-SETUP-17.0.0.md: 17.0.0 anchor present
-PASS RP-STUDIO-CHATGPT-PLUGIN-SETUP-17.0.0.md: no stale 5.0.0/5.0.1 anchor
-PASS RIGOROUS-AUDIT-17.0.0.json: 17.0.0 anchor present
-PASS RIGOROUS-AUDIT-17.0.0.json: no stale 5.0.0/5.0.1 anchor
-PASS RIGOROUS-AUDIT-FILES-17.0.0.ndjson: 17.0.0 anchor present
-PASS RIGOROUS-AUDIT-FILES-17.0.0.ndjson: no stale 5.0.0/5.0.1 anchor
-PASS RIGOROUS-AUDIT-TOOLS-17.0.0.ndjson: 17.0.0 anchor present
-PASS RIGOROUS-AUDIT-TOOLS-17.0.0.ndjson: no stale 5.0.0/5.0.1 anchor
+PASS ARCHITECTURE-1.0.0.md: 1.0.0 anchor present
+PASS ARCHITECTURE-1.0.0.md: no stale 5.0.0/5.0.1 anchor
+PASS H24-OPERATIONS-1.0.0.md: 1.0.0 anchor present
+PASS H24-OPERATIONS-1.0.0.md: no stale 5.0.0/5.0.1 anchor
+PASS MCP-TOOLCHAIN-1.0.0.md: 1.0.0 anchor present
+PASS MCP-TOOLCHAIN-1.0.0.md: no stale 5.0.0/5.0.1 anchor
+PASS SOCIAL-CONNECTORS-1.0.0.md: 1.0.0 anchor present
+PASS SOCIAL-CONNECTORS-1.0.0.md: no stale 5.0.0/5.0.1 anchor
+PASS RP-STUDIO-CHATGPT-PLUGIN-1.0.0.json: 1.0.0 anchor present
+PASS RP-STUDIO-CHATGPT-PLUGIN-1.0.0.json: no stale 5.0.0/5.0.1 anchor
+PASS RP-STUDIO-CHATGPT-PLUGIN-INSTRUCTIONS-1.0.0.txt: 1.0.0 anchor present
+PASS RP-STUDIO-CHATGPT-PLUGIN-INSTRUCTIONS-1.0.0.txt: no stale 5.0.0/5.0.1 anchor
+PASS RP-STUDIO-CHATGPT-PLUGIN-SETUP-1.0.0.md: 1.0.0 anchor present
+PASS RP-STUDIO-CHATGPT-PLUGIN-SETUP-1.0.0.md: no stale 5.0.0/5.0.1 anchor
+PASS RIGOROUS-AUDIT-1.0.0.json: 1.0.0 anchor present
+PASS RIGOROUS-AUDIT-1.0.0.json: no stale 5.0.0/5.0.1 anchor
+PASS RIGOROUS-AUDIT-FILES-1.0.0.ndjson: 1.0.0 anchor present
+PASS RIGOROUS-AUDIT-FILES-1.0.0.ndjson: no stale 5.0.0/5.0.1 anchor
+PASS RIGOROUS-AUDIT-TOOLS-1.0.0.ndjson: 1.0.0 anchor present
+PASS RIGOROUS-AUDIT-TOOLS-1.0.0.ndjson: no stale 5.0.0/5.0.1 anchor
 PASS descriptor schema version
 PASS descriptor role is explicit
 PASS descriptor release version
@@ -227,98 +227,98 @@ PASS MCP batch limit guard
 PASS OAuth never adds an unrequested write scope — current source must be corrected before strict release
 PASS generic capability gateway uses conservative destructive annotation — current=false,false,false,true
 PASS root ChatGPT drafts contain no credential material
-PASS INSTALL-CONNECTION-COMPATIBILITY-17.0.0.json: active version fields are 17.0.0
-PASS MCP-PLUGIN-PREFLIGHT-17.0.0.json: active version fields are 17.0.0
-PASS ONE-GUARD-BENCHMARK-17.0.0.json: active version fields are 17.0.0
-PASS ONE-GUARD-STATUS-17.0.0.json: active version fields are 17.0.0
-PASS PERFORMANCE-BENCHMARK-17.0.0.json: active version fields are 17.0.0
-PASS QUALITY-GATE-17.0.0.json: active version fields are 17.0.0
-PASS RELEASE-MANIFEST-17.0.0.json: active version fields are 17.0.0
-PASS RIGOROUS-AUDIT-17.0.0.json: active version fields are 17.0.0
-PASS RP-STUDIO-CHATGPT-PLUGIN-17.0.0.json: active version fields are 17.0.0
-PASS SECURITY-HARDENING-17.0.0.json: active version fields are 17.0.0
-PASS TEST-REPORT-17.0.0.json: active version fields are 17.0.0
+PASS INSTALL-CONNECTION-COMPATIBILITY-1.0.0.json: active version fields are 1.0.0
+PASS MCP-PLUGIN-PREFLIGHT-1.0.0.json: active version fields are 1.0.0
+PASS ONE-GUARD-BENCHMARK-1.0.0.json: active version fields are 1.0.0
+PASS ONE-GUARD-STATUS-1.0.0.json: active version fields are 1.0.0
+PASS PERFORMANCE-BENCHMARK-1.0.0.json: active version fields are 1.0.0
+PASS QUALITY-GATE-1.0.0.json: active version fields are 1.0.0
+PASS RELEASE-MANIFEST-1.0.0.json: active version fields are 1.0.0
+PASS RIGOROUS-AUDIT-1.0.0.json: active version fields are 1.0.0
+PASS RP-STUDIO-CHATGPT-PLUGIN-1.0.0.json: active version fields are 1.0.0
+PASS SECURITY-HARDENING-1.0.0.json: active version fields are 1.0.0
+PASS TEST-REPORT-1.0.0.json: active version fields are 1.0.0
 PASS Browser source uses exact lowercase manifest.json — case is part of the cross-platform package contract
 PASS Browser source has no colliding MANIFEST.json — rename component metadata to COMPONENT-MANIFEST.json
-PASS Control plugin header is 17.0.0 — source editing is intentionally outside this draft task
-PASS Control product constant is 17.0.0 — source editing is intentionally outside this draft task
-PASS MCP server version is 17.0.0 — source editing is intentionally outside this draft task
-PASS Control BUILD-INFO version is 17.0.0 — source editing is intentionally outside this draft task
-PASS Control component manifest version is 17.0.0 — source editing is intentionally outside this draft task
-PASS Browser BUILD-INFO versions are 17.0.0 — source editing is intentionally outside this draft task
-PASS Chrome manifest product version is 17.0.0 — source editing is intentionally outside this draft task
-PASS Browser executor product version is 17.0.0 — source editing is intentionally outside this draft task
-PASS prstudio-unified-control-17.0.0.zip: safe unique paths
-PASS prstudio-unified-control-17.0.0.zip: single stable top-level folder — prstudio-unified-control
-PASS prstudio-unified-control-17.0.0.zip: byte-for-byte source parity — missing=-; extra=-; changed=-
-PASS prstudio-unified-control-17.0.0.zip: CRC and decompression — 144 files
-PASS prstudio-unified-browser-agent-17.0.0.zip: safe unique paths
-PASS prstudio-unified-browser-agent-17.0.0.zip: single stable top-level folder — prstudio-unified-browser-agent
-PASS prstudio-unified-browser-agent-17.0.0.zip: lowercase Chrome manifest
-PASS prstudio-unified-browser-agent-17.0.0.zip: no MANIFEST.json collision
-PASS prstudio-unified-browser-agent-17.0.0.zip: byte-for-byte source parity — missing=-; extra=-; changed=-
-PASS prstudio-unified-browser-agent-17.0.0.zip: CRC and decompression — 61 files
+PASS Control plugin header is 1.0.0 — source editing is intentionally outside this draft task
+PASS Control product constant is 1.0.0 — source editing is intentionally outside this draft task
+PASS MCP server version is 1.0.0 — source editing is intentionally outside this draft task
+PASS Control BUILD-INFO version is 1.0.0 — source editing is intentionally outside this draft task
+PASS Control component manifest version is 1.0.0 — source editing is intentionally outside this draft task
+PASS Browser BUILD-INFO versions are 1.0.0 — source editing is intentionally outside this draft task
+PASS Chrome manifest product version is 1.0.0 — source editing is intentionally outside this draft task
+PASS Browser executor product version is 1.0.0 — source editing is intentionally outside this draft task
+PASS prstudio-unified-control-1.0.0.zip: safe unique paths
+PASS prstudio-unified-control-1.0.0.zip: single stable top-level folder — prstudio-unified-control
+PASS prstudio-unified-control-1.0.0.zip: byte-for-byte source parity — missing=-; extra=-; changed=-
+PASS prstudio-unified-control-1.0.0.zip: CRC and decompression — 144 files
+PASS prstudio-unified-browser-agent-1.0.0.zip: safe unique paths
+PASS prstudio-unified-browser-agent-1.0.0.zip: single stable top-level folder — prstudio-unified-browser-agent
+PASS prstudio-unified-browser-agent-1.0.0.zip: lowercase Chrome manifest
+PASS prstudio-unified-browser-agent-1.0.0.zip: no MANIFEST.json collision
+PASS prstudio-unified-browser-agent-1.0.0.zip: byte-for-byte source parity — missing=-; extra=-; changed=-
+PASS prstudio-unified-browser-agent-1.0.0.zip: CRC and decompression — 61 files
 PASS release manifest version
 PASS release manifest top-level folder
 PASS release manifest component ZIP names
-PASS release artifact bytes: ARCHITECTURE-17.0.0.md — 1858 != 1858
-PASS release artifact SHA-256: ARCHITECTURE-17.0.0.md
-PASS release artifact bytes: H24-OPERATIONS-17.0.0.md — 1446 != 1446
-PASS release artifact SHA-256: H24-OPERATIONS-17.0.0.md
-PASS release artifact bytes: INSTALL-CONNECTION-COMPATIBILITY-17.0.0.json — 1853 != 1853
-PASS release artifact SHA-256: INSTALL-CONNECTION-COMPATIBILITY-17.0.0.json
-PASS release artifact bytes: LIVE-ACCEPTANCE-17.0.0.md — 864 != 864
-PASS release artifact SHA-256: LIVE-ACCEPTANCE-17.0.0.md
-PASS release artifact bytes: MCP-PLUGIN-PREFLIGHT-17.0.0.json — 1568 != 1568
-PASS release artifact SHA-256: MCP-PLUGIN-PREFLIGHT-17.0.0.json
-PASS release artifact bytes: PERFORMANCE-BENCHMARK-17.0.0.json — 7235 != 7235
-PASS release artifact SHA-256: PERFORMANCE-BENCHMARK-17.0.0.json
-PASS release artifact bytes: PR-STUDIO-17.0.0-FINAL-REPORT.md — 11081 != 11081
-PASS release artifact SHA-256: PR-STUDIO-17.0.0-FINAL-REPORT.md
-PASS release artifact bytes: QUALITY-GATE-17.0.0.json — 1244 != 1244
-PASS release artifact SHA-256: QUALITY-GATE-17.0.0.json
-PASS release artifact bytes: RP-STUDIO-CHATGPT-PLUGIN-17.0.0.json — 6875 != 6875
-PASS release artifact SHA-256: RP-STUDIO-CHATGPT-PLUGIN-17.0.0.json
-PASS release artifact bytes: RP-STUDIO-CHATGPT-PLUGIN-INSTRUCTIONS-17.0.0.txt — 1449 != 1449
-PASS release artifact SHA-256: RP-STUDIO-CHATGPT-PLUGIN-INSTRUCTIONS-17.0.0.txt
-PASS release artifact bytes: RP-STUDIO-CHATGPT-PLUGIN-SETUP-17.0.0.md — 1485 != 1485
-PASS release artifact SHA-256: RP-STUDIO-CHATGPT-PLUGIN-SETUP-17.0.0.md
-PASS release artifact bytes: SECURITY-HARDENING-17.0.0.json — 1542 != 1542
-PASS release artifact SHA-256: SECURITY-HARDENING-17.0.0.json
-PASS release artifact bytes: SOCIAL-CONNECTORS-17.0.0.md — 694 != 694
-PASS release artifact SHA-256: SOCIAL-CONNECTORS-17.0.0.md
-PASS release artifact bytes: TEST-REPORT-17.0.0.json — 1661 != 1661
-PASS release artifact SHA-256: TEST-REPORT-17.0.0.json
-PASS release artifact bytes: VISIONE-E-DECISIONI-17.0.0.md — 1477 != 1477
-PASS release artifact SHA-256: VISIONE-E-DECISIONI-17.0.0.md
-PASS release artifact bytes: prstudio-unified-browser-agent-17.0.0.zip — 252332 != 252332
-PASS release artifact SHA-256: prstudio-unified-browser-agent-17.0.0.zip
-PASS release artifact bytes: prstudio-unified-control-17.0.0.zip — 1254065 != 1254065
-PASS release artifact SHA-256: prstudio-unified-control-17.0.0.zip
-PASS COMPONENT-SHA256SUMS-17.0.0.txt: ARCHITECTURE-17.0.0.md
-PASS COMPONENT-SHA256SUMS-17.0.0.txt: H24-OPERATIONS-17.0.0.md
-PASS COMPONENT-SHA256SUMS-17.0.0.txt: INSTALL-CONNECTION-COMPATIBILITY-17.0.0.json
-PASS COMPONENT-SHA256SUMS-17.0.0.txt: LIVE-ACCEPTANCE-17.0.0.md
-PASS COMPONENT-SHA256SUMS-17.0.0.txt: MCP-PLUGIN-PREFLIGHT-17.0.0.json
-PASS COMPONENT-SHA256SUMS-17.0.0.txt: PERFORMANCE-BENCHMARK-17.0.0.json
-PASS COMPONENT-SHA256SUMS-17.0.0.txt: PR-STUDIO-17.0.0-FINAL-REPORT.md
-PASS COMPONENT-SHA256SUMS-17.0.0.txt: prstudio-unified-browser-agent-17.0.0.zip
-PASS COMPONENT-SHA256SUMS-17.0.0.txt: prstudio-unified-control-17.0.0.zip
-PASS COMPONENT-SHA256SUMS-17.0.0.txt: QUALITY-GATE-17.0.0.json
-PASS COMPONENT-SHA256SUMS-17.0.0.txt: RELEASE-MANIFEST-17.0.0.json
-PASS COMPONENT-SHA256SUMS-17.0.0.txt: RP-STUDIO-CHATGPT-PLUGIN-17.0.0.json
-PASS COMPONENT-SHA256SUMS-17.0.0.txt: RP-STUDIO-CHATGPT-PLUGIN-INSTRUCTIONS-17.0.0.txt
-PASS COMPONENT-SHA256SUMS-17.0.0.txt: RP-STUDIO-CHATGPT-PLUGIN-SETUP-17.0.0.md
-PASS COMPONENT-SHA256SUMS-17.0.0.txt: SECURITY-HARDENING-17.0.0.json
-PASS COMPONENT-SHA256SUMS-17.0.0.txt: SOCIAL-CONNECTORS-17.0.0.md
-PASS COMPONENT-SHA256SUMS-17.0.0.txt: TEST-REPORT-17.0.0.json
-PASS COMPONENT-SHA256SUMS-17.0.0.txt: VISIONE-E-DECISIONI-17.0.0.md
-PASS security contract suite — PASS release identity and stable wire protocol PASS Chrome manifest uses exact lowercase MV3 entrypoint PASS raw CDP policy is an exact read-only allowlist PASS critical-action classifier covers native and mutating paths PASS protocol rejects caller-supplied raw CDP while sensitive actions remain typed telemetry without approval gates PASS typed protocol maps observation, social and native input safely PASS observation redaction removes secrets without mutating evidence PASS observation envelopes mark all page content as untrusted data PASS native pointer and keyboard execution compiles only to bounded Input CDP PASS restart recovery terminalizes uncertain mutation without human approval or blind replay PASS pairing is HTTPS-bound, redirect-free and same-origin PASS owned-tab registry prevents fallback to personal user tabs PASS page fetch cannot export an authenticated cross-origin session PASS Browser runtime integrates abort, observer-only user activity and Anti-Crash-only checkpoints PASS control contract exposes the seven audited additive browser operations PASS SQL store v4 provides durable jobs, schedules, dead letters and ownership PASS SQL job ownership claim is atomic and immutable PASS Browser task completion reconciles its durable parent job PASS OAuth scopes stay explicit and offline credentials are conditional PASS MCP publishes the stable 2026 core with bounded 2025 compatibility and no mandatory Tasks surface PASS MCP durable job and agency control require OAuth ownership PASS MCP option ownership registry uses bounded compare-and-swap PASS MCP tool catalog preserves the 81-tool 10.0 baseline and allows additive tools PASS bounded browser runtime and public execution credentials {"suiteVersion":"17.0.0","test":"validate-security-contract-stable-mcp","mcpProfile":"2026-07-28+2025-compat/no-mandatory-tasks","passed":24,"failed":0,"total":24,"durationMs":14.67,"status":"passed"}
+PASS release artifact bytes: ARCHITECTURE-1.0.0.md — 1858 != 1858
+PASS release artifact SHA-256: ARCHITECTURE-1.0.0.md
+PASS release artifact bytes: H24-OPERATIONS-1.0.0.md — 1446 != 1446
+PASS release artifact SHA-256: H24-OPERATIONS-1.0.0.md
+PASS release artifact bytes: INSTALL-CONNECTION-COMPATIBILITY-1.0.0.json — 1853 != 1853
+PASS release artifact SHA-256: INSTALL-CONNECTION-COMPATIBILITY-1.0.0.json
+PASS release artifact bytes: LIVE-ACCEPTANCE-1.0.0.md — 864 != 864
+PASS release artifact SHA-256: LIVE-ACCEPTANCE-1.0.0.md
+PASS release artifact bytes: MCP-PLUGIN-PREFLIGHT-1.0.0.json — 1568 != 1568
+PASS release artifact SHA-256: MCP-PLUGIN-PREFLIGHT-1.0.0.json
+PASS release artifact bytes: PERFORMANCE-BENCHMARK-1.0.0.json — 7235 != 7235
+PASS release artifact SHA-256: PERFORMANCE-BENCHMARK-1.0.0.json
+PASS release artifact bytes: PR-STUDIO-1.0.0-FINAL-REPORT.md — 11081 != 11081
+PASS release artifact SHA-256: PR-STUDIO-1.0.0-FINAL-REPORT.md
+PASS release artifact bytes: QUALITY-GATE-1.0.0.json — 1244 != 1244
+PASS release artifact SHA-256: QUALITY-GATE-1.0.0.json
+PASS release artifact bytes: RP-STUDIO-CHATGPT-PLUGIN-1.0.0.json — 6875 != 6875
+PASS release artifact SHA-256: RP-STUDIO-CHATGPT-PLUGIN-1.0.0.json
+PASS release artifact bytes: RP-STUDIO-CHATGPT-PLUGIN-INSTRUCTIONS-1.0.0.txt — 1449 != 1449
+PASS release artifact SHA-256: RP-STUDIO-CHATGPT-PLUGIN-INSTRUCTIONS-1.0.0.txt
+PASS release artifact bytes: RP-STUDIO-CHATGPT-PLUGIN-SETUP-1.0.0.md — 1485 != 1485
+PASS release artifact SHA-256: RP-STUDIO-CHATGPT-PLUGIN-SETUP-1.0.0.md
+PASS release artifact bytes: SECURITY-HARDENING-1.0.0.json — 1542 != 1542
+PASS release artifact SHA-256: SECURITY-HARDENING-1.0.0.json
+PASS release artifact bytes: SOCIAL-CONNECTORS-1.0.0.md — 694 != 694
+PASS release artifact SHA-256: SOCIAL-CONNECTORS-1.0.0.md
+PASS release artifact bytes: TEST-REPORT-1.0.0.json — 1661 != 1661
+PASS release artifact SHA-256: TEST-REPORT-1.0.0.json
+PASS release artifact bytes: VISIONE-E-DECISIONI-1.0.0.md — 1477 != 1477
+PASS release artifact SHA-256: VISIONE-E-DECISIONI-1.0.0.md
+PASS release artifact bytes: prstudio-unified-browser-agent-1.0.0.zip — 252332 != 252332
+PASS release artifact SHA-256: prstudio-unified-browser-agent-1.0.0.zip
+PASS release artifact bytes: prstudio-unified-control-1.0.0.zip — 1254065 != 1254065
+PASS release artifact SHA-256: prstudio-unified-control-1.0.0.zip
+PASS COMPONENT-SHA256SUMS-1.0.0.txt: ARCHITECTURE-1.0.0.md
+PASS COMPONENT-SHA256SUMS-1.0.0.txt: H24-OPERATIONS-1.0.0.md
+PASS COMPONENT-SHA256SUMS-1.0.0.txt: INSTALL-CONNECTION-COMPATIBILITY-1.0.0.json
+PASS COMPONENT-SHA256SUMS-1.0.0.txt: LIVE-ACCEPTANCE-1.0.0.md
+PASS COMPONENT-SHA256SUMS-1.0.0.txt: MCP-PLUGIN-PREFLIGHT-1.0.0.json
+PASS COMPONENT-SHA256SUMS-1.0.0.txt: PERFORMANCE-BENCHMARK-1.0.0.json
+PASS COMPONENT-SHA256SUMS-1.0.0.txt: PR-STUDIO-1.0.0-FINAL-REPORT.md
+PASS COMPONENT-SHA256SUMS-1.0.0.txt: prstudio-unified-browser-agent-1.0.0.zip
+PASS COMPONENT-SHA256SUMS-1.0.0.txt: prstudio-unified-control-1.0.0.zip
+PASS COMPONENT-SHA256SUMS-1.0.0.txt: QUALITY-GATE-1.0.0.json
+PASS COMPONENT-SHA256SUMS-1.0.0.txt: RELEASE-MANIFEST-1.0.0.json
+PASS COMPONENT-SHA256SUMS-1.0.0.txt: RP-STUDIO-CHATGPT-PLUGIN-1.0.0.json
+PASS COMPONENT-SHA256SUMS-1.0.0.txt: RP-STUDIO-CHATGPT-PLUGIN-INSTRUCTIONS-1.0.0.txt
+PASS COMPONENT-SHA256SUMS-1.0.0.txt: RP-STUDIO-CHATGPT-PLUGIN-SETUP-1.0.0.md
+PASS COMPONENT-SHA256SUMS-1.0.0.txt: SECURITY-HARDENING-1.0.0.json
+PASS COMPONENT-SHA256SUMS-1.0.0.txt: SOCIAL-CONNECTORS-1.0.0.md
+PASS COMPONENT-SHA256SUMS-1.0.0.txt: TEST-REPORT-1.0.0.json
+PASS COMPONENT-SHA256SUMS-1.0.0.txt: VISIONE-E-DECISIONI-1.0.0.md
+PASS security contract suite — PASS release identity and stable wire protocol PASS Chrome manifest uses exact lowercase MV3 entrypoint PASS raw CDP policy is an exact read-only allowlist PASS critical-action classifier covers native and mutating paths PASS protocol rejects caller-supplied raw CDP while sensitive actions remain typed telemetry without approval gates PASS typed protocol maps observation, social and native input safely PASS observation redaction removes secrets without mutating evidence PASS observation envelopes mark all page content as untrusted data PASS native pointer and keyboard execution compiles only to bounded Input CDP PASS restart recovery terminalizes uncertain mutation without human approval or blind replay PASS pairing is HTTPS-bound, redirect-free and same-origin PASS owned-tab registry prevents fallback to personal user tabs PASS page fetch cannot export an authenticated cross-origin session PASS Browser runtime integrates abort, observer-only user activity and Anti-Crash-only checkpoints PASS control contract exposes the seven audited additive browser operations PASS SQL store v4 provides durable jobs, schedules, dead letters and ownership PASS SQL job ownership claim is atomic and immutable PASS Browser task completion reconciles its durable parent job PASS OAuth scopes stay explicit and offline credentials are conditional PASS MCP publishes the stable 2026 core with bounded 2025 compatibility and no mandatory Tasks surface PASS MCP durable job and agency control require OAuth ownership PASS MCP option ownership registry uses bounded compare-and-swap PASS MCP tool catalog preserves the 81-tool 10.0 baseline and allows additive tools PASS bounded browser runtime and public execution credentials {"suiteVersion":"1.0.0","test":"validate-security-contract-stable-mcp","mcpProfile":"2026-07-28+2025-compat/no-mandatory-tasks","passed":24,"failed":0,"total":24,"durationMs":14.67,"status":"passed"}
 PASS runtime regression suite — runtime-regressions: PASS
 PASS Browser runtime/security + Side Panel UI + migration tests — TAP version 13 # Subtest: agent-created tabs keep provisional ownership across about:blank and pendingUrl ok 1 - agent-created tabs keep provisional ownership across about:blank and pendingUrl --- duration_ms: 1.540596 type: 'test' ... # Subtest: raw CDP uses an exact read-only allowlist and separate internal privilege ok 2 - raw CDP uses an exact read-only allowlist and separate internal privilege --- duration_ms: 0.487664 type: 'test' ... # Subtest: sensitive runtime actions are operational with telemetry classification and no approval gate ok 3 - sensitive runtime actions are operational with telemetry classification and no approval gate --- duration_ms: 1.331536 type: 'test' ... # Subtest: critical and mutating classification inspects nested custom actions ok 4 - critical and mutating classification inspects nested custom actions --- duration_ms: 1.01781 type: 'test' ... # Subtest: native pointer, drag, touch, wheel and keyboard build bounded exact CDP commands ok 5 - native pointer, drag, touch, wheel and keyboard build bounded exact CDP commands --- duration_ms: 1.584081 type: 'test' ... # Subtest: mutating in-flight or committing work never replays after restart ok 6 - mutating in-flight or committing work never replays after restart --- duration_ms: 7.993953 type: 'test' ... # Subtest: sensitive browser executor is exact, telemetry-classified, and raw CDP remains blocked ok 7 - sensitive browser executor is exact, telemetry-classified, and raw CDP remains blocked --- duration_ms: 3.305575 type: 'test' ... # Subtest: service worker statically preserves pairing/protocol and checkpoint security order ok 8 - service worker statically preserves pairing/protocol and checkpoint security order --- duration_ms: 2.5276 type: 'test' ... # Subtest: lane ownership survives task boundaries without re-adoption ok 9 - lane ownership survives task boundaries without re-adoption --- duration_ms: 0.702042 type: 'test' ... # Subtest: agent tab creation claims about:blank before target navigation ok 10 - agent tab creation claims about:blank before target navigation --- duration_ms: 3.862051 type: 'test' ... # Subtest: browser batch compiles action+arguments without a syntax discovery round-trip ok 11 - browser batch compiles action+arguments without a syntax discovery round-trip --- duration_ms: 0.383349 type: 'test' ... # Subtest: native pointer aliases normalize before exact CDP dispatch ok 12 - native pointer aliases normalize before exact CDP dispatch --- duration_ms: 0.224413 type: 'test' ... # Subtest: remote self-healing only restarts from zero after two safe failures ok 13 - remote self-healing only restarts from zero after two safe failures --- duration_ms: 2.393041 type: 'test' ... # Subtest: responsive matrix no-progress watchdog is progress-aware and bounded ok 14 - responsive matrix no-progress watchdog is progress-aware and bounded --- duration_ms: 2.262968 type: 'test' ... # Subtest: service worker contains bounded queue self-healing and internal-scroll fallback ok 15 - service worker contains bounded queue self-healing and internal-scroll fallback --- duration_ms: 1.915152 type: 'test' ... # Subtest: native-input timeout remains typed technical failure even though parse errors can restart ok 16 - native-input timeout remains typed technical failure even though parse errors can restart --- duration_ms: 0.77525 type: 'test' ... # Subtest: policy helper exports are operational and deterministic ok 17 - policy helper exports are operational and deterministic --- duration_ms: 0.462507 type: 'test' ... # Subtest: legacy interaction pacer and execution circuit are physically absent ok 18 - legacy interaction pacer and execution circuit are physically absent --- duration_ms: 4.90584 type: 'test' ... # Subtest: GSC property identity distinguishes Domain and URL-prefix properties ok 19 - GSC property identity distinguishes Domain and URL-prefix properties --- duration_ms: 3.778687 type: 'test' ... # Subtest: fill is native-first and bad postconditions remain nonblocking evidence ok 20 - fill is native-first and bad postconditions remain nonblocking evidence --- duration_ms: 3.361769 type: 'test' ... # Subtest: GSC inspection selects the exact property and request-indexing is visibly verified ok 21 - GSC inspection selects the exact property and request-indexing is visibly verified --- duration_ms: 4.401341 type: 'test' ... # Subtest: tab load semantics support none and DOM interactive without impossible Chrome tab states ok 22 - tab load semantics support none and DOM interactive without impossible Chrome tab states --- duration_ms: 1.891016 type: 'test' ... # Subtest: every step emitted by actionToSteps has a concrete Browser Agent executor ok 23 - every step emitted by actionToSteps has a concrete Browser Agent executor --- duration_ms: 1.801844 type: 'test' ... # Subtest: verify_url uses an owned tab and returns truthful normalized/pattern evidence ok 24 - verify_url uses an owned tab and returns truthful normalized/pattern evidence --- duration_ms: 3.983832 type: 'test' ... # Subtest: user observation never becomes takeover and debugger detach stays technical recovery ok 25 - user observation never becomes takeover and debugger detach stays technical recovery --- duration_ms: 1.77889 type: 'test' ... # Subtest: local schedules and remote polling do not park each other behind an application lane gate ok 26 - local schedules and remote polling do not park each other behind an application lane gate --- duration_ms: 3.042334 type: 'test' ... # Subtest: screenshot perception captures first; persistence failure is degraded evidence only ok 27 - screenshot perception captures first; persistence failure is degraded evidence only --- duration_ms: 3.738468 type: 'test' ... # Subtest: GSC payload collection is generation-bound and stale buffers are cleared ok 28 - GSC payload collection is generation-bound and stale buffers are cleared --- duration_ms: 5.51932 type: 'test' ... # Subtest: Sentinel repair preserves explicitly adopted user tabs ok 29 - Sentinel repair preserves explicitly adopted user tabs --- duration_ms: 2.134958 type: 'test' ... # Subtest: GSC request indexing is a critical mutation while Search Console reads remain read-only ok 30 - GSC request indexing is a critical mutation while Search Console reads remain read-only --- duration_ms: 0.137995 type: 'test' ... # Subtest: bounded MV3 runtime covers CDP/API, exact local baselines, popup ownership and durable start-stop sessions ok 31 - bounded MV3 runtime covers CDP/API, exact local baselines, popup ownership and durable start-stop sessions --- duration_ms: 2.774978 type: 'test' ... # Subtest: remote action timeouts are bounded before execution ok 32 - remote action timeouts are bounded before execution --- duration_ms: 0.510777 type: 'test' ... # Subtest: idle remote polling remains warm enough for sub-second task pickup ok 33 - idle remote polling remains warm enough for sub-second task pickup --- duration_ms: 0.265644 type: 'test' ... # Subtest: remote URL regex rejects backtracking-prone patterns before evaluation ok 34 - remote URL regex rejects backtracking-prone patterns before evaluation --- duration_ms: 0.297071 type: 'test' ... # Subtest: screenshot remote watchdog stays inside the interactive 10-second envelope ok 35 - screenshot remote watchdog stays inside the interactive 10-second envelope --- duration_ms: 1.398415 type: 'test' ... # Subtest: screenshot watchdog cannot be expanded above the interactive envelope by caller timeout ok 36 - screenshot watchdog cannot be expanded above the interactive envelope by caller timeout --- duration_ms: 0.484799 type: 'test' ... # Subtest: ONE_GUARD browser runtime has inline auth challenge and no parked takeover protocol ok 37 - ONE_GUARD browser runtime has inline auth challenge and no parked takeover protocol --- duration_ms: 5.270741 type: 'test' ... # Subtest: controlled session reuse treats taskId as affinity only ok 38 - controlled session reuse treats taskId as affinity only --- duration_ms: 0.164955 type: 'test' ... # Subtest: controlled tab close is a technical error, not an approval/review state ok 39 - controlled tab close is a technical error, not an approval/review state --- duration_ms: 3.958555 type: 'test' ... # Subtest: local studio is zero-account additive capability surface ok 40 - local studio is zero-account additive capability surface --- duration_ms: 0.645207 type: 'test' ... # Subtest: restricted Chrome/internal URLs never enter local automation ok 41 - restricted Chrome/internal URLs never enter local automation --- duration_ms: 0.919805 type: 'test' ... # Subtest: recorder marks credential-like inputs sensitive ok 42 - recorder marks credential-like inputs sensitive --- duration_ms: 0.351842 type: 'test' ... # Subtest: workflow validation is bounded and forbids arbitrary step types ok 43 - workflow validation is bounded and forbids arbitrary step types --- duration_ms: 0.739638 type: 'test' ... # Subtest: imported workflows cannot persist secret-looking fill values ok 44 - imported workflows cannot persist secret-looking fill values --- duration_ms: 0.14832 type: 'test' ... # Subtest: page health score remains bounded ok 45 - page health score remains bounded --- duration_ms: 0.179175 type: 'test' ... # Subtest: recursively redacts credentials, headers, bodies, form values and console handles ok 46 - recursively redacts credentials, headers, bodies, form values and console handles --- duration_ms: 3.038269 type: 'test' ... # Subtest: redacts secret URL query parameters without hiding safe parameters or fragments ok 47 - redacts secret URL query parameters without hiding safe parameters or fragments --- duration_ms: 0.42433 type: 'test' ... # Subtest: envelope fixes trust, preserves provenance and reports truncation ok 48 - envelope fixes trust, preserves provenance and reports truncation --- duration_ms: 0.395707 type: 'test' ... # Subtest: redacts inline bearer/JWT/OTP labels and accessibility textbox values ok 49 - redacts inline bearer/JWT/OTP labels and accessibility textbox values --- duration_ms: 0.346124 type: 'test' ... # Subtest: sensitive-key classifier covers externally supplied field names ok 50 - sensitive-key classifier covers externally supplied field names --- duration_ms: 0.156142 type: 'test' ... # Subtest: every Browser Agent JavaScript file parses as an ES module ok 51 - every Browser Agent JavaScript file parses as an ES module --- duration_ms: 386.529884 type: 'test' ... # Subtest: all literal sidepanel element references exist in HTML ok 52 - all literal sidepanel element references exist in HTML --- duration_ms: 0.812306 type: 'test' ... # Subtest: all primary controls register click/change handlers ok 53 - all primary controls register click/change handlers --- duration_ms: 0.220558 type: 'test' ... # Subtest: Automation/Log tabs are interactive and pairing controls remain exposed ok 54 - Automation/Log tabs are interactive and pairing controls remain exposed --- duration_ms: 0.301808 type: 'test' ... # Subtest: pairing button actually dispatches the pair message ok 55 - pairing button actually dispatches the pair message --- duration_ms: 1.811919 type: 'test' ... # Subtest: empty quick command does not silently run the first action ok 56 - empty quick command does not silently run the first action --- duration_ms: 0.602985 type: 'test' ... # Subtest: local audit button dispatches a real local action ok 57 - local audit button dispatches a real local action --- duration_ms: 2.367373 type: 'test' ... # Subtest: dashboard exposes inline auth challenge without manual resume/takeover queue ok 58 - dashboard exposes inline auth challenge without manual resume/takeover queue --- duration_ms: 0.221028 type: 'test' ... # Subtest: ONE_GUARD migration deletes legacy parked execution state without runtime routing ok 59 - ONE_GUARD migration deletes legacy parked execution state without runtime routing --- duration_ms: 1.286319 type: 'test' ... 1..59 # tests 59 # suites 0 # pass 59 # fail 0 # cancelled 0 # skipped 0 # todo 0 # duration_ms 487.765354
 PASS local integration contract suite — PASS local integration contract: unchanged install/pairing, lane-isolated remote Local Studio gateway, no extra account/API dependency.
-PASS MCP toolchain integration suite — PASS MCP toolchain integration: native-first, pinned optional sidecars, sandboxed processes, unchanged 17.0.0 install/pairing/Chrome permissions.
-PASS operational surface coverage — { "evidence": { "agency": { "actions": 93, "native": 22, "plan_result_append_count": 1, "semantic": 71, "semantic_cases": 71, "state_native": 0 }, "complete_executor": { "actions": 437, "routes": 23, "semantically_covered": 437 }, "global": { "control_catalog": 1076, "mcp_additive": 38, "mcp_baseline": 81, "mcp_dispatched": 119, "mcp_tools": 119, "mcp_unique": 119 }, "milestone_11_contracts": { "annotations": { "capabilities": 1371, "catalog_actions": 1076, "catalog_capability_parity_checked": 1076, "inspect_theme_assets_contract_ok": true, "mcp_annotations_parsed": 119, "mcp_tools_declared": 119, "semantic_read_mislabels": [] }, "browser_reachability": { "direct_actions": 79, "missing_step_bindings": {}, "service_worker_step_types": 61, "verify_url_observational": true, "verify_url_reachable": true }, "engineering": { "php_lint_windows_exit_fallback": true, "repo_map_typed_error": true }, "lane_handle": { "additive_schema": true, "call_tool_resolves_handle": true, "context_open_returns_handle": true, "legacy_token_preserved": true }, "legacy_direct": { "capabilities": 199, "compat_method_present": true, "nullable_agency_fallback": false, "unique_tool_names": 199, "wrong_executor_bindings": 0 } } }, "failure_count": 0, "failures": [], "ok": true, "policy": "Every declared public action resolves to a concrete semantic executor. Defensive binding errors are release-defect sentinels, not normal implementation paths.", "suite_version": "17.0.0" }
+PASS MCP toolchain integration suite — PASS MCP toolchain integration: native-first, pinned optional sidecars, sandboxed processes, unchanged 1.0.0 install/pairing/Chrome permissions.
+PASS operational surface coverage — { "evidence": { "agency": { "actions": 93, "native": 22, "plan_result_append_count": 1, "semantic": 71, "semantic_cases": 71, "state_native": 0 }, "complete_executor": { "actions": 437, "routes": 23, "semantically_covered": 437 }, "global": { "control_catalog": 1076, "mcp_additive": 38, "mcp_baseline": 81, "mcp_dispatched": 119, "mcp_tools": 119, "mcp_unique": 119 }, "milestone_11_contracts": { "annotations": { "capabilities": 1371, "catalog_actions": 1076, "catalog_capability_parity_checked": 1076, "inspect_theme_assets_contract_ok": true, "mcp_annotations_parsed": 119, "mcp_tools_declared": 119, "semantic_read_mislabels": [] }, "browser_reachability": { "direct_actions": 79, "missing_step_bindings": {}, "service_worker_step_types": 61, "verify_url_observational": true, "verify_url_reachable": true }, "engineering": { "php_lint_windows_exit_fallback": true, "repo_map_typed_error": true }, "lane_handle": { "additive_schema": true, "call_tool_resolves_handle": true, "context_open_returns_handle": true, "legacy_token_preserved": true }, "legacy_direct": { "capabilities": 199, "compat_method_present": true, "nullable_agency_fallback": false, "unique_tool_names": 199, "wrong_executor_bindings": 0 } } }, "failure_count": 0, "failures": [], "ok": true, "policy": "Every declared public action resolves to a concrete semantic executor. Defensive binding errors are release-defect sentinels, not normal implementation paths.", "suite_version": "1.0.0" }
 PASS milestone-11 typed technical failure contracts — { "evidence": { "annotations": { "capabilities": 1371, "catalog_actions": 1076, "catalog_capability_parity_checked": 1076, "inspect_theme_assets_contract_ok": true, "mcp_annotations_parsed": 119, "mcp_tools_declared": 119, "semantic_read_mislabels": [] }, "browser_reachability": { "direct_actions": 79, "missing_step_bindings": {}, "service_worker_step_types": 61, "verify_url_observational": true, "verify_url_reachable": true }, "engineering": { "php_lint_windows_exit_fallback": true, "repo_map_typed_error": true }, "lane_handle": { "additive_schema": true, "call_tool_resolves_handle": true, "context_open_returns_handle": true, "legacy_token_preserved": true }, "legacy_direct": { "capabilities": 199, "compat_method_present": true, "nullable_agency_fallback": false, "unique_tool_names": 199, "wrong_executor_bindings": 0 } }, "failure_count": 0, "failures": [], "ok": true, "policy": "Public wrappers, underlying executors, lane credentials and annotations are typed technical failure." }
 PASS rigorous file-by-file and tool-by-tool audit controller — PASS rigorous audit: files=205 mcp=119 capabilities=1371 actions=1076 hard_failures=0
 PASS portable multi-process concurrency stress — PASS 16 separate PHP processes open lanes without errors PASS concurrent context opens preserve 16 unique lanes PASS shared state has no lost lane updates PASS two reusable lane credentials are available for contention PASS lease race 1/20 grants exactly one owner PASS lease race 1/20 returns typed technical contention for the competing lane PASS lease race 2/20 grants exactly one owner PASS lease race 2/20 returns typed technical contention for the competing lane PASS lease race 3/20 grants exactly one owner PASS lease race 3/20 returns typed technical contention for the competing lane PASS lease race 4/20 grants exactly one owner PASS lease race 4/20 returns typed technical contention for the competing lane PASS lease race 5/20 grants exactly one owner PASS lease race 5/20 returns typed technical contention for the competing lane PASS lease race 6/20 grants exactly one owner PASS lease race 6/20 returns typed technical contention for the competing lane PASS lease race 7/20 grants exactly one owner PASS lease race 7/20 returns typed technical contention for the competing lane PASS lease race 8/20 grants exactly one owner PASS lease race 8/20 returns typed technical contention for the competing lane PASS lease race 9/20 grants exactly one owner PASS lease race 9/20 returns typed technical contention for the competing lane PASS lease race 10/20 grants exactly one owner PASS lease race 10/20 returns typed technical contention for the competing lane PASS lease race 11/20 grants exactly one owner PASS lease race 11/20 returns typed technical contention for the competing lane PASS lease race 12/20 grants exactly one owner PASS lease race 12/20 returns typed technical contention for the competing lane PASS lease race 13/20 grants exactly one owner PASS lease race 13/20 returns typed technical contention for the competing lane PASS lease race 14/20 grants exactly one owner PASS lease race 14/20 returns typed technical contention for the competing lane PASS lease race 15/20 grants exactly one owner PASS lease race 15/20 returns typed technical contention for the competing lane PASS lease race 16/20 grants exactly one owner PASS lease race 16/20 returns typed technical contention for the competing lane PASS lease race 17/20 grants exactly one owner PASS lease race 17/20 returns typed technical contention for the competing lane PASS lease race 18/20 grants exactly one owner PASS lease race 18/20 returns typed technical contention for the competing lane PASS lease race 19/20 grants exactly one owner PASS lease race 19/20 returns typed technical contention for the competing lane PASS lease race 20/20 grants exactly one owner PASS lease race 20/20 returns typed technical contention for the competing lane PASS 24 concurrent editorial mutations execute without application quota veto PASS technical editorial mutex preserves all 24 concurrent updates OK portable multi-process lane and technical editorial concurrency stress

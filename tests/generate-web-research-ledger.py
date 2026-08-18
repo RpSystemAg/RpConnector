@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib, json, re
 from pathlib import Path
 
-VERSION='17.0.0'
+VERSION='1.0.0'
 ROOT=Path(__file__).resolve().parent.parent
 OUT_JSON=ROOT/f'PR-STUDIO-{VERSION}-WEB-RESEARCH-5PASS.json'
 OUT_MD=ROOT/f'PR-STUDIO-{VERSION}-WEB-RESEARCH-5PASS.md'

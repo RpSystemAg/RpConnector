@@ -2,7 +2,7 @@
 if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
 /** Central, bounded discovery layer over native 4.0 capabilities and the mapped 2.0 catalog. */
 final class PRSTUDIO_UC_Capability_Registry {
-    public const VERSION = '17.0.0';
+    public const VERSION = '1.0.0';
     private const DEFAULT_LIMIT = 12;
     private const MAX_LIMIT = 25;
     private static ?array $cache = null;
