@@ -1,0 +1,146 @@
+name: Nightly soak and chaos
+
+on:
+  schedule:
+    - cron: '17 1 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-soak-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deterministic-chaos:
+    name: 3,000-run deterministic chaos model
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - run: python tests/runtime-state-model-check.py
+      - run: python tests/runtime-chaos-model.py
+      - run: python tests/runtime-invariants-audit.py
+      - run: python tests/release-evidence-gate.py
+
+  real-db-soak:
+    name: Real DB soak ${{ matrix.db }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        db: ['mariadb:11.4', 'mysql:8.4']
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: '8.1'
+          extensions: mysqli, mbstring
+      - name: Start real database
+        run: |
+          docker run -d --name rpconnector-soak-db \
+            -e MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=yes \
+            -e MYSQL_ALLOW_EMPTY_PASSWORD=yes \
+            -p 3306:3306 \
+            ${{ matrix.db }}
+      - name: Wait for database
+        run: |
+          for i in $(seq 1 90); do
+            if php -r '$m=@new mysqli("127.0.0.1","root","","",3306); exit($m->connect_errno?1:0);'; then exit 0; fi
+            sleep 1
+          done
+          docker logs rpconnector-soak-db
+          exit 1
+      - name: Repeat durable runtime integration 25 times
+        env:
+          PRSTUDIO_TEST_DB_HOST: 127.0.0.1
+          PRSTUDIO_TEST_DB_PORT: '3306'
+          PRSTUDIO_TEST_DB_USER: root
+          PRSTUDIO_TEST_DB_PASS: ''
+          PRSTUDIO_TEST_DB_NAME: prstudio_runtime_soak
+        run: |
+          for i in $(seq 1 25); do
+            echo "=== runtime DB soak iteration $i/25 ==="
+            php tests/php-runtime-db-liveness-integration.php
+          done
+      - name: Repeat task dispatcher integration 10 times
+        env:
+          PRSTUDIO_TEST_DB_HOST: 127.0.0.1
+          PRSTUDIO_TEST_DB_PORT: '3306'
+          PRSTUDIO_TEST_DB_USER: root
+          PRSTUDIO_TEST_DB_PASS: ''
+          PRSTUDIO_TEST_DB_NAME: prstudio_queue_soak
+        run: |
+          for i in $(seq 1 10); do
+            echo "=== queue soak iteration $i/10 ==="
+            php tests/php-task-queue-integration.php
+          done
+      - name: DB diagnostics on failure
+        if: failure()
+        run: docker logs rpconnector-soak-db
+
+  browser-agent-repeat:
+    name: Browser Agent deterministic repeat
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Build release integrity inputs
+        run: python tests/build-release.py --build
+      - name: Repeat Browser Agent suite 10 times
+        working-directory: prstudio-unified-browser-agent
+        run: |
+          for i in $(seq 1 10); do
+            echo "=== browser deterministic iteration $i/10 ==="
+            node --test tests/*.test.mjs
+          done
+
+  real-chrome-repeat:
+    name: Real Chrome extension restart soak
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - run: google-chrome --version
+      - run: python tests/build-release.py --build
+      - name: Launch fresh Chrome profile with extension 20 times
+        run: |
+          for i in $(seq 1 20); do
+            echo "=== real Chrome iteration $i/20 ==="
+            node tests/chrome-extension-live-smoke.mjs
+          done
+
+  benchmark-repeatability:
+    name: SYSTEM-BENCH repeated preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: '8.1'
+          extensions: mysqli, mbstring
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Ten-run non-mutating benchmark preview
+        run: python bench/prstudio-bench.py --mode preview --runs 10 --php "$(command -v php)"
+      - name: Benchmark preview cannot rewrite canonical history
+        run: git diff --exit-code -- bench/SYSTEM-BENCH-HISTORY.ndjson bench/AGENT-BENCH-HISTORY.ndjson
