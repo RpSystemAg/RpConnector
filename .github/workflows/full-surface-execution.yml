@@ -102,6 +102,8 @@ jobs:
           wp config create --path="$RP_WP_PATH" --dbname=wordpress_stateful --dbuser=root --dbpass='' --dbhost=127.0.0.1:3306 --skip-check
           wp config set WP_ENVIRONMENT_TYPE local --path="$RP_WP_PATH"
           wp core install --path="$RP_WP_PATH" --url="$WP_URL" --title='Full surface execution' --admin_user=rpadmin --admin_password='Full-Surface-Only-2026!' --admin_email='full-surface@example.invalid' --skip-email
+          wp rewrite structure '/%postname%/' --path="$RP_WP_PATH"
+          wp rewrite flush --path="$RP_WP_PATH"
           cp -a prstudio-unified-control "$RP_WP_PATH/wp-content/plugins/prstudio-unified-control"
           wp plugin activate prstudio-unified-control --path="$RP_WP_PATH"
           wp eval --path="$RP_WP_PATH" 'if (!PRSTUDIO_UC_Store::maybe_upgrade()) { fwrite(STDERR,"store upgrade failed\n"); exit(1); } echo "store ready\n";'
@@ -135,6 +137,8 @@ jobs:
           jq -e '.issuer and .token_endpoint and .authorization_endpoint' /tmp/rp-full-surface-oauth.json >/dev/null
           curl --fail --silent --output /tmp/rp-full-surface-login.html "$WP_URL/wp-login.php"
           test -s /tmp/rp-full-surface-login.html
+          curl --fail --silent "$WP_URL/wp-json/" > /tmp/rp-full-surface-rest-index.json
+          jq -e '.namespaces | index("prstudio-unified/v1")' /tmp/rp-full-surface-rest-index.json >/dev/null
 
           token="$(wp eval --path="$RP_WP_PATH" '$m=new ReflectionMethod(PRSTUDIO_UC_MCP_Auth_V5::class,"issue_tokens"); $m->setAccessible(true); $t=$m->invoke(null,"full-surface-runtime","prstudio.read prstudio.write",PRSTUDIO_UC_MCP_Auth_V5::mcp_url()); if (empty($t["access_token"])) { exit(1); } echo $t["access_token"];' | tail -n 1)"
           test -n "$token"
