@@ -57,3 +57,36 @@ Browser ownership belongs to lane/session, never task ID. Agent-created tabs are
 Deterministic browser input is grounded before dispatch. No trial clicks and no blind fallback chains. Screenshot perception and DOM/AX/geometry/coordinate transforms are execution inputs, not optional diagnostics.
 
 A future feature that can stop a technically valid action is forbidden unless it is the Anti-Crash mutation guard.
+
+## Single-repository AI coordination protocol
+
+**`master` is the only authoritative repository state.** All agents, human contributors, CI workflows, release gates and remediation work must resolve their decisions against the current `master` HEAD before reading, testing, editing or reporting project status.
+
+The former `hardening/runtime-invariants-2026-08-18` branch is historical only. It must not be treated as a second source of truth, used for new hardening work, or cited as the current product state.
+
+### Division of work
+
+- **Verification/control agents** add or strengthen tests, invariants, benchmarks, evidence collectors, security/supply-chain gates and production-readiness checks against current `master`.
+- **Remediation agents** read those exact failures from current `master`, fix the product or the test harness when the harness is objectively wrong, and keep the invariant equal or stronger.
+- No agent weakens, skips, marks advisory, raises thresholds or suppresses a failing control merely to obtain a green build.
+- A failing control that is a test defect is fixed as a test defect; a failing control that reproduces a product defect remains release-blocking until the product is fixed.
+
+### Branch discipline
+
+Long-lived parallel truth branches are forbidden. If a temporary branch is necessary, it must:
+
+1. start from the current `master` HEAD;
+2. contain one bounded change set;
+3. re-read/rebase from `master` before final write if `master` moved;
+4. merge back promptly;
+5. be considered obsolete immediately after its content reaches `master`.
+
+Before every write to `master`, fetch the current `master` HEAD and the current blob SHA of every file being modified. If `master` moved during the operation, stop the write, re-read the new state and integrate rather than force-pushing or overwriting another agent's work.
+
+### Control-plane ownership
+
+The canonical control plane lives in `.github/workflows/`, `quality/`, `tests/`, `evidence/`, `ENTERPRISE-VERIFICATION-PROTOCOL-2026-08-18.md`, `ATOMIC-CAPABILITY-ASSURANCE-2026-08-19.md` and `PRODUCTION-READINESS-CERTIFICATION-2026-08-19.md` on `master`.
+
+Capability/tool counts are inventory only. A capability may be called operational or production-ready only when the current `master` evidence model proves the required implementation, atomic execution test, independent oracle, negative/security/idempotency behavior where applicable, official documentation mapping and real-environment evidence.
+
+`production_ready` / `production_proven` is an output of the certification gates for the exact candidate SHA. It is never asserted manually because many unrelated checks happened to pass.
