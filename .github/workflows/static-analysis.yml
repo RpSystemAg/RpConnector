@@ -52,13 +52,20 @@ jobs:
           php tests/php-new-capabilities-smoke.php
           php tests/php-intelligence-smoke.php
 
-  # Broad multi-language linting. Advisory: this repo predates it, so a first run
-  # surfaces a long tail of pre-existing style findings. Blocking on those would
-  # train everyone to ignore the job, which is how a real finding gets missed.
-  # Read the report, fix in batches, and tighten specific linters to blocking
-  # once their backlog is clear.
+  # Broad multi-language linting, run as a ratchet.
+  #
+  # The repo predates the linter, so a full sweep reports a long tail of
+  # findings nobody in the current change introduced. Two runs, two postures:
+  #
+  #   master push    -> whole codebase, advisory. Measures the standing backlog
+  #                     without blocking work on debt that is already there.
+  #   everything else-> changed files only, BLOCKING. New code has to be clean.
+  #
+  # So the backlog can only shrink. It was worth saying plainly: the earlier
+  # version of this job was advisory in both directions, which made it a report
+  # nobody had to act on.
   megalinter:
-    name: MegaLinter (advisory)
+    name: MegaLinter (${{ github.event_name == 'push' && github.ref == 'refs/heads/master' && 'full sweep, advisory' || 'changed files, blocking' }})
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -71,7 +78,11 @@ jobs:
         uses: oxsecurity/megalinter/flavors/php@v8
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # These two move together and must stay in sync: the full sweep is the
+          # only run allowed to be advisory. Splitting them would either block on
+          # the backlog or let new findings through.
           VALIDATE_ALL_CODEBASE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+          DISABLE_ERRORS: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
       - name: Upload the report
         if: always()
         uses: actions/upload-artifact@v4

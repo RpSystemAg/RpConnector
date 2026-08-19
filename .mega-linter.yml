@@ -1,21 +1,32 @@
 # MegaLinter configuration for the PR STUDIO Unified Suite.
 #
-# Posture: advisory, deliberately. This repo predates the linter, so a first full
-# run surfaces a long tail of pre-existing style findings. Blocking on those
-# would train everyone to skip the job, which is exactly how a real finding gets
-# missed. Read the report, fix in batches, and move individual linters to
-# blocking as their backlog clears.
+# Posture: a ratchet, not a suppression.
 #
-# What is NOT advisory lives elsewhere and blocks: the PHP 8.0 compatibility
-# check in this same workflow, the one-guard constitution, the tools/list token
-# budget, the SQL syntax validator and the task-queue integration test.
+# This repo predates the linter, so a full sweep surfaces a long tail of
+# findings nobody in the current change introduced. Blocking on those stalls
+# every commit on pre-existing debt, and a gate that fails for things you did
+# not do is one people learn to route around -- which is how a real finding
+# ends up ignored.
+#
+# So the two runs behave differently, set per run in the workflow:
+#   - changed files (pull requests, non-master pushes): DISABLE_ERRORS=false.
+#     New code must be clean. This is a real gate and it fails the build.
+#   - full codebase (master push): DISABLE_ERRORS=true. Reports the standing
+#     backlog without blocking, so it stays visible and measurable.
+#
+# The effect is that the backlog can only shrink: nothing new gets in, and
+# existing debt is paid down deliberately rather than under duress.
+#
+# Checks that block unconditionally, regardless of this file: the PHP
+# 8.0/8.1/8.3 matrix, the one-guard constitution, the tools/list token budget,
+# the SQL syntax validator and the task-queue integration test.
 
 APPLY_FIXES: none
 SHOW_ELAPSED_TIME: true
 FILEIO_REPORTER: false
 PRINT_ALPACA: false
 
-# Fail the step only on genuine errors, never on style. See posture above.
+# Default only -- the workflow overrides this per run. See the posture note.
 DISABLE_ERRORS: true
 
 ENABLE_LINTERS:
