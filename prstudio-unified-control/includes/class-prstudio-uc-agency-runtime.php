@@ -238,6 +238,16 @@ final class PRSTUDIO_UC_Agency_Runtime {
 				);
 			}
 		}
+		// Ontological trust is a second, independent axis and is reported
+		// beside `ok` rather than folded into it. `ok` answers "does the
+		// evidence support that the requested effects happened"; trust answers
+		// "was the trajectory still the one the user authorized". A mission can
+		// hold on one and drift on the other, and collapsing them into a single
+		// boolean would discard exactly the distinction that makes drift
+		// visible. Neither can stop a mutation -- see LAW 1 and LAW 2.
+		$trust = class_exists('PRSTUDIO_UC_Trust_Trajectory')
+			? PRSTUDIO_UC_Trust_Trajectory::evaluate($plan,$checkpoint)
+			: array('monitor'=>'unavailable','ok'=>null,'drift'=>array(),'blocking'=>false);
 		return array(
 			'ok'=>$ok,
 			'verifier'=>'agency_playbook_v10',
@@ -246,6 +256,9 @@ final class PRSTUDIO_UC_Agency_Runtime {
 			'degraded'=>$degraded,
 			'unverified_steps'=>$unverified,
 			'steps_without_evidence'=>$without_evidence,
+			'trust_ok'=>$trust['ok']??null,
+			'trust_drift'=>$trust['drift']??array(),
+			'trust'=>$trust,
 		);
 	}
 

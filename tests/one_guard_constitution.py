@@ -118,6 +118,33 @@ if re.search(r'phase\s*=\s*["\']pending["\']',sw): fail.append('runtime uses pen
 ui='\n'.join(p.read_text(errors='replace') for p in [BROWSER/'sidepanel.html',BROWSER/'sidepanel.js'])
 if re.search(r'\bresume\b|riprendi|takeover|acknowledge',ui,re.I): fail.append('manual human control surface remains')
 
+
+def constitution_text(path):
+    """Read a constitution with whitespace collapsed to single spaces.
+
+    The clauses below are prose sentences, and prose in Markdown wraps. Matching
+    against the raw bytes meant a clause that was fully present but broken over
+    two lines read as missing: on 19 Aug 2026 this reported twelve missing Law 10
+    clauses across all six constitution files while every one of them was
+    actually there, wrapped.
+
+    That is worse than a false negative. A control that fails while the thing it
+    guards is correct is one people learn to ignore, and it was already the only
+    red in an otherwise passing local run.
+
+    Collapsing whitespace does not weaken the requirement: the clause must still
+    appear verbatim, word for word, in order. It only stops a line break from
+    defeating the check.
+    """
+    if not path.exists():
+        return ''
+    return ' '.join(path.read_text(errors='replace').split())
+
+
+def clause_present(text, clause):
+    return ' '.join(clause.split()) in text
+
+
 # Constitution files and exact laws.
 required_agent_laws=[
  'ANTI-CRASH IS THE ONLY MUTATION GUARD',
@@ -132,16 +159,16 @@ required_agent_laws=[
 ]
 agent_constitutions=[ROOT/'AGENTS.md',CONTROL/'AGENTS.md',BROWSER/'AGENTS.md']
 for p in agent_constitutions:
-    text=p.read_text(errors='replace') if p.exists() else ''
+    text=constitution_text(p)
     for law in required_agent_laws:
-        if law not in text: fail.append(f'{p.relative_to(ROOT)}: missing law {law}')
+        if not clause_present(text,law): fail.append(f'{p.relative_to(ROOT)}: missing law {law}')
 
 claude_constitutions=[ROOT/'CLAUDE.md',CONTROL/'CLAUDE.md',BROWSER/'CLAUDE.md']
 for p in claude_constitutions:
-    text=p.read_text(errors='replace') if p.exists() else ''
-    if 'NO EXCLUSIONS, NO DEFERRAL, NO PARTIAL ACCEPTANCE' not in text:
+    text=constitution_text(p)
+    if not clause_present(text,'NO EXCLUSIONS, NO DEFERRAL, NO PARTIAL ACCEPTANCE'):
         fail.append(f'{p.relative_to(ROOT)}: missing no-exclusion/no-deferral law')
-    if 'must read and obey' not in text or '`AGENTS.md`' not in text:
+    if not clause_present(text,'must read and obey') or '`AGENTS.md`' not in text:
         fail.append(f'{p.relative_to(ROOT)}: missing mandatory AGENTS.md handoff')
 
 law10_clauses=[
@@ -151,9 +178,9 @@ law10_clauses=[
  'No alternative path to completion exists.',
 ]
 for p in agent_constitutions + claude_constitutions:
-    text=p.read_text(errors='replace') if p.exists() else ''
+    text=constitution_text(p)
     for clause in law10_clauses:
-        if clause not in text: fail.append(f'{p.relative_to(ROOT)}: missing Law 10 clause {clause}')
+        if not clause_present(text,clause): fail.append(f'{p.relative_to(ROOT)}: missing Law 10 clause {clause}')
 
 if fail:
     print('ONE_GUARD_CONSTITUTION: FAIL')

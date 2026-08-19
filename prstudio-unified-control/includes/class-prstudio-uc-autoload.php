@@ -50,6 +50,7 @@ final class PRSTUDIO_UC_Autoload {
             'PRSTUDIO_UC_Agency_Action_Executor' => 'includes/class-prstudio-uc-agency-action-executor.php',
             'PRSTUDIO_UC_Agency_Capabilities' => 'includes/class-prstudio-uc-agency-capabilities.php',
             'PRSTUDIO_UC_Agency_Runtime' => 'includes/class-prstudio-uc-agency-runtime.php',
+            'PRSTUDIO_UC_Trust_Trajectory' => 'includes/class-prstudio-uc-trust-trajectory.php',
             'PRSTUDIO_UC_Agency_State' => 'includes/class-prstudio-uc-agency-state.php',
             'PRSTUDIO_UC_Anti_Crash' => 'includes/class-prstudio-uc-anti-crash.php',
             'PRSTUDIO_UC_Pre_Mutation_Safety' => 'includes/class-prstudio-uc-anti-crash.php',
