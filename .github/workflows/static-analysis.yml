@@ -28,7 +28,7 @@ jobs:
       matrix:
         php: ['8.0', '8.1', '8.3']
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
@@ -70,12 +70,12 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # MegaLinter diffs against the base ref to decide what changed.
           fetch-depth: 0
       - name: MegaLinter
-        uses: oxsecurity/megalinter/flavors/php@v8
+        uses: oxsecurity/megalinter/flavors/php@v10
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # These two move together and must stay in sync: the full sweep is the
@@ -85,7 +85,7 @@ jobs:
           DISABLE_ERRORS: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
       - name: Upload the report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: megalinter-report
           path: |
