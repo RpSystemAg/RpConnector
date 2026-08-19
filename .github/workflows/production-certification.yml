@@ -44,9 +44,11 @@ jobs:
             tests/production-test-plan-audit.py \
             tests/production-h24-soak.py \
             tests/production-fault-injection.py \
+            tests/production-scenario-gate.py \
             tests/production-wordpress-lifecycle-receipt.py \
             tests/production-workflow-evidence.py \
             tests/production-supply-chain-source.py \
+            tests/production-documentation-claims.py \
             tests/generate-production-sbom.py \
             tests/collect-production-evidence.py \
             tests/atomic-capability-assurance.py
@@ -96,6 +98,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: python tests/production-workflow-evidence.py --commit "$GITHUB_SHA" --strict
+
+      - name: Documentation and release claims must not exceed source or evidence
+        run: python tests/production-documentation-claims.py --commit "$GITHUB_SHA" --strict
 
       - name: AGENT-BENCH must be measured, not calibrated
         run: python bench/agent-bench-status.py
