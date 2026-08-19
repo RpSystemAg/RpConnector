@@ -24,8 +24,7 @@ LAW 13 — HUMAN INTENT MUST RESOLVE TO ACTION, NOT INTERNAL ENCYCLOPEDIA.
 
 No agent may exclude, skip, waive, suppress, narrow, mark `N/A`, mark advisory,
 move work out of scope, postpone, backlog, leave `TODO`, defer to a later pass or
-stop at partial implementation of applicable work. An explicit rationale does
-not legalize an exclusion or a deferral. The required loop is:
+stop at partial implementation of applicable work. An explicit rationale does not legalize an exclusion or a deferral. The required loop is:
 
 ```text
 ANALYZE
@@ -38,8 +37,7 @@ ANALYZE
 → REPEAT UNTIL PROVEN
 ```
 
-The only acceptable stopping condition is verified closure. No alternative path
-to completion exists.
+The only acceptable stopping condition is verified closure. No alternative path to completion exists.
 
 The test/execution denominator is discovered from the exact authoritative
 checkout at runtime. There are no allowlists, helper exemptions, fixture

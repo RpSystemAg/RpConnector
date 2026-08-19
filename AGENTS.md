@@ -47,8 +47,7 @@ from the most trivial operation to the most complex one.
 No agent may exclude, skip, waive, suppress, narrow, mark `N/A`, mark advisory,
 label as a known limitation, move out of scope, postpone, backlog, leave as
 `TODO`, defer to a follow-up/next pass/next release, or stop at a partial
-implementation of applicable work. An explicit rationale does not legalize an
-exclusion or a deferral. Time, token budget, complexity, cost, legacy status,
+implementation of applicable work. An explicit rationale does not legalize an exclusion or a deferral. Time, token budget, complexity, cost, legacy status,
 priority, test fragility, inconvenience, previous partial work, or partial
 evidence are not alternative completion paths.
 
@@ -79,8 +78,7 @@ is forbidden unless that evidence exists for the exact candidate state.
 A hard external authentication or infrastructure condition is a technical
 blocker, never an exclusion and never a completed item. The mission remains
 incomplete, all unblocked work continues, and execution resumes automatically as
-soon as the condition clears under Laws 4 and 5. No alternative path to
-completion exists.
+soon as the condition clears under Laws 4 and 5. No alternative path to completion exists.
 
 ### Law 11 in full
 
@@ -217,6 +215,16 @@ Before every write to `master`, fetch the current `master` HEAD and the current 
 ### Control-plane ownership
 
 The canonical control plane lives in `.github/workflows/`, `quality/`, `tests/`, `evidence/`, `ENTERPRISE-VERIFICATION-PROTOCOL-2026-08-18.md`, `ATOMIC-CAPABILITY-ASSURANCE-2026-08-19.md` and `PRODUCTION-READINESS-CERTIFICATION-2026-08-19.md` on `master`.
+
+### Research radar
+
+Il digest settimanale dei paper arXiv rilevanti per la suite vive in
+`docs/research-radar/` (mappatura paper → sottosistema → area repo →
+proposta) ed è interrogabile a runtime dal tool MCP
+`prstudio_research_radar`. I contributi proposti dal radar sono input per il
+work loop (Law 10–12), mai scorciatoie: ogni proposta implementata segue
+ANALYZE → UNDERSTAND → IMPLEMENT → TEST → OBSERVE → FIX → RETEST → REPEAT
+UNTIL PROVEN.
 
 Capability/tool counts are inventory only. A capability may be called operational or production-ready only when the current `master` evidence model proves the required implementation, atomic execution test, independent oracle, negative/security/idempotency behavior where applicable, official documentation mapping and real-environment evidence.
 

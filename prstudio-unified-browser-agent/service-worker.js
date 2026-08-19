@@ -66,6 +66,8 @@ import {
   resolveLocalWorkflowTarget,
   executeLocalWorkflowStep,
 } from "./lib/local-page-functions.js";
+import { hardenStepsForUntrustedPage, containmentDecision, containmentFallbackStep } from "./lib/trap-page-policy.js";
+import { createHorizonSession, planHorizonStep } from "./lib/horizon-stability.js";
 
 const STORAGE_KEYS = {
   CONFIG: "prstudioConfig",
@@ -1909,17 +1911,75 @@ async function executeTask(serverTask) {
     const steps = actionToSteps(state.action, state.arguments);
     const compactFlow = String(state.action || "") === "playwright_flow" || String(state.action || "") === "browser_batch";
     const flowResults = [];
+    // 2026-08-19 hardening (MobileWorldSafety / Wuying-Browser-Agent, arXiv
+    // week 2026-08-13..19): page content is untrusted input, and long-horizon
+    // flows degrade to a single step when the page mutated under the plan
+    // evidence. The plan evidence is the checkpoint the task resumed from
+    // (Law 5 retry case); fresh tasks without evidence never force a fallback.
+    const planEvidence = state.checkpoint?.last_result || null;
+    const hardenedSurface = hardenStepsForUntrustedPage(steps, {
+      previousEvidence: planEvidence,
+      taskArguments: state.arguments,
+    });
+    for (let i = 0; i < steps.length; i += 1) {
+      steps[i] = hardenedSurface.steps[i] || steps[i];
+    }
+    const horizonSession = createHorizonSession({ previousEvidence: planEvidence });
+    let liveEvidence = planEvidence;
+    if (hardenedSurface.containedCount > 0) {
+      await appendLog("trap_page.hardening", {
+        taskId: state.taskId,
+        contained: hardenedSurface.containedCount,
+        directives: hardenedSurface.directives.length,
+      });
+    }
     for (let index = state.stepIndex; index < steps.length; index += 1) {
       throwIfTaskAborted(executionGeneration);
       state.stepIndex = index;
       await saveActiveTask(state);
-      const step = steps[index];
+      let step = steps[index];
 
       let tabId = null;
       if (stepRequiresOwnedTab(step)) {
         tabId = await resolveTabId(state, step);
         if (tabId) state.tabId = tabId;
         await assertTargetBinding(tabId, step, state, { allowNavigationTransition: ["navigate", "history"].includes(step.type) });
+      }
+
+      // Trap-page containment: a page-derived step needs a live auth
+      // challenge; without one it is replaced by read-only observation, so no
+      // action generated from untrusted page text escapes the sandbox.
+      if (step?.page_derived && step?.requires_auth_challenge) {
+        const challenge = tabId ? await detectExternalAuthChallenge(tabId) : null;
+        const decision = containmentDecision(step, { challengePresent: challenge?.reason === "captcha_or_mfa" });
+        if (!decision.execute) {
+          const trapClass = String(step._prstudio_trap || "page_derived");
+          steps[index] = containmentFallbackStep(tabId);
+          step = steps[index];
+          await appendLog("trap_page.contained", {
+            taskId: state.taskId,
+            stepIndex: index,
+            trap: trapClass,
+          });
+        }
+      }
+
+      // Horizon stability: when the freshest observed page state no longer
+      // matches the evidence the plan was built on, degrade to a single-step
+      // refresh instead of replaying stale selectors.
+      const horizonPlan = planHorizonStep(step, {
+        session: horizonSession,
+        liveEvidence,
+        multiStepRemaining: Math.max(0, steps.length - index - 1),
+      });
+      if (horizonPlan.singleStepFallback) {
+        steps[index] = horizonPlan.step;
+        step = steps[index];
+        await appendLog("horizon.fallback", {
+          taskId: state.taskId,
+          stepIndex: index,
+          reason: horizonPlan.reason,
+        });
       }
 
       const challengeBefore = tabId && shouldCheckAuthChallengeBefore(step) ? await detectExternalAuthChallenge(tabId) : null;
@@ -1944,6 +2004,11 @@ async function executeTask(serverTask) {
         ...(correlationId ? { correlation_id: correlationId } : {}),
       };
       if (result?.tabId) state.tabId = result.tabId;
+      // Horizon stability: keep the freshest observed page state so the next
+      // step can be checked against it (dense evidence states, Wuying).
+      if (securedResult && typeof securedResult === "object") {
+        liveEvidence = securedResult;
+      }
       state = markCommittingState(state, await sha256Text(JSON.stringify(securedResult)));
       await saveActiveTask(state);
       if (compactFlow) flowResults.push({ index, result: securedResult, step_digest: stepHash });

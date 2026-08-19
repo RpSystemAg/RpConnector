@@ -38,3 +38,16 @@ Daily mode permits one record per Europe/Rome calendar day. Concurrent or catch-
 The reliable executor remains the external H24 worker/system scheduler. A ChatGPT scheduled action can wake the task, run SYSTEM-BENCH, check AGENT-BENCH readiness, compare fresh records, and try to falsify the hypothesis that the current candidate is better. It may validly conclude `NO CHANGE`. It must not edit a formula/reference, exclude tasks, suppress failed checks, or apply a code/site mutation without an explicit write scope and execution lane.
 
 This local benchmark does not prove a live WordPress upgrade, Browser pairing/restart, OAuth against ChatGPT, provider integrations, or a 24-hour soak. `production_proven` therefore remains `false`.
+
+## Tool-surface harness (2026-08-19)
+
+`bench/tool-surface-harness.py` loads the REAL runtime tool catalog
+(`PRSTUDIO_UC_MCP_V5::tools()` via PHP) and reports per tool: surface bytes,
+approx tokens, schema conformity (valid samples accepted 100%, invalid
+rejected 100% on closed schemas), direct dispatch coverage. It runs the
+order-variance protocol (same workload, shuffled orderings → identical Law 9
+advertised surface, variance must be 0) — Fragility of Self-Improving Agents
+and Task-Aware Harness Provisioning (arXiv week 2026-08-13..19). It is a
+release-equation column in `full-surface-execution.yml` and
+`production-certification.yml`; the report lands in
+`quality/tool-surface-report.json`.

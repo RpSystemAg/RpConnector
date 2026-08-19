@@ -557,11 +557,65 @@ HTML;
 
     private static function clean_result( $value ) {
         if ( class_exists( 'PRSTUDIO_UC_Memory' ) ) { $value = PRSTUDIO_UC_Memory::redact( $value ); }
+        // Context-leakage gauge: invariant BLOCKING (The Model's Tell, arXiv
+        // week 2026-08-13..19). Un segreto non può mai uscire in una risposta
+        // MCP: se il gauge rileva fuga dopo la redazione, la risposta viene
+        // sostituita da un errore tecnico `context_leak_blocked`.
+        if ( is_array( $value ) && class_exists( 'PRSTUDIO_UC_Context_Leak_Gauge' ) ) {
+            $verdict = PRSTUDIO_UC_Context_Leak_Gauge::blocking_verdict( $value, array( 'known_secrets' => self::known_secrets_for_gauge() ) );
+            if ( ! empty( $verdict['blocked'] ) ) {
+                return array(
+                    'ok' => false,
+                    'status' => 'error',
+                    'result' => array( 'available' => false ),
+                    'provider' => '',
+                    'task_id' => '',
+                    'job_id' => '',
+                    'correlation_id' => '',
+                    'error' => array(
+                        'code' => 'context_leak_blocked',
+                        'message' => 'Response redaction guard blocked a context leak.',
+                        'retryable' => false,
+                        'details' => array( 'findings' => $verdict['findings'] ),
+                    ),
+                );
+            }
+        }
         $json = wp_json_encode( $value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
         if ( false !== $json && strlen( $json ) > self::MAX_RESULT_CHARS ) {
             return array( 'truncated'=>true, 'message'=>'Result exceeded MCP response budget.', 'original_bytes'=>strlen($json), 'preview'=>mb_substr($json,0,160000) );
         }
         return $value;
+    }
+
+    /**
+     * Segreti noti del sistema per il gauge di context-leakage.
+     *
+     * In produzione: valori reali delle opzioni OAuth (prstudio_mcp_v5_tokens,
+     * prstudio_mcp_v5_clients). La lista vive solo in memoria per la durata
+     * del confronto e non viene mai serializzata nella risposta.
+     *
+     * @return array<int,string>
+     */
+    private static function known_secrets_for_gauge(): array {
+        $secrets = array();
+        if ( ! function_exists( 'get_option' ) ) { return $secrets; }
+        $tokens = get_option( 'prstudio_mcp_v5_tokens', array() );
+        if ( is_array( $tokens ) ) {
+            foreach ( $tokens as $row ) {
+                if ( ! is_array( $row ) ) { continue; }
+                foreach ( array( 'access_token', 'refresh_token', 'id_token' ) as $key ) {
+                    if ( isset( $row[ $key ] ) && is_string( $row[ $key ] ) ) { $secrets[] = $row[ $key ]; }
+                }
+            }
+        }
+        $clients = get_option( 'prstudio_mcp_v5_clients', array() );
+        if ( is_array( $clients ) ) {
+            foreach ( $clients as $row ) {
+                if ( is_array( $row ) && isset( $row['client_secret'] ) && is_string( $row['client_secret'] ) ) { $secrets[] = $row['client_secret']; }
+            }
+        }
+        return array_values( array_unique( $secrets ) );
     }
     private static function extract_viewer_frame( &$value ): array {
         if ( ! is_array( $value ) ) { return array(); }
@@ -974,6 +1028,14 @@ HTML;
         $tools[]=self::tool('prstudio_intervention_record','Record an intervention','Write one entry into the interventions ledger so this work is not proposed again. Record applied after a verified change, rejected when the user declines, reverted when a change is undone. This is what gives the site a memory of what has been done, as opposed to what has been seen.',self::obj(array('entity_type'=>self::str('post, url, product, option, term or site.'),'entity_id'=>self::str('ID or URL of the entity.'),'intervention_key'=>self::str('Stable slug for the change, e.g. meta_description or image_alt_text.'),'state'=>self::str('applied, rejected, reverted, superseded, failed or proposed.',array('enum'=>array('applied','rejected','reverted','superseded','failed','proposed'))),'summary'=>self::str('One line describing the change.'),'impact'=>self::str('critical, high, medium, low or unknown.',array('enum'=>array('critical','high','medium','low','unknown'))),'evidence_ref'=>self::str('Artifact, job or correlation reference proving the effect.')),array('entity_type','entity_id','intervention_key','state'),false),self::annotations(false,false,true));
         $tools[]=self::tool('prstudio_flow','PR Studio flow','Execute an ordered deterministic sequence of typed tools and/or capability IDs locally in one MCP turn. Steps may save results with save_as and later arguments may reference them as ${name.path}. The existing anti-crash gate runs once for the whole flow when a protected-site mutation is present.',self::obj(array('steps'=>array('type'=>'array','minItems'=>1,'maxItems'=>100,'items'=>self::any_object('Step: tool or capability, arguments, optional save_as.')),'stop_on_error'=>self::bool('Stop at first failed step. Default true.'),'lane_handle'=>self::str('Lane handle reused by every step.'),'work_id'=>self::str('Existing work session for anti-crash attestation reuse.')),array('steps'),false),self::annotations(true,false,false,true));
         $tools[]=self::tool('prstudio_tool_manual','Tool manual','Return the complete operating guidance for one tool: full description, argument notes, safety annotations and input schema. Tool descriptions in the listing are deliberately one line so the whole surface fits in context; this is where the detail lives. Call with no arguments for the index.',self::obj(array('tool'=>self::str('Exact tool name. Omit for the index.')),array(),false),self::annotations(true));
+
+        /* ------------------------------------------------------------------
+         * Research radar (2026-08-19, arXiv week 13-19 August).
+         * ~40 token sul Law 9 budget; ammesso in tools_within_budget dopo i
+         * router essenziali. Classifica i paper arXiv recenti sui 6
+         * sottosistemi della suite e propone i contributi migliori.
+         * ---------------------------------------------------------------- */
+        $tools[]=self::tool('prstudio_research_radar','Research radar','Scan recent arXiv work and propose suite contributions.',self::obj(array('category'=>self::str('arXiv category.'),'window_days'=>self::integer('Lookback days.'),'limit'=>self::integer('Max papers.')),array(),false),self::annotations(true));
         return $tools;
     }
 
@@ -1324,6 +1386,7 @@ HTML;
                 return array('recorded'=>$ok,'entity_key'=>$entity,'intervention_key'=>(string)$args['intervention_key'],'state'=>(string)$args['state'],'totals'=>PRSTUDIO_UC_Interventions::stats());
             }
             case 'prstudio_tool_manual': return self::tool_manual($args);
+            case 'prstudio_research_radar': return class_exists('PRSTUDIO_UC_Research_Radar') ? PRSTUDIO_UC_Research_Radar::scan($args) : new WP_Error('research_radar_unavailable','Research radar module unavailable.',array('status'=>503));
             case 'prstudio_context_open':
                 $context=PRSTUDIO_UC_Execution_Lanes::open($args,array('client_id'=>$client_id));
                 if(is_wp_error($context))return $context;
@@ -1653,6 +1716,60 @@ HTML;
     public static function advertised_tools_for_test(): array { return self::tools_within_budget(); }
     public static function tools_list_budget_for_test(): int { return self::TOOLS_LIST_TOKEN_BUDGET; }
     public static function essential_tools_for_test(): array { return self::SURFACE_ESSENTIAL; }
+
+    /**
+     * Profili di provisioning per-task (Task-Aware Harness Provisioning,
+     * arXiv week 2026-08-13..19).
+     *
+     * Selezionare dinamicamente l'insieme minimo di tool per intento rilevato
+     * riduce latenza ed errori rispetto a una superficie statica. Il profilo è
+     * una HINT di selezione: la superficie reale emessa da tools/list resta
+     * SEMPRE governata da tools_within_budget() (hard-cap Law 9) e il profilo
+     * non può mai contenere tool che non esistono nella superficie completa.
+     */
+    private const INTENT_PROFILES = array(
+        'content' => array( 'prstudio_observe', 'prstudio_do', 'wordpress_content_transaction', 'prstudio_intervention_record', 'prstudio_backlog' ),
+        'browser' => array( 'browser_open', 'browser_navigate', 'browser_snapshot', 'browser_click', 'browser_fill', 'browser_screenshot', 'browser_tabs' ),
+        'commerce' => array( 'commerce_product_audit', 'prstudio_observe', 'twin_query', 'prstudio_backlog' ),
+        'research' => array( 'prstudio_research_radar', 'prstudio_memory_search', 'prstudio_capability_search', 'prstudio_tool_manual' ),
+        'diagnostics' => array( 'prstudio_health', 'agency_status', 'browser_status', 'twin_query', 'prstudio_context_status' ),
+        'seo' => array( 'prstudio_seo_autopilot_status', 'prstudio_seo_autopilot_next', 'prstudio_seo_autopilot_control', 'gsc_search_analytics', 'twin_query' ),
+    );
+
+    /**
+     * Profilo minimo di tool per un intento, con hard-cap Law 9.
+     *
+     * @return array{intent:string,profile_tools:array<int,string>,profile_tokens:int,within_budget:bool,budget:int,valid:bool}
+     */
+    public static function tools_for_intent( string $intent ): array {
+        $intent = strtolower( trim( $intent ) );
+        $match = '';
+        foreach ( self::INTENT_PROFILES as $name => $tools ) {
+            if ( str_contains( $intent, $name ) || str_contains( $name, $intent ) || '' === $intent ) { $match = $name; break; }
+        }
+        $profile = isset( self::INTENT_PROFILES[ $match ] ) ? self::INTENT_PROFILES[ $match ] : self::SURFACE_ESSENTIAL;
+        $all = self::tools();
+        $by_name = array();
+        foreach ( $all as $tool ) { $by_name[ (string) ( $tool['name'] ?? '' ) ] = $tool; }
+        $profile_tools = array();
+        $bytes = 2;
+        foreach ( $profile as $name ) {
+            if ( ! isset( $by_name[ $name ] ) ) { continue; }
+            $profile_tools[] = $name;
+            $bytes += self::surface_bytes( $by_name[ $name ] ) + 1;
+        }
+        return array(
+            'intent' => $match,
+            'profile_tools' => $profile_tools,
+            'profile_tokens' => self::approx_tokens( $bytes ),
+            'within_budget' => $bytes <= ( self::TOOLS_LIST_TOKEN_BUDGET * 4 ),
+            'budget' => self::TOOLS_LIST_TOKEN_BUDGET,
+            'valid' => count( $profile_tools ) > 0,
+        );
+    }
+
+    /** Accessor per i test: profili dichiarati. */
+    public static function intent_profiles_for_test(): array { return self::INTENT_PROFILES; }
 
     private static function control_browser_task(array $args){
         $task_id=sanitize_text_field((string)($args['task_id']??''));

@@ -13,9 +13,7 @@ LAW 12 — BLOCKERS TRIGGER STUDY AND REMEDIATION; THEY NEVER AUTHORIZE BYPASS O
 LAW 13 — HUMAN INTENT MUST RESOLVE TO ACTION, NOT INTERNAL ENCYCLOPEDIA.
 
 No agent may exclude, waive, relabel, defer or partially accept applicable work.
-An explicit rationale does not legalize an exclusion or a deferral. The only
-acceptable stopping condition is verified closure. No alternative path to
-completion exists.
+An explicit rationale does not legalize an exclusion or a deferral. The only acceptable stopping condition is verified closure. No alternative path to completion exists.
 
 The required loop is:
 

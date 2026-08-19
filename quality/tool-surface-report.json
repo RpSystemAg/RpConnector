@@ -1,0 +1,1198 @@
+{
+  "advertised_surface_count": 36,
+  "checkout": "6952c96f37499f78",
+  "direct_dispatch_coverage": 1.0,
+  "invalid_sample_rejection_rate": 1.0,
+  "law9_budget": 5000,
+  "order_variance": {
+    "identical_across_orders": true,
+    "runs": 5
+  },
+  "rows": [
+    {
+      "approx_tokens": 100,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 400,
+      "tool": "prstudio_health",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 143,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 572,
+      "tool": "prstudio_capability_search",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 78,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 312,
+      "tool": "prstudio_capability_describe",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 265,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 1059,
+      "tool": "prstudio_execute",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 86,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 343,
+      "tool": "prstudio_job_get",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 114,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 454,
+      "tool": "prstudio_job_control",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 104,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 414,
+      "tool": "prstudio_memory_search",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 135,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 537,
+      "tool": "prstudio_context_open",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 46,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 183,
+      "tool": "prstudio_context_status",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 127,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 507,
+      "tool": "prstudio_context_heartbeat",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 70,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 278,
+      "tool": "prstudio_context_close",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 150,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 597,
+      "tool": "gsc_sites",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 338,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 1351,
+      "tool": "gsc_search_analytics",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 173,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 690,
+      "tool": "gsc_sitemaps",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 213,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 849,
+      "tool": "gsc_url_inspection",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 243,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 970,
+      "tool": "gsc_request_indexing",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 414,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 1654,
+      "tool": "wordpress_content_transaction",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 135,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 538,
+      "tool": "commerce_product_audit",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 325,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 1298,
+      "tool": "sequential_thinking",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 68,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 272,
+      "tool": "sequential_thinking_session",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 48,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 192,
+      "tool": "sequential_thinking_status",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 112,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 447,
+      "tool": "procedural_skill_search",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 64,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 255,
+      "tool": "procedural_skill_get",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 48,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 192,
+      "tool": "procedural_skill_status",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 91,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 364,
+      "tool": "procedural_skill_invalidate",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 112,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 445,
+      "tool": "procedural_skill_curate",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 89,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 354,
+      "tool": "prstudio_seo_autopilot_status",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 126,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 501,
+      "tool": "prstudio_seo_autopilot_next",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 309,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 1233,
+      "tool": "prstudio_seo_autopilot_control",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 56,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 223,
+      "tool": "engineering_status",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 98,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 390,
+      "tool": "engineering_repo_map",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 118,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 471,
+      "tool": "engineering_validate",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 205,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 818,
+      "tool": "engineering_terminal",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 123,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 492,
+      "tool": "browser_live_attach",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 154,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 616,
+      "tool": "browser_live_signal",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 113,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 449,
+      "tool": "browser_live_stop",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 78,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 309,
+      "tool": "browser_live_status",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 260,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 1039,
+      "tool": "motion_animate",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 128,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 511,
+      "tool": "browser_task_control",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 244,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 976,
+      "tool": "browser_status",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 144,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 575,
+      "tool": "browser_tabs",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 203,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 810,
+      "tool": "browser_adopt_tabs",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 305,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 1218,
+      "tool": "local_studio",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 188,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 751,
+      "tool": "browser_open",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 146,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 581,
+      "tool": "browser_close",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 183,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 732,
+      "tool": "browser_navigate",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 141,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 561,
+      "tool": "browser_back",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 142,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 567,
+      "tool": "browser_forward",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 140,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 559,
+      "tool": "browser_reload",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 412,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 1648,
+      "tool": "browser_wait",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 384,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 1535,
+      "tool": "browser_snapshot",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 146,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 582,
+      "tool": "browser_dom",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 147,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 585,
+      "tool": "browser_accessibility",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 336,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 1343,
+      "tool": "browser_click",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 333,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 1329,
+      "tool": "browser_double_click",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 330,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 1318,
+      "tool": "browser_hover",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 335,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 1337,
+      "tool": "browser_focus",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 352,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 1407,
+      "tool": "browser_fill",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 352,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 1405,
+      "tool": "browser_type",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 356,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 1422,
+      "tool": "browser_press",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 365,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 1460,
+      "tool": "browser_select",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 357,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 1425,
+      "tool": "browser_check",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 188,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 752,
+      "tool": "browser_scroll",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 272,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 1085,
+      "tool": "browser_screenshot",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 334,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 1333,
+      "tool": "browser_extract",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 145,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 579,
+      "tool": "browser_network",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 143,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 569,
+      "tool": "browser_console",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 145,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 578,
+      "tool": "browser_page_errors",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 88,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 349,
+      "tool": "browser_launch",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 328,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 1312,
+      "tool": "browser_tap",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 340,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 1360,
+      "tool": "browser_blur",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 233,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 929,
+      "tool": "browser_drag",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 341,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 1363,
+      "tool": "browser_screenshot_element",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 358,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 1432,
+      "tool": "browser_computed_styles",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 150,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 597,
+      "tool": "browser_headers",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 151,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 601,
+      "tool": "browser_accessibility_scan",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 149,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 596,
+      "tool": "browser_core_web_vitals",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 150,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 600,
+      "tool": "browser_service_workers",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 196,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 783,
+      "tool": "browser_dialog",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 233,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 932,
+      "tool": "browser_viewport",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 170,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 678,
+      "tool": "browser_verify_url",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 162,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 648,
+      "tool": "browser_capture_baseline",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 165,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 660,
+      "tool": "browser_compare_baseline",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 184,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 736,
+      "tool": "browser_pdf",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 223,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 892,
+      "tool": "browser_wait_network",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 202,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 806,
+      "tool": "browser_geolocation",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 162,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 648,
+      "tool": "browser_locale",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 169,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 675,
+      "tool": "browser_timezone",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 176,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 704,
+      "tool": "browser_offline",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 253,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 1010,
+      "tool": "browser_trace",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 208,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 832,
+      "tool": "browser_har",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 163,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 652,
+      "tool": "browser_lighthouse",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 208,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 831,
+      "tool": "browser_link_crawl",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 195,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 779,
+      "tool": "browser_sitemap_crawl",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 242,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 968,
+      "tool": "browser_responsive_matrix",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 113,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 449,
+      "tool": "browser_actions_search",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 142,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 568,
+      "tool": "browser_batch",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 133,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 529,
+      "tool": "browser_action",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 55,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 219,
+      "tool": "agency_status",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 148,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 592,
+      "tool": "agency_submit",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 100,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 400,
+      "tool": "agency_control",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 100,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 400,
+      "tool": "twin_sync",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 97,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 386,
+      "tool": "twin_query",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 73,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": true,
+      "schema_object": true,
+      "surface_bytes": 289,
+      "tool": "social_metrics_ingest",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 109,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 436,
+      "tool": "social_insights",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 138,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 552,
+      "tool": "opportunity_rank",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 95,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 378,
+      "tool": "sentinel_scan",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 195,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 780,
+      "tool": "browser_observation_bundle",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 193,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 770,
+      "tool": "browser_social_snapshot",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 210,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 839,
+      "tool": "browser_pointer_sequence",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 208,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 832,
+      "tool": "browser_keyboard_sequence",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 243,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 970,
+      "tool": "prstudio_observe",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 184,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 735,
+      "tool": "prstudio_do",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 129,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 514,
+      "tool": "prstudio_backlog",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 265,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 1058,
+      "tool": "prstudio_intervention_record",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 178,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 709,
+      "tool": "prstudio_flow",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 82,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 325,
+      "tool": "prstudio_tool_manual",
+      "valid_sample_accepted": true
+    },
+    {
+      "approx_tokens": 97,
+      "direct_dispatch": true,
+      "invalid_sample_rejected": true,
+      "open_schema": false,
+      "schema_object": true,
+      "surface_bytes": 386,
+      "tool": "prstudio_research_radar",
+      "valid_sample_accepted": true
+    }
+  ],
+  "schema_version": "1.0.0",
+  "surface_approx_tokens": 21773,
+  "surface_total_bytes": 87090,
+  "tools_total": 118,
+  "valid_sample_acceptance_rate": 1.0
+}
