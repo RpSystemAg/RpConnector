@@ -24,6 +24,36 @@ final class PRSTUDIO_UC_Content_Transaction {
         return new WP_Error( $code, $message, $data );
     }
 
+    /**
+     * Apply WordPress post KSES without silently deleting bounded inert HTML
+     * comment markers used as exact idempotency/postcondition evidence.
+     *
+     * wp_kses_post() removes HTML comments. Before this helper an append_once of
+     * "<!-- marker -->" became an empty replacement; the transaction then wrote
+     * only its framing newlines and verified that wrong target hash as success.
+     * Protect only comments whose payload contains no markup delimiters/NUL and
+     * is bounded to 256 bytes. All other HTML still goes through wp_kses_post().
+     */
+    private static function sanitize_replacement( string $raw ): string {
+        if ( ! function_exists( 'wp_kses_post' ) ) { return $raw; }
+        $comments = array();
+        $protected = preg_replace_callback(
+            '/<!--([^\x00<>]{1,256})-->/',
+            static function ( array $match ) use ( &$comments ): string {
+                $token = 'PRSTUDIOCOMMENT' . count( $comments ) . 'TOKEN';
+                $comments[ $token ] = $match[0];
+                return $token;
+            },
+            $raw
+        );
+        if ( ! is_string( $protected ) ) { $protected = $raw; }
+        $sanitized = (string) wp_kses_post( $protected );
+        foreach ( $comments as $token => $comment ) {
+            $sanitized = str_replace( $token, $comment, $sanitized );
+        }
+        return $sanitized;
+    }
+
     private static function snapshot( WP_Post $post ): array {
         return array(
             'id' => (int) $post->ID,
@@ -232,7 +262,15 @@ final class PRSTUDIO_UC_Content_Transaction {
         }
         $search = (string) ( $args['search'] ?? '' );
         $replacement_raw = (string) ( $args['replacement'] ?? '' );
-        $replacement = function_exists( 'wp_kses_post' ) ? wp_kses_post( $replacement_raw ) : $replacement_raw;
+        $replacement = self::sanitize_replacement( $replacement_raw );
+        if ( '' !== $replacement_raw && '' === $replacement ) {
+            return self::error(
+                'prstudio_content_replacement_sanitized_empty',
+                'The requested replacement was removed completely by WordPress content sanitization, so no write was attempted.',
+                400,
+                array( 'retryable' => false )
+            );
+        }
         $marker = trim( (string) ( $args['idempotency_marker'] ?? '' ) );
         $expected_occurrences = max( 1, min( 100, (int) ( $args['expected_occurrences'] ?? 1 ) ) );
 
@@ -293,6 +331,33 @@ final class PRSTUDIO_UC_Content_Transaction {
 
         $target_hash = hash( 'sha256', $after_content );
 
+        // A dry run ends at the pre-commit boundary. It may prove preconditions
+        // and the exact target hash, but it must not create a revision, call the
+        // mutation guard/commit path, touch modified_gmt, or write audit/ledger
+        // state. In particular it never reports database verification because no
+        // database mutation was attempted.
+        if ( ! empty( $args['dry_run'] ) ) {
+            return array(
+                'transaction_version' => self::VERSION,
+                'id' => $id,
+                'dry_run' => true,
+                'changed' => false,
+                'would_change' => true,
+                'executed' => false,
+                'operation' => $operation,
+                'actual_occurrences' => $actual_occurrences,
+                'before_sha256' => $before['sha256'],
+                'expected_after_sha256' => $target_hash,
+                'db_verified' => null,
+                'verified' => false,
+                'blocking' => false,
+                'verification_scope' => 'preconditions_only',
+                'retry_mutation' => false,
+                'permalink' => $before['permalink'],
+                'modified_gmt' => $before['modified_gmt'],
+            );
+        }
+
         // All optimistic-lock, anchor-count, idempotency and size preconditions
         // have succeeded. This is the actual pre-commit boundary: only now is a
         // protected WordPress mutation possible.
@@ -337,8 +402,34 @@ final class PRSTUDIO_UC_Content_Transaction {
             );
         }
 
+        // Hash equality proves the exact target bytes persisted. Also verify the
+        // semantic needle requested by the caller so db_verified can never mean
+        // merely "some transformed replacement was stored".
+        $db_needle = (string) ( $args['verify_contains'] ?? ( '' !== $marker ? $marker : $replacement ) );
+        if ( '' !== $db_needle && false === strpos( $persisted_content, $db_needle ) ) {
+            return array(
+                'transaction_version' => self::VERSION,
+                'id' => $id,
+                'changed' => true,
+                'executed' => true,
+                'operation' => $operation,
+                'revision_id' => $revision_id,
+                'before_sha256' => $before['sha256'],
+                'expected_after_sha256' => $target_hash,
+                'observed_sha256' => $persisted_hash,
+                'db_verified' => false,
+                'verified' => false,
+                'degraded' => true,
+                'blocking' => false,
+                'state' => 'PERSISTED_UNVERIFIED',
+                'reason' => 'database_postcondition_missing',
+                'verify_contains' => $db_needle,
+                'retry_mutation' => false,
+            );
+        }
+
         $after = self::snapshot( $persisted );
-        $needle = (string) ( $args['verify_contains'] ?? ( '' !== $marker ? $marker : $replacement ) );
+        $needle = $db_needle;
         $public = ! empty( $args['public_verify'] ) ? self::public_verify( $after['permalink'], $needle ) : array( 'requested' => false, 'verified' => null );
         $frontend_verified = true === ( $public['verified'] ?? null );
 
