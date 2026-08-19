@@ -3,31 +3,39 @@ name: Build and attest provenance
 on:
   push:
     branches: [master]
+    tags: ['production-*']
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: build-attest-${{ github.ref }}
+  group: build-attest-${{ github.sha }}
   cancel-in-progress: false
 
 jobs:
   build:
+    name: Build, SBOM, checksum and provenance
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     permissions:
       contents: read
       id-token: write
       attestations: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
       - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
         with:
           php-version: '8.1'
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
+
+      - name: Audit immutable release/build dependencies
+        run: python tests/production-supply-chain-source.py --strict --json-output dist/supply-chain-source.json
 
       - name: Verify generated capability/contract artifacts match source
         run: python tests/regenerate-contract-artifacts.py --php-binary php --check
@@ -48,24 +56,34 @@ jobs:
       - name: Generated artifacts must be reproducible
         run: git diff --exit-code
 
-      - name: Package build artifacts
+      - name: Generate deterministic CycloneDX SBOM
+        run: |
+          python tests/generate-production-sbom.py --output dist/sbom.cdx.json
+          test -s dist/sbom.cdx.json
+          jq -e '.bomFormat == "CycloneDX" and .specVersion == "1.6" and (.components | length > 2)' dist/sbom.cdx.json
+
+      - name: Package build artifacts and checksums
         run: |
           mkdir -p dist
           sha=$(git rev-parse --short HEAD)
           zip -rq "dist/prstudio-unified-browser-agent-${sha}.zip" prstudio-unified-browser-agent -x '*.claude*'
           zip -rq "dist/prstudio-unified-control-${sha}.zip" prstudio-unified-control
-          sha256sum dist/*.zip > dist/SHA256SUMS
+          sha256sum dist/*.zip dist/sbom.cdx.json dist/supply-chain-source.json > dist/SHA256SUMS
+          sha256sum --check --strict dist/SHA256SUMS
 
-      - name: Attest build provenance
+      - name: Attest complete build provenance
         uses: actions/attest-build-provenance@ef244123eb79f2f7a7e75d99086184180e6d0018 # v1
         with:
-          subject-path: 'dist/*.zip'
+          subject-path: 'dist/*'
 
       - name: Upload immutable release candidates
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: prstudio-build-${{ github.sha }}
           path: |
             dist/*.zip
             dist/SHA256SUMS
+            dist/sbom.cdx.json
+            dist/supply-chain-source.json
+          if-no-files-found: error
           retention-days: 30
