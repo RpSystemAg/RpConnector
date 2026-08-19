@@ -313,7 +313,8 @@ final class PRSTUDIO_UC_Store {
 		}
 		$wpdb->update( self::devices_table(), $data, array( 'device_uuid' => $device_uuid ), $formats, array( '%s' ) );
 	}
-// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
+
+// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
 
 	public static function list_devices(): array {
 		global $wpdb;
@@ -568,7 +569,8 @@ final class PRSTUDIO_UC_Store {
 		) );
 		return 1 === (int) $updated;
 	}
-// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
+
+// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
 
 	public static function mark_running( string $task_uuid, string $lease_token ): ?array {
 		return self::transition( $task_uuid, PRSTUDIO_UC_State_Machine::RUNNING, array(), $lease_token );
@@ -761,7 +763,7 @@ final class PRSTUDIO_UC_Store {
 				     lease_token = NULL,
 				     lease_expires_gmt = NULL,
 				     updated_gmt = %s
-				 WHERE status IN (%s, %s, %s)
+				 WHERE status IN (%s, %s)
 				   AND lease_expires_gmt IS NOT NULL
 				   AND lease_expires_gmt < %s",
 				PRSTUDIO_UC_State_Machine::QUEUED,
@@ -920,7 +922,8 @@ final class PRSTUDIO_UC_Store {
 		if(1!==(int)$updated)return null;
 		self::event( 'job:' . $job_uuid, 'job.running' ); return self::get_job( $job_uuid );
 	}
-// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
+
+// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
 
 	public static function checkpoint_job( string $job_uuid, int $step_index, array $result ): ?array {
 		global $wpdb; $job = self::get_job( $job_uuid );
@@ -976,7 +979,8 @@ final class PRSTUDIO_UC_Store {
 		if(!$data){return $job;} $data['updated_gmt']=self::now();$formats[]='%s';$wpdb->update(self::jobs_table(),$data,array('job_uuid'=>$job_uuid),$formats,array('%s'));return self::get_job($job_uuid);
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
 	}
-// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
+
+// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
 
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
 	public static function set_job_state( string $job_uuid, string $state, array $patch = array() ): ?array {
@@ -1038,14 +1042,16 @@ final class PRSTUDIO_UC_Store {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
 		if(1!==(int)$updated)return null;self::event('job:'.$job_uuid,'job.checkpoint',array('step_index'=>$step_index,'progress'=>$progress));return self::get_job($job_uuid);
 	}
-// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
+
+// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
 
 	public static function wait_leased_job( string $job_uuid, string $lease_token, string $state, array $checkpoint ): ?array {
 		global $wpdb;$state=self::canonical_job_state($state);if('WAITING_FOR_BROWSER'!==$state)return null;
 		$updated=$wpdb->update(self::jobs_table(),array('status'=>$state,'checkpoint'=>self::encode($checkpoint),'lease_token'=>null,'lease_expires_gmt'=>null,'worker_id'=>null,'heartbeat_gmt'=>null,'updated_gmt'=>self::now()),array('job_uuid'=>$job_uuid,'lease_token'=>$lease_token,'status'=>'RUNNING'),array('%s','%s','%s','%s','%s','%s','%s'),array('%s','%s','%s'));
 		if(1!==(int)$updated)return null;self::event('job:'.$job_uuid,'job.'.strtolower($state));return self::get_job($job_uuid);
 	}
-// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
+
+// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
 
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
 	public static function release_leased_job( string $job_uuid, string $lease_token, array $checkpoint, int $step_index, int $progress, int $delay_seconds = 0 ): ?array {
@@ -1066,7 +1072,8 @@ final class PRSTUDIO_UC_Store {
 		$base=max(5,(int)($job['backoff_seconds']??30));$attempt=max(1,(int)($job['attempts']??1));$delay=min(3600,$base*(2**min(8,$attempt-1)));$spread=max(1,min(60,(int)floor($delay/4)));$jitter=hexdec(substr(hash('sha256',(string)($job['job_uuid']??'').'|'.$attempt),0,4))%$spread;return $delay+$jitter;
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
 	}
-// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
+
+// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
 
 	public static function retry_leased_job( string $job_uuid, string $lease_token, array $error ): ?array {
 		global $wpdb;$job=self::get_job($job_uuid);if(!$job||!hash_equals((string)($job['lease_token']??''),$lease_token))return null;
@@ -1084,7 +1091,8 @@ final class PRSTUDIO_UC_Store {
 		$updated=$wpdb->update(self::jobs_table(),array('status'=>'DEAD_LETTER','failure_class'=>sanitize_key($failure_class),'error'=>self::encode($error),'lease_token'=>null,'lease_expires_gmt'=>null,'worker_id'=>null,'heartbeat_gmt'=>null,'updated_gmt'=>self::now(),'completed_gmt'=>self::now()),$where,array('%s','%s','%s','%s','%s','%s','%s','%s','%s'),$where_formats);
 		if(1!==(int)$updated)return false;self::event('job:'.$job_uuid,'job.dead_letter',array('failure_class'=>$failure_class));return true;
 	}
-// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
+
+// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
 
 	public static function upsert_schedule( string $playbook, string $objective, array $context, int $interval_seconds, string $next_run_gmt = '', string $schedule_uuid = '' ): array {
 		global $wpdb;$playbook=sanitize_key($playbook);$schedule_uuid=preg_match('/^[a-f0-9-]{20,64}$/i',$schedule_uuid)?strtolower($schedule_uuid):self::uuid();$interval_seconds=max(300,min(30*DAY_IN_SECONDS,$interval_seconds));$next=strtotime($next_run_gmt.' UTC');if(false===$next){$next=class_exists('PRSTUDIO_UC_Schedule_Clock')?PRSTUDIO_UC_Schedule_Clock::initial_run($context,$interval_seconds)->getTimestamp():time()+60;}$now=self::now();
