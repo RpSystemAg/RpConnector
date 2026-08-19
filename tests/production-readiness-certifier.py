@@ -65,6 +65,7 @@ def validate_artifacts(receipt: dict[str, Any], gate_id: str, require_sha: bool)
     artifacts = receipt.get("artifacts")
     if not isinstance(artifacts, list) or not artifacts:
         return [f"{gate_id}: artifacts must be a non-empty list"]
+    remote_prefixes = ("http://", "https://", "s3://", "gs://", "artifact://")
     for index, artifact in enumerate(artifacts):
         if not isinstance(artifact, dict):
             errors.append(f"{gate_id}: artifact[{index}] is not an object")
@@ -73,17 +74,27 @@ def validate_artifacts(receipt: dict[str, Any], gate_id: str, require_sha: bool)
         digest = str(artifact.get("sha256") or "").lower().strip()
         if not location:
             errors.append(f"{gate_id}: artifact[{index}] has no path/uri")
+            continue
         if require_sha and (len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest)):
             errors.append(f"{gate_id}: artifact[{index}] has no valid sha256")
             continue
-        if location and not location.startswith(("http://", "https://", "s3://", "gs://", "artifact://")):
-            path = Path(location)
-            if not path.is_absolute():
-                path = ROOT / path
-            if path.exists() and path.is_file() and require_sha:
-                actual = sha256_file(path)
-                if actual != digest:
-                    errors.append(f"{gate_id}: artifact[{index}] digest mismatch for {location}")
+        if location.startswith(remote_prefixes):
+            # The meta-certifier has no authority to fetch arbitrary evidence URIs.
+            # Remote references therefore require a prior collector/verifier to assert
+            # that it fetched the object and checked this digest for the exact release.
+            if artifact.get("verified_external") is not True:
+                errors.append(f"{gate_id}: artifact[{index}] remote URI is not independently verified")
+            continue
+        path = Path(location)
+        if not path.is_absolute():
+            path = ROOT / path
+        if not path.exists() or not path.is_file():
+            errors.append(f"{gate_id}: artifact[{index}] local evidence is missing: {location}")
+            continue
+        if require_sha:
+            actual = sha256_file(path)
+            if actual != digest:
+                errors.append(f"{gate_id}: artifact[{index}] digest mismatch for {location}")
     return errors
 
 
