@@ -22,9 +22,24 @@ function wp_salt( $scheme = 'auth' ) { return 'm11-portable-concurrency-' . (str
 function absint( $value ) { return abs( (int) $value ); }
 function esc_url_raw( $value ) { return trim( (string) $value ); }
 
+$self_test = '' === (string) ( $argv[2] ?? '' ) && '' === (string) ( $argv[3] ?? '' );
+$self_test_paths = array();
 $store = (string) ( $argv[2] ?? '' );
 $barrier = (string) ( $argv[3] ?? '' );
-if ( '' === $store || '' === $barrier ) {
+if ( $self_test ) {
+	$store = tempnam( sys_get_temp_dir(), 'prstudio-m11-options-' );
+	$barrier = tempnam( sys_get_temp_dir(), 'prstudio-m11-barrier-' );
+	if ( false === $store || false === $barrier ) {
+		fwrite( STDERR, "worker self-test temporary files unavailable\n" );
+		exit( 74 );
+	}
+	$self_test_paths = array( $store, $barrier );
+	if ( false === file_put_contents( $store, "{}\n", LOCK_EX ) || false === file_put_contents( $barrier, "go\n", LOCK_EX ) ) {
+		foreach ( $self_test_paths as $path ) { @unlink( $path ); }
+		fwrite( STDERR, "worker self-test temporary state unavailable\n" );
+		exit( 74 );
+	}
+} elseif ( '' === $store || '' === $barrier ) {
 	fwrite( STDERR, "worker requires store and barrier paths\n" );
 	exit( 64 );
 }
@@ -80,8 +95,70 @@ function m11_wait_barrier( string $path ): void {
 	while ( ! file_exists( $path ) && microtime( true ) < $deadline ) { usleep( 1000 ); }
 	if ( ! file_exists( $path ) ) { throw new RuntimeException( 'barrier_timeout' ); }
 }
+function m11_require_ok( $value, string $stage ): array {
+	if ( is_wp_error( $value ) ) {
+		throw new RuntimeException( $stage . ':' . (string) $value->get_error_code() );
+	}
+	if ( ! is_array( $value ) || empty( $value['ok'] ) ) {
+		throw new RuntimeException( $stage . ':invalid_result' );
+	}
+	return $value;
+}
 
 try {
+	if ( $self_test ) {
+		m11_wait_barrier( $barrier );
+		$context = array( 'client_id' => 'portable-oauth-client' );
+		$first = m11_require_ok( PRSTUDIO_UC_Execution_Lanes::open( array( 'label' => 'bare worker A', 'chat_key' => 'bare-worker-a' ), $context ), 'open_a' );
+		$second = m11_require_ok( PRSTUDIO_UC_Execution_Lanes::open( array( 'label' => 'bare worker B', 'chat_key' => 'bare-worker-b' ), $context ), 'open_b' );
+		$first_handle = (string) ( $first['lane_handle'] ?? '' );
+		$second_handle = (string) ( $second['lane_handle'] ?? '' );
+		if ( '' === $first_handle || '' === $second_handle || hash_equals( $first_handle, $second_handle ) ) {
+			throw new RuntimeException( 'lane_identity_invalid' );
+		}
+
+		$status = m11_require_ok( PRSTUDIO_UC_Execution_Lanes::status( array(), $context ), 'status' );
+		if ( 2 !== (int) ( $status['count'] ?? -1 ) ) {
+			throw new RuntimeException( 'lane_state_not_persisted' );
+		}
+
+		$resource = 'wp:post:bare-worker-self-test';
+		$lease_a = m11_require_ok( PRSTUDIO_UC_Execution_Lanes::acquire( array( 'lane_handle' => $first_handle, 'resource' => $resource, 'ttl_seconds' => 120 ), $context ), 'acquire_a' );
+		$contended = PRSTUDIO_UC_Execution_Lanes::acquire( array( 'lane_handle' => $second_handle, 'resource' => $resource, 'ttl_seconds' => 120 ), $context );
+		if ( ! is_wp_error( $contended ) || 'resource_busy_other_context' !== (string) $contended->get_error_code() ) {
+			throw new RuntimeException( 'contention_not_enforced' );
+		}
+		m11_require_ok( PRSTUDIO_UC_Execution_Lanes::release( array( 'lane_handle' => $first_handle, 'resource' => $resource ), $context ), 'release_a' );
+		$lease_b = m11_require_ok( PRSTUDIO_UC_Execution_Lanes::acquire( array( 'lane_handle' => $second_handle, 'resource' => $resource, 'ttl_seconds' => 120 ), $context ), 'acquire_b_after_release' );
+		m11_require_ok( PRSTUDIO_UC_Execution_Lanes::release( array( 'lane_handle' => $second_handle, 'resource' => $resource ), $context ), 'release_b' );
+		m11_require_ok( PRSTUDIO_UC_Execution_Lanes::close( array( 'lane_handle' => $first_handle ), $context ), 'close_a' );
+		m11_require_ok( PRSTUDIO_UC_Execution_Lanes::close( array( 'lane_handle' => $second_handle ), $context ), 'close_b' );
+		$final_status = m11_require_ok( PRSTUDIO_UC_Execution_Lanes::status( array(), $context ), 'final_status' );
+		if ( 0 !== (int) ( $final_status['count'] ?? -1 ) ) {
+			throw new RuntimeException( 'lane_cleanup_incomplete' );
+		}
+
+		$store_state = json_decode( (string) file_get_contents( $store ), true );
+		if ( ! is_array( $store_state ) ) {
+			throw new RuntimeException( 'option_store_invalid_json' );
+		}
+		foreach ( $self_test_paths as $path ) {
+			if ( ! @unlink( $path ) ) { throw new RuntimeException( 'temporary_cleanup_failed' ); }
+		}
+		$self_test_paths = array();
+		echo json_encode( array(
+			'ok' => true,
+			'mode' => 'direct-real-execution-lanes',
+			'opened' => 2,
+			'contention_error' => (string) $contended->get_error_code(),
+			'first_lease_ok' => ! empty( $lease_a['ok'] ),
+			'second_lease_after_release_ok' => ! empty( $lease_b['ok'] ),
+			'final_count' => 0,
+			'cleanup' => true,
+		), JSON_UNESCAPED_SLASHES );
+		exit( 0 );
+	}
+
 	$mode = (string) ( $argv[1] ?? '' );
 	m11_wait_barrier( $barrier );
 	if ( 'open' === $mode ) {
@@ -99,6 +176,7 @@ try {
 		throw new InvalidArgumentException( 'unknown_worker_mode' );
 	}
 } catch ( Throwable $error ) {
+	foreach ( $self_test_paths as $path ) { @unlink( $path ); }
 	fwrite( STDERR, get_class( $error ) . ': ' . $error->getMessage() . "\n" );
 	exit( 70 );
 }
