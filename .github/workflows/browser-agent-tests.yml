@@ -27,8 +27,16 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
+      - name: Stamp exact Browser Agent source identity
+        shell: pwsh
+        run: python ../.github/scripts/stamp-browser-build-identity.py --source-sha "$env:GITHUB_SHA"
       - name: Generate component MANIFEST/FILE-INTEGRITY
         run: python ../tests/build-release.py --build
+      - name: Verify exact Browser Agent source identity
+        shell: pwsh
+        run: python ../.github/scripts/stamp-browser-build-identity.py --source-sha "$env:GITHUB_SHA" --verify
+      - name: Verify deterministic component build
+        run: python ../tests/build-release.py --check
       - name: Parse extension manifest
         run: node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8')); console.log('manifest ok')"
       - name: Browser Agent deterministic tests
