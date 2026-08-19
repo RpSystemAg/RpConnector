@@ -24,6 +24,7 @@ jobs:
       PRSTUDIO_TEST_DB_USER: root
       PRSTUDIO_TEST_DB_PASS: ''
       PRSTUDIO_TEST_DB_NAME: prstudio_full_surface
+      RP_WP_PATH: /tmp/rpconnector-full-surface-wp
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -34,6 +35,8 @@ jobs:
         with:
           php-version: '8.1'
           extensions: mysqli, mbstring, xml
+          tools: wp-cli:2.12.0
+          coverage: none
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -43,33 +46,56 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install mandatory parser and syscall evidence tools
+      - name: Install mandatory parser, generative and syscall evidence tools
         run: |
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y strace
-          python -m pip install --disable-pip-version-check --no-input PyYAML
+          python -m pip install --disable-pip-version-check --no-input PyYAML "hypothesis==6.164.0"
+          python - <<'PY'
+          import hypothesis, yaml
+          assert hypothesis.__version__ == '6.164.0', hypothesis.__version__
+          print('Hypothesis', hypothesis.__version__)
+          print('PyYAML', yaml.__version__)
+          PY
           strace -V
+          wp --info
           php -v
           node --version
           python --version
           bash --version | head -n 1
 
-      - name: Start real SQL engine used by integration tests
+      - name: Start real SQL engine used by integration and WordPress tests
         run: |
           set -euo pipefail
           docker run -d --name rpconnector-full-surface-db \
             -e MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=yes \
+            -e MARIADB_DATABASE=wordpress_stateful \
             -p 3306:3306 \
             mariadb:11.4@sha256:a794d9eb009e20de605858a11f32f63b4075cbd197c650436f0e3b457e4caed7
           for i in $(seq 1 90); do
             if php -r '$m=@new mysqli("127.0.0.1","root","", "",3306); exit($m->connect_errno?1:0);'; then
-              exit 0
+              break
+            fi
+            if [ "$i" = 90 ]; then
+              docker logs rpconnector-full-surface-db
+              exit 1
             fi
             sleep 1
           done
-          docker logs rpconnector-full-surface-db
-          exit 1
+          php -r '$m=new mysqli("127.0.0.1","root","", "",3306); if($m->connect_errno){fwrite(STDERR,$m->connect_error);exit(1);} if(!$m->query("CREATE DATABASE IF NOT EXISTS prstudio_full_surface CHARACTER SET utf8mb4")){fwrite(STDERR,$m->error);exit(1);} echo "databases ready\n";'
+
+      - name: Install exact candidate into real WordPress runtime
+        run: |
+          set -euo pipefail
+          rm -rf "$RP_WP_PATH"
+          mkdir -p "$RP_WP_PATH"
+          wp core download --path="$RP_WP_PATH" --force
+          wp config create --path="$RP_WP_PATH" --dbname=wordpress_stateful --dbuser=root --dbpass='' --dbhost=127.0.0.1:3306 --skip-check
+          wp core install --path="$RP_WP_PATH" --url=http://127.0.0.1:8080 --title='Full surface execution' --admin_user=rpadmin --admin_password='Full-Surface-Only-2026!' --admin_email='full-surface@example.invalid' --skip-email
+          cp -a prstudio-unified-control "$RP_WP_PATH/wp-content/plugins/prstudio-unified-control"
+          wp plugin activate prstudio-unified-control --path="$RP_WP_PATH"
+          wp eval --path="$RP_WP_PATH" 'if (!PRSTUDIO_UC_Store::maybe_upgrade()) { fwrite(STDERR,"store upgrade failed\n"); exit(1); } echo "store ready\n";'
 
       - name: Execute exact-checkout 100 percent gate
         run: |
@@ -96,9 +122,11 @@ jobs:
             .ok == true
           ' evidence/full-surface-execution.json
 
-      - name: Show database evidence on failure
+      - name: Show database and WordPress evidence on failure
         if: failure()
-        run: docker logs rpconnector-full-surface-db || true
+        run: |
+          docker logs rpconnector-full-surface-db || true
+          wp eval --path="$RP_WP_PATH" 'echo wp_json_encode(PRSTUDIO_UC_Store::queue_stats(), JSON_PRETTY_PRINT),"\n";' || true
 
       - name: Upload exact-SHA execution registry
         if: always()
