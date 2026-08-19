@@ -1,0 +1,154 @@
+name: Network chaos
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+  schedule:
+    - cron: '41 4 * * 2'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: network-chaos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  toxiproxy:
+    name: Toxiproxy 2.12.0 / DB + HTTP latency reset recovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      db:
+        image: mariadb:11.4@sha256:a794d9eb009e20de605858a11f32f63b4075cbd197c650436f0e3b457e4caed7
+        env:
+          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: 'yes'
+          MARIADB_DATABASE: wordpress_chaos
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+    env:
+      WP_PATH: /tmp/rpconnector-chaos-wp
+      TOXIPROXY_VERSION: '2.12.0'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: '8.4'
+          extensions: mysqli, mbstring, curl
+          tools: wp-cli:2.12.0
+          coverage: none
+
+      - name: Download exact Toxiproxy binaries and verify upstream checksums
+        run: |
+          set -euo pipefail
+          base="https://github.com/Shopify/toxiproxy/releases/download/v${TOXIPROXY_VERSION}"
+          curl --fail --location --silent --show-error "$base/checksums.txt" -o /tmp/toxiproxy-checksums.txt
+          for asset in toxiproxy-server-linux-amd64 toxiproxy-cli-linux-amd64; do
+            curl --fail --location --silent --show-error "$base/$asset" -o "/tmp/$asset"
+            (cd /tmp && grep "  ${asset}$" toxiproxy-checksums.txt | sha256sum --check --strict)
+            chmod +x "/tmp/$asset"
+          done
+          /tmp/toxiproxy-server-linux-amd64 -version
+          /tmp/toxiproxy-cli-linux-amd64 --version
+
+      - name: Start proxy and route WordPress database through it
+        run: |
+          /tmp/toxiproxy-server-linux-amd64 -host 127.0.0.1 -port 8474 >/tmp/toxiproxy.log 2>&1 &
+          for i in $(seq 1 50); do curl --fail --silent http://127.0.0.1:8474/version && break; sleep 0.1; done
+          curl --fail --silent --show-error -X POST http://127.0.0.1:8474/proxies \
+            -H 'Content-Type: application/json' \
+            --data '{"name":"mysql","listen":"127.0.0.1:13306","upstream":"127.0.0.1:3306"}' >/tmp/toxi-mysql.json
+
+          rm -rf "$WP_PATH" && mkdir -p "$WP_PATH"
+          wp core download --path="$WP_PATH" --force
+          wp config create --path="$WP_PATH" --dbname=wordpress_chaos --dbuser=root --dbpass='' --dbhost=127.0.0.1:13306 --skip-check
+          wp core install --path="$WP_PATH" --url=http://127.0.0.1:8080 --title='Network chaos' --admin_user=rpadmin --admin_password='Chaos-Only-2026!' --admin_email='chaos@example.invalid' --skip-email
+          cp -a prstudio-unified-control "$WP_PATH/wp-content/plugins/prstudio-unified-control"
+          wp plugin activate prstudio-unified-control --path="$WP_PATH"
+          wp eval --path="$WP_PATH" 'if (!PRSTUDIO_UC_Store::maybe_upgrade()) { exit(1); }'
+          wp db check --path="$WP_PATH"
+
+      - name: Inject DB latency plus jitter and prove it is observable but bounded
+        run: |
+          curl --fail --silent --show-error -X POST http://127.0.0.1:8474/proxies/mysql/toxics \
+            -H 'Content-Type: application/json' \
+            --data '{"name":"db-latency","type":"latency","stream":"downstream","toxicity":1.0,"attributes":{"latency":700,"jitter":250}}' >/tmp/toxi-latency.json
+          start=$(date +%s%3N)
+          timeout 8s wp option get siteurl --path="$WP_PATH" >/tmp/latency-siteurl.txt
+          end=$(date +%s%3N)
+          elapsed=$((end-start))
+          echo "observed DB latency=${elapsed}ms"
+          test "$elapsed" -ge 400
+          test "$elapsed" -lt 8000
+          curl --fail --silent -X DELETE http://127.0.0.1:8474/proxies/mysql/toxics/db-latency >/dev/null
+
+      - name: Cut DB stream and require bounded failure followed by clean recovery
+        run: |
+          curl --fail --silent --show-error -X POST http://127.0.0.1:8474/proxies/mysql/toxics \
+            -H 'Content-Type: application/json' \
+            --data '{"name":"db-timeout","type":"timeout","stream":"downstream","toxicity":1.0,"attributes":{"timeout":100}}' >/tmp/toxi-timeout.json
+          set +e
+          timeout 6s wp option get siteurl --path="$WP_PATH" >/tmp/db-cut.out 2>/tmp/db-cut.err
+          code=$?
+          set -e
+          test "$code" -ne 0
+          test "$code" -ne 124
+          curl --fail --silent -X DELETE http://127.0.0.1:8474/proxies/mysql/toxics/db-timeout >/dev/null
+          sleep 0.5
+          timeout 8s wp db check --path="$WP_PATH"
+          timeout 8s wp eval --path="$WP_PATH" 'echo wp_json_encode(PRSTUDIO_UC_Store::queue_stats()),"\n";' >/tmp/post-db-recovery.json
+          jq -e 'type == "object"' /tmp/post-db-recovery.json
+
+      - name: Put WordPress HTTP itself behind Toxiproxy
+        run: |
+          PHP_CLI_SERVER_WORKERS=8 php -S 127.0.0.1:8080 -t "$WP_PATH" "$WP_PATH/index.php" >/tmp/chaos-wp.log 2>&1 &
+          for i in $(seq 1 100); do curl --fail --silent http://127.0.0.1:8080/ >/dev/null && break; sleep 0.1; done
+          curl --fail --silent --show-error -X POST http://127.0.0.1:8474/proxies \
+            -H 'Content-Type: application/json' \
+            --data '{"name":"http","listen":"127.0.0.1:18080","upstream":"127.0.0.1:8080"}' >/tmp/toxi-http.json
+          curl --fail --silent http://127.0.0.1:18080/ >/dev/null
+
+      - name: HTTP latency/reset is bounded and target recovers
+        run: |
+          curl --fail --silent --show-error -X POST http://127.0.0.1:8474/proxies/http/toxics \
+            -H 'Content-Type: application/json' \
+            --data '{"name":"http-latency","type":"latency","stream":"downstream","toxicity":1.0,"attributes":{"latency":900,"jitter":300}}' >/dev/null
+          start=$(date +%s%3N)
+          curl --fail --silent --max-time 6 http://127.0.0.1:18080/ >/dev/null
+          end=$(date +%s%3N)
+          test $((end-start)) -ge 500
+          curl --fail --silent -X DELETE http://127.0.0.1:8474/proxies/http/toxics/http-latency >/dev/null
+
+          curl --fail --silent --show-error -X POST http://127.0.0.1:8474/proxies/http/toxics \
+            -H 'Content-Type: application/json' \
+            --data '{"name":"http-reset","type":"reset_peer","stream":"downstream","toxicity":1.0,"attributes":{"timeout":0}}' >/dev/null
+          set +e
+          curl --fail --silent --max-time 4 http://127.0.0.1:18080/ >/tmp/http-reset.out 2>/tmp/http-reset.err
+          code=$?
+          set -e
+          test "$code" -ne 0
+          curl --fail --silent -X DELETE http://127.0.0.1:8474/proxies/http/toxics/http-reset >/dev/null
+          sleep 0.2
+          curl --fail --silent --max-time 6 http://127.0.0.1:18080/ >/dev/null
+          wp db check --path="$WP_PATH"
+
+      - name: Preserve chaos evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: network-chaos-${{ github.sha }}
+          path: |
+            /tmp/toxiproxy.log
+            /tmp/toxi-*.json
+            /tmp/db-cut.*
+            /tmp/http-reset.*
+            /tmp/post-db-recovery.json
+            /tmp/chaos-wp.log
+          if-no-files-found: warn
+          retention-days: 30
