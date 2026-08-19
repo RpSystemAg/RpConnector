@@ -5,6 +5,11 @@ The harness refuses shortened production runs. It executes only bounded argv or
 HTTP probes (never shell=True), records every observation, requires a real
 operator-supplied restart hook, and requires independent lease/queue/memory
 oracles before h24_soak can pass.
+
+A bare invocation runs a deterministic self-test of this executable harness. It
+never emits or claims H24 production evidence. Supplying production inputs or
+RP_H24_REAL_ENVIRONMENT=1 enters the real H24 path, whose 86,400-second minimum
+and real-environment requirements remain unchanged.
 """
 from __future__ import annotations
 
@@ -14,6 +19,8 @@ import json
 import os
 import signal
 import subprocess
+import sys
+import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -151,6 +158,83 @@ def append_event(path: Path, event: dict[str, Any]) -> None:
         handle.write(json.dumps(event, sort_keys=True) + "\n")
 
 
+def self_test() -> int:
+    """Exercise the executable harness without fabricating production evidence."""
+    failures: list[str] = []
+
+    try:
+        profile = json.loads(DEFAULT_PROFILE.read_text(encoding="utf-8"))
+        if int(profile.get("minimum_duration_seconds", 0)) < 86400:
+            failures.append("default profile no longer enforces an H24 minimum")
+    except Exception as exc:
+        failures.append(f"default profile could not be loaded: {type(exc).__name__}: {exc}")
+
+    ok, detail = run_argv([sys.executable, "-c", "print('h24-self-test-ok')"], 10)
+    if not ok or detail.get("returncode") != 0 or "h24-self-test-ok" not in detail.get("output_tail", ""):
+        failures.append(f"successful argv probe failed: {detail}")
+
+    bad_ok, bad_detail = run_argv([sys.executable, "-c", "import sys; sys.exit(7)"], 10)
+    if bad_ok or bad_detail.get("returncode") != 7:
+        failures.append(f"failing argv probe was not observed: {bad_detail}")
+
+    missing_http_ok, missing_http = run_http({"url_env": "RP_H24_SELF_TEST_URL_MUST_NOT_EXIST", "path": "/"}, 1)
+    if missing_http_ok or "missing URL environment variable" not in missing_http.get("error", ""):
+        failures.append(f"missing HTTP environment was not rejected: {missing_http}")
+
+    unsupported_ok, unsupported = execute_probe({"kind": "unsupported"}, 1)
+    if unsupported_ok or "unsupported probe kind" not in unsupported.get("error", ""):
+        failures.append(f"unsupported probe kind was not rejected: {unsupported}")
+
+    with tempfile.TemporaryDirectory(prefix="rp-h24-self-test-") as tmp_name:
+        temp = Path(tmp_name)
+        profile_path = temp / "environment.json"
+        command = [sys.executable, "-c", "import sys; sys.exit(0)"]
+        profile_path.write_text(
+            json.dumps(
+                {
+                    "real": True,
+                    "environment_id": "h24-harness-self-test",
+                    "hooks": {hook_id: {"kind": "argv", "command": command} for hook_id in REQUIRED_HOOKS},
+                },
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        loaded, errors, resolved = load_environment_profile(str(profile_path))
+        if errors or resolved != profile_path or loaded.get("real") is not True:
+            failures.append(f"valid environment profile was rejected: errors={errors} resolved={resolved}")
+
+        for hook_id in REQUIRED_HOOKS:
+            hook_ok, hook_detail = execute_probe({"id": hook_id, **loaded["hooks"][hook_id]}, 10)
+            if not hook_ok:
+                failures.append(f"hook {hook_id} did not execute: {hook_detail}")
+
+        events = temp / "events.ndjson"
+        append_event(events, {"event": "self_test", "ok": True})
+        try:
+            event = json.loads(events.read_text(encoding="utf-8").strip())
+            if event != {"event": "self_test", "ok": True}:
+                failures.append(f"event persistence mismatch: {event}")
+            if len(sha256(events)) != 64:
+                failures.append("event SHA-256 digest length is invalid")
+        except Exception as exc:
+            failures.append(f"event evidence could not be read: {type(exc).__name__}: {exc}")
+
+    print("PRODUCTION H24 HARNESS SELF-TEST")
+    if failures:
+        for item in failures:
+            print(f"FAIL {item}")
+        return 1
+    print("PASS default_profile_minimum_24h")
+    print("PASS argv_success_and_failure_observed")
+    print("PASS http_missing_environment_rejected")
+    print("PASS environment_hooks_execute")
+    print("PASS event_evidence_and_hash")
+    print("SELF_TEST production_evidence_claimed=false")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--profile", default=str(DEFAULT_PROFILE))
@@ -160,6 +244,17 @@ def main() -> int:
     parser.add_argument("--commit", default="")
     parser.add_argument("--strict", action="store_true")
     args = parser.parse_args()
+
+    production_requested = bool(
+        args.environment_profile
+        or args.duration_seconds
+        or args.interval_seconds
+        or args.commit
+        or args.strict
+        or os.environ.get("RP_H24_REAL_ENVIRONMENT", "").strip() == "1"
+    )
+    if not production_requested:
+        return self_test()
 
     profile_path = Path(args.profile)
     if not profile_path.is_absolute():
@@ -348,7 +443,7 @@ def main() -> int:
     for check in checks:
         print(f"{'PASS' if check['ok'] else 'FAIL'} {check['id']}")
     print(f"receipt={receipt_path.relative_to(ROOT)} ok={str(receipt['ok']).lower()}")
-    return 1 if args.strict and not receipt["ok"] else 0
+    return 0 if receipt["ok"] else 1
 
 
 if __name__ == "__main__":
