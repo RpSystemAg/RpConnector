@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "name": "rpconnector-production-h24",
+  "minimum_duration_seconds": 86400,
+  "probe_interval_seconds": 300,
+  "max_probe_runtime_seconds": 120,
+  "max_consecutive_failures": 2,
+  "required_environment_variables": [
+    "RP_H24_REAL_ENVIRONMENT",
+    "RP_H24_WORDPRESS_URL"
+  ],
+  "probes": [
+    {
+      "id": "runtime_state_model",
+      "kind": "argv",
+      "command": ["python", "tests/runtime-state-model-check.py"]
+    },
+    {
+      "id": "runtime_invariants",
+      "kind": "argv",
+      "command": ["python", "tests/runtime-invariants-audit.py"]
+    },
+    {
+      "id": "wordpress_health",
+      "kind": "http_get",
+      "url_env": "RP_H24_WORDPRESS_URL",
+      "path": "/wp-json/",
+      "expected_status": [200]
+    }
+  ]
+}

@@ -1,0 +1,199 @@
+name: WooCommerce live acceptance
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: woocommerce-live-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  commerce:
+    name: WooCommerce 11.0.1 real mutation/rollback
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      db:
+        # mariadb:11.4 — multi-platform index pinned for reproducible acceptance.
+        image: mariadb:11.4@sha256:a794d9eb009e20de605858a11f32f63b4075cbd197c650436f0e3b457e4caed7
+        env:
+          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: 'yes'
+          MARIADB_DATABASE: wordpress_woo_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+    env:
+      WP_PATH: /tmp/rpconnector-woocommerce
+      WP_URL: http://127.0.0.1:8090
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: '8.1'
+          extensions: mysqli, mbstring, curl
+          tools: wp-cli:2.12.0
+
+      - name: Install current WordPress and pinned WooCommerce
+        run: |
+          rm -rf "$WP_PATH"
+          mkdir -p "$WP_PATH"
+          wp core download --path="$WP_PATH" --force
+          wp config create --path="$WP_PATH" --dbname=wordpress_woo_test --dbuser=root --dbpass='' --dbhost=127.0.0.1:3306 --skip-check
+          wp core install --path="$WP_PATH" --url="$WP_URL" --title='RP Woo acceptance' --admin_user=rpadmin --admin_password='Acceptance-Only-Password-2026!' --admin_email='acceptance@example.invalid' --skip-email
+          wp plugin install woocommerce --version=11.0.1 --activate --path="$WP_PATH"
+          test "$(wp plugin get woocommerce --field=version --path="$WP_PATH")" = '11.0.1'
+
+      - name: Install RP Connector from exact commit
+        run: |
+          rm -rf "$WP_PATH/wp-content/plugins/prstudio-unified-control"
+          cp -a prstudio-unified-control "$WP_PATH/wp-content/plugins/prstudio-unified-control"
+          wp plugin activate prstudio-unified-control --path="$WP_PATH"
+          wp eval --path="$WP_PATH" 'if (!PRSTUDIO_UC_Store::maybe_upgrade()) { fwrite(STDERR,"RP schema migration failed\n"); exit(1); } echo "rp schema ready\n";'
+
+      - name: Create deterministic real WooCommerce product
+        run: |
+          wp eval --path="$WP_PATH" '
+            $p=new WC_Product_Simple();
+            $p->set_name("RP Enterprise Product");
+            $p->set_status("publish");
+            $p->set_regular_price("10.00");
+            $p->set_catalog_visibility("visible");
+            $p->set_featured(false);
+            $p->set_virtual(false);
+            $p->set_downloadable(false);
+            $p->set_manage_stock(true);
+            $p->set_stock_quantity(7);
+            $p->set_stock_status("instock");
+            $id=$p->save();
+            if (!$id) { fwrite(STDERR,"product create failed\n"); exit(1); }
+            file_put_contents("/tmp/rp-product-id",(string)$id);
+            echo "product_id={$id}\n";
+          '
+          test -s /tmp/rp-product-id
+
+      - name: Capture baseline through RP Commerce Engine
+        run: |
+          id=$(cat /tmp/rp-product-id)
+          wp eval --path="$WP_PATH" "
+            \$r=PRSTUDIO_UC_Commerce_Engine::product_read(['id'=>(int)$id]);
+            if (is_wp_error(\$r)) { fwrite(STDERR,\$r->get_error_message().'\\n'); exit(1); }
+            file_put_contents('/tmp/rp-product-baseline.json',wp_json_encode(\$r,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES));
+            echo wp_json_encode(\$r),\"\\n\";
+          "
+          jq -e '.regular_price == "10" or .regular_price == "10.00"' /tmp/rp-product-baseline.json
+          jq -e '.catalog_visibility == "visible" and .featured == false and .virtual == false and .downloadable == false and .stock_quantity == 7' /tmp/rp-product-baseline.json
+
+      - name: Mutate all historically rollback-sensitive fields
+        run: |
+          id=$(cat /tmp/rp-product-id)
+          wp eval --path="$WP_PATH" "
+            \$r=PRSTUDIO_UC_Commerce_Engine::product_update([
+              'id'=>(int)$id,
+              'changes'=>[
+                'regular_price'=>'19.95',
+                'catalog_visibility'=>'hidden',
+                'featured'=>true,
+                'virtual'=>true,
+                'downloadable'=>true
+              ]
+            ]);
+            if (is_wp_error(\$r)) { fwrite(STDERR,\$r->get_error_message().'\\n'); exit(1); }
+            if ((\$r['_control_outcome']['verified']??null)!==false) { fwrite(STDERR,'mutation must not self-certify independent verification\\n'); exit(1); }
+            echo wp_json_encode(\$r),\"\\n\";
+          "
+
+      - name: Independent WooCommerce CRUD read-back proves mutation
+        run: |
+          id=$(cat /tmp/rp-product-id)
+          wp eval --path="$WP_PATH" "
+            wc_delete_product_transients((int)$id);
+            \$p=wc_get_product((int)$id);
+            \$observed=[
+              'regular_price'=>(string)\$p->get_regular_price(),
+              'catalog_visibility'=>(string)\$p->get_catalog_visibility(),
+              'featured'=>(bool)\$p->get_featured(),
+              'virtual'=>(bool)\$p->get_virtual(),
+              'downloadable'=>(bool)\$p->get_downloadable()
+            ];
+            echo wp_json_encode(\$observed),\"\\n\";
+            if (\$observed['regular_price']!=='19.95' || \$observed['catalog_visibility']!=='hidden' || !\$observed['featured'] || !\$observed['virtual'] || !\$observed['downloadable']) exit(1);
+          "
+
+      - name: Invalid payload is atomic — validation error means zero write
+        run: |
+          id=$(cat /tmp/rp-product-id)
+          before=$(wp eval --path="$WP_PATH" "echo (string)wc_get_product((int)$id)->get_regular_price();")
+          wp eval --path="$WP_PATH" "
+            \$r=PRSTUDIO_UC_Commerce_Engine::product_update([
+              'id'=>(int)$id,
+              'changes'=>['regular_price'=>'999.00','seo'=>['unsupported_key'=>'must-not-write']]
+            ]);
+            if (!is_wp_error(\$r) || \$r->get_error_code()!=='prstudio_product_seo_field_unsupported') { fwrite(STDERR,'expected validation error\\n'); exit(1); }
+            echo \$r->get_error_code(),\"\\n\";
+          "
+          after=$(wp eval --path="$WP_PATH" "wc_delete_product_transients((int)$id); echo (string)wc_get_product((int)$id)->get_regular_price();")
+          test "$before" = "$after"
+
+      - name: Inventory mutation and independent read-back
+        run: |
+          id=$(cat /tmp/rp-product-id)
+          wp eval --path="$WP_PATH" "
+            \$r=PRSTUDIO_UC_Commerce_Engine::inventory_update(['id'=>(int)$id,'stock_quantity'=>3,'stock_status'=>'instock']);
+            if (is_wp_error(\$r)) { fwrite(STDERR,\$r->get_error_message().'\\n'); exit(1); }
+            wc_delete_product_transients((int)$id);
+            \$p=wc_get_product((int)$id);
+            if ((int)\$p->get_stock_quantity()!==3 || (string)\$p->get_stock_status()!=='instock') exit(1);
+            echo 'inventory verified\\n';
+          "
+
+      - name: Restore baseline and independently verify rollback completeness
+        run: |
+          id=$(cat /tmp/rp-product-id)
+          wp eval --path="$WP_PATH" "
+            \$b=json_decode(file_get_contents('/tmp/rp-product-baseline.json'),true);
+            \$changes=[];
+            foreach (['name','slug','description','short_description','status','regular_price','sale_price','catalog_visibility','featured','virtual','downloadable','sku'] as \$k) {
+              if (array_key_exists(\$k,\$b)) \$changes[\$k]=\$b[\$k];
+            }
+            \$r=PRSTUDIO_UC_Commerce_Engine::product_update(['id'=>(int)$id,'changes'=>\$changes]);
+            if (is_wp_error(\$r)) { fwrite(STDERR,\$r->get_error_message().'\\n'); exit(1); }
+            \$stock=PRSTUDIO_UC_Commerce_Engine::inventory_update(['id'=>(int)$id,'stock_quantity'=>(int)\$b['stock_quantity'],'stock_status'=>(string)\$b['stock_status']]);
+            if (is_wp_error(\$stock)) { fwrite(STDERR,\$stock->get_error_message().'\\n'); exit(1); }
+            wc_delete_product_transients((int)$id);
+            \$p=wc_get_product((int)$id);
+            \$ok=(string)\$p->get_catalog_visibility()===(string)\$b['catalog_visibility']
+              && (bool)\$p->get_featured()===(bool)\$b['featured']
+              && (bool)\$p->get_virtual()===(bool)\$b['virtual']
+              && (bool)\$p->get_downloadable()===(bool)\$b['downloadable']
+              && (int)\$p->get_stock_quantity()===(int)\$b['stock_quantity']
+              && (string)\$p->get_stock_status()===(string)\$b['stock_status'];
+            if (!\$ok) { fwrite(STDERR,'rollback read-back mismatch\\n'); exit(1); }
+            echo 'rollback independently verified\\n';
+          "
+
+      - name: Real public product page remains reachable after rollback
+        run: |
+          php -S 127.0.0.1:8090 -t "$WP_PATH" "$WP_PATH/index.php" > /tmp/rp-woo-http.log 2>&1 &
+          id=$(cat /tmp/rp-product-id)
+          url=$(wp post get "$id" --field=url --path="$WP_PATH")
+          for i in $(seq 1 40); do
+            if curl --fail --silent --show-error "$url" -o /tmp/rp-product-page.html; then break; fi
+            sleep 0.25
+          done
+          grep -q 'RP Enterprise Product' /tmp/rp-product-page.html
+
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          wp core version --path="$WP_PATH" || true
+          wp plugin list --path="$WP_PATH" || true
+          cat /tmp/rp-woo-http.log || true

@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "real": false,
+  "environment_id": "REPLACE-WITH-STAGING-ID",
+  "instructions": "Copy outside the repository, set real=true only for a real isolated staging environment, and replace every command with environment-specific argv. Commands must exit 0 only when the independent oracle is satisfied.",
+  "hooks": {
+    "restart": {
+      "kind": "argv",
+      "command": ["REPLACE", "WITH", "REAL", "WORDPRESS-DB-CHROME", "RESTART", "ARGV"]
+    },
+    "lease_oracle": {
+      "kind": "argv",
+      "command": ["REPLACE", "WITH", "ORPHAN-LEASE", "ORACLE", "ARGV"]
+    },
+    "queue_oracle": {
+      "kind": "argv",
+      "command": ["REPLACE", "WITH", "QUEUE-GROWTH", "ORACLE", "ARGV"]
+    },
+    "memory_oracle": {
+      "kind": "argv",
+      "command": ["REPLACE", "WITH", "MEMORY-GROWTH", "ORACLE", "ARGV"]
+    }
+  }
+}

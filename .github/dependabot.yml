@@ -14,6 +14,12 @@
 # Grouped into a single weekly pull request. Separate PRs per action would
 # produce a stream of near-identical reviews for a set that changes together
 # anyway, and a review nobody reads is not a review.
+#
+# A `docker` ecosystem entry was proposed on the branch this merged with. It is
+# left out because `git ls-files` finds no Dockerfile and no compose file:
+# Dependabot would have nothing to read, and a configured ecosystem that never
+# produces an update is indistinguishable from one that is quietly broken. Add
+# it in the same commit that adds the first Dockerfile.
 version: 2
 updates:
   - package-ecosystem: "github-actions"
@@ -21,6 +27,8 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
+      time: "05:00"
+      timezone: "Europe/Rome"
     open-pull-requests-limit: 5
     groups:
       github-actions:

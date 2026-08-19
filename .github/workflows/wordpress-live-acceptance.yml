@@ -1,0 +1,271 @@
+name: WordPress live acceptance
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wordpress-live-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  wordpress:
+    name: WP ${{ matrix.wordpress }} / PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        wordpress: ['6.5', 'latest']
+        php: ['8.0', '8.5']
+    services:
+      db:
+        # mariadb:11.4 — multi-platform index pinned for reproducible acceptance.
+        image: mariadb:11.4@sha256:a794d9eb009e20de605858a11f32f63b4075cbd197c650436f0e3b457e4caed7
+        env:
+          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: 'yes'
+          MARIADB_DATABASE: wordpress_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+    env:
+      WP_PATH: /tmp/rpconnector-wordpress
+      WP_URL: http://127.0.0.1:8080
+      WP_VERSION: ${{ matrix.wordpress }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mysqli, mbstring, curl
+          tools: wp-cli:2.12.0
+
+      - name: Download real WordPress core
+        run: |
+          rm -rf "$WP_PATH"
+          mkdir -p "$WP_PATH"
+          if [ "$WP_VERSION" = "latest" ]; then
+            wp core download --path="$WP_PATH" --force
+          else
+            wp core download --path="$WP_PATH" --version="$WP_VERSION" --force
+          fi
+          wp core version --path="$WP_PATH"
+
+      - name: Configure and install WordPress
+        run: |
+          wp config create \
+            --path="$WP_PATH" \
+            --dbname=wordpress_test \
+            --dbuser=root \
+            --dbpass='' \
+            --dbhost=127.0.0.1:3306 \
+            --skip-check
+          wp config set WP_ENVIRONMENT_TYPE local --path="$WP_PATH"
+          wp core install \
+            --path="$WP_PATH" \
+            --url="$WP_URL" \
+            --title='RP Connector acceptance' \
+            --admin_user=rpadmin \
+            --admin_password='Acceptance-Only-Password-2026!' \
+            --admin_email='acceptance@example.invalid' \
+            --skip-email
+
+      - name: Install plugin from this exact commit
+        run: |
+          rm -rf "$WP_PATH/wp-content/plugins/prstudio-unified-control"
+          cp -a prstudio-unified-control "$WP_PATH/wp-content/plugins/prstudio-unified-control"
+          wp plugin activate prstudio-unified-control --path="$WP_PATH"
+          wp plugin status prstudio-unified-control --path="$WP_PATH"
+
+      - name: Exercise real bootstrap and schema migration
+        run: |
+          wp eval --path="$WP_PATH" '
+            if (!class_exists("PRSTUDIO_UC_Store")) { fwrite(STDERR, "PRSTUDIO_UC_Store missing\n"); exit(1); }
+            if (!PRSTUDIO_UC_Store::maybe_upgrade()) { fwrite(STDERR, "schema upgrade failed\n"); exit(1); }
+            $version=(string)get_option("prstudio_uc_schema_version", "");
+            if ($version !== PRSTUDIO_UC_Store::schema_version()) { fwrite(STDERR, "schema version mismatch: {$version}\n"); exit(1); }
+            echo "schema=".$version."\n";
+          '
+
+      - name: Deactivate/reactivate without corrupting durable schema
+        run: |
+          before=$(wp option get prstudio_uc_schema_version --path="$WP_PATH")
+          wp plugin deactivate prstudio-unified-control --path="$WP_PATH"
+          wp plugin activate prstudio-unified-control --path="$WP_PATH"
+          after=$(wp option get prstudio_uc_schema_version --path="$WP_PATH")
+          test "$before" = "$after"
+          wp eval --path="$WP_PATH" 'if (!PRSTUDIO_UC_Store::schema_ready()) { fwrite(STDERR,"schema not ready after reactivation\n"); exit(1); } echo "reactivation schema ready\n";'
+
+      - name: Exercise WordPress cron bootstrap
+        run: |
+          wp cron event run --due-now --path="$WP_PATH"
+          wp eval --path="$WP_PATH" 'echo wp_json_encode(PRSTUDIO_UC_Store::queue_stats(), JSON_UNESCAPED_SLASHES),"\n";'
+
+      - name: Serve WordPress with eight real concurrent PHP workers
+        run: |
+          PHP_CLI_SERVER_WORKERS=8 php -S 127.0.0.1:8080 -t "$WP_PATH" "$WP_PATH/index.php" > /tmp/rpconnector-wordpress-http.log 2>&1 &
+          echo $! > /tmp/rpconnector-wordpress-http.pid
+          for i in $(seq 1 80); do
+            if curl --fail --silent --show-error "$WP_URL/" -o /tmp/rpconnector-home.html; then break; fi
+            sleep 0.25
+          done
+          test -s /tmp/rpconnector-home.html
+          grep -qi '<html' /tmp/rpconnector-home.html
+
+      - name: Verify OAuth authorization-server metadata over real HTTP
+        run: |
+          curl --fail --silent --show-error "$WP_URL/.well-known/oauth-authorization-server" -o /tmp/oauth-metadata.json
+          jq -e '
+            .issuer != null and
+            .authorization_response_iss_parameter_supported == true and
+            .client_id_metadata_document_supported == true and
+            (.code_challenge_methods_supported | index("S256")) != null
+          ' /tmp/oauth-metadata.json
+
+      - name: Concurrent DCR — accepted registrations cannot be lost
+        run: |
+          set -euo pipefail
+          wp option delete prstudio_mcp_v5_clients --path="$WP_PATH" || true
+          wp db query --path="$WP_PATH" "DELETE FROM wp_options WHERE option_name LIKE '_transient_prstudio_mcp_v5_dcr_%' OR option_name LIKE '_transient_timeout_prstudio_mcp_v5_dcr_%';"
+          rm -f /tmp/dcr-*.json /tmp/dcr-*.code
+          seq 1 12 | xargs -P12 -I{} sh -c '
+            curl --silent --show-error \
+              -o "/tmp/dcr-{}.json" \
+              -w "%{http_code}" \
+              -X POST "http://127.0.0.1:8080/?rest_route=/prstudio-unified/v1/oauth/register" \
+              -H "Content-Type: application/json" \
+              --data-binary "{\"client_name\":\"parallel-{}\",\"redirect_uris\":[\"http://127.0.0.1/callback/{}\"],\"scope\":\"prstudio.read\"}" \
+              > "/tmp/dcr-{}.code"
+          '
+          for i in $(seq 1 12); do
+            test "$(cat /tmp/dcr-$i.code)" = '200'
+            jq -e '.client_id | type == "string" and length > 0' "/tmp/dcr-$i.json" >/dev/null
+          done
+          persisted=$(wp option get prstudio_mcp_v5_clients --format=json --path="$WP_PATH" | jq 'length')
+          echo "parallel DCR accepted=12 persisted=$persisted"
+          test "$persisted" -eq 12
+
+      - name: Concurrent DCR rate limit is bounded and persistence matches accepted responses
+        run: |
+          set -euo pipefail
+          wp option delete prstudio_mcp_v5_clients --path="$WP_PATH" || true
+          wp db query --path="$WP_PATH" "DELETE FROM wp_options WHERE option_name LIKE '_transient_prstudio_mcp_v5_dcr_%' OR option_name LIKE '_transient_timeout_prstudio_mcp_v5_dcr_%';"
+          rm -f /tmp/rate-*.json /tmp/rate-*.code
+          seq 1 40 | xargs -P20 -I{} sh -c '
+            curl --silent --show-error \
+              -o "/tmp/rate-{}.json" \
+              -w "%{http_code}" \
+              -X POST "http://127.0.0.1:8080/?rest_route=/prstudio-unified/v1/oauth/register" \
+              -H "Content-Type: application/json" \
+              --data-binary "{\"client_name\":\"rate-{}\",\"redirect_uris\":[\"http://127.0.0.1/rate/{}\"],\"scope\":\"prstudio.read\"}" \
+              > "/tmp/rate-{}.code"
+          '
+          accepted=0
+          rejected=0
+          for i in $(seq 1 40); do
+            code=$(cat "/tmp/rate-$i.code")
+            if [ "$code" = '200' ]; then
+              accepted=$((accepted+1))
+            elif [ "$code" = '429' ]; then
+              rejected=$((rejected+1))
+            else
+              echo "unexpected DCR status $code for request $i"
+              cat "/tmp/rate-$i.json"
+              exit 1
+            fi
+          done
+          persisted=$(wp option get prstudio_mcp_v5_clients --format=json --path="$WP_PATH" | jq 'length')
+          echo "DCR accepted=$accepted rejected=$rejected persisted=$persisted"
+          test "$accepted" -le 20
+          test "$accepted" -eq "$persisted"
+          test "$rejected" -ge 20
+
+      - name: Mint an ephemeral runtime token inside real WordPress
+        run: |
+          wp eval --path="$WP_PATH" '
+            $method=(new ReflectionClass("PRSTUDIO_UC_MCP_Auth_V5"))->getMethod("issue_tokens");
+            $method->setAccessible(true);
+            $tokens=$method->invoke(null,"ci-runtime-client","prstudio.read prstudio.write offline_access",PRSTUDIO_UC_MCP_Auth_V5::mcp_url());
+            if (!is_array($tokens) || empty($tokens["access_token"])) { fwrite(STDERR,"token issuance failed\n"); exit(1); }
+            file_put_contents("/tmp/rpconnector-access-token",$tokens["access_token"]);
+          '
+          test -s /tmp/rpconnector-access-token
+
+      - name: MCP 2026-07-28 authenticated tools/list over WordPress HTTP
+        run: |
+          token=$(cat /tmp/rpconnector-access-token)
+          cat > /tmp/mcp-tools-list.json <<'JSON'
+          {"jsonrpc":"2.0","id":"tools-ci","method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/clientInfo":{"name":"rpconnector-ci","version":"1.0"}}}}
+          JSON
+          curl --fail --silent --show-error \
+            -D /tmp/mcp-tools-headers.txt \
+            -o /tmp/mcp-tools-response.json \
+            -X POST "$WP_URL/?rest_route=/prstudio-unified/v1/mcp" \
+            -H "Authorization: Bearer $token" \
+            -H 'Content-Type: application/json' \
+            -H 'MCP-Protocol-Version: 2026-07-28' \
+            -H 'Mcp-Method: tools/list' \
+            --data-binary @/tmp/mcp-tools-list.json
+          grep -qi '^MCP-Protocol-Version: 2026-07-28' /tmp/mcp-tools-headers.txt
+          jq -e '.jsonrpc == "2.0" and .id == "tools-ci" and (.result.tools | type == "array") and (.result.tools | length > 0) and (.result._meta["io.modelcontextprotocol/serverInfo"].name == "RP Studio Connector")' /tmp/mcp-tools-response.json
+
+      - name: MCP modern request without _meta is rejected
+        run: |
+          token=$(cat /tmp/rpconnector-access-token)
+          status=$(curl --silent --show-error \
+            -o /tmp/mcp-missing-meta.json \
+            -w '%{http_code}' \
+            -X POST "$WP_URL/?rest_route=/prstudio-unified/v1/mcp" \
+            -H "Authorization: Bearer $token" \
+            -H 'Content-Type: application/json' \
+            -H 'MCP-Protocol-Version: 2026-07-28' \
+            -H 'Mcp-Method: ping' \
+            --data-binary '{"jsonrpc":"2.0","id":"bad-meta","method":"ping","params":{}}')
+          test "$status" = '400'
+          jq -e '.error.code == -32602' /tmp/mcp-missing-meta.json
+
+      - name: MCP modern initialize is explicitly absent
+        run: |
+          token=$(cat /tmp/rpconnector-access-token)
+          cat > /tmp/mcp-initialize.json <<'JSON'
+          {"jsonrpc":"2.0","id":"init-modern","method":"initialize","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}
+          JSON
+          status=$(curl --silent --show-error \
+            -o /tmp/mcp-initialize-response.json \
+            -w '%{http_code}' \
+            -X POST "$WP_URL/?rest_route=/prstudio-unified/v1/mcp" \
+            -H "Authorization: Bearer $token" \
+            -H 'Content-Type: application/json' \
+            -H 'MCP-Protocol-Version: 2026-07-28' \
+            -H 'Mcp-Method: initialize' \
+            --data-binary @/tmp/mcp-initialize.json)
+          test "$status" = '404'
+          jq -e '.error.code == -32601' /tmp/mcp-initialize-response.json
+
+      - name: Deterministic authenticated MCP HTTP fuzz
+        env:
+          RP_MCP_URL: http://127.0.0.1:8080/?rest_route=/prstudio-unified/v1/mcp
+        run: |
+          export RP_MCP_TOKEN="$(cat /tmp/rpconnector-access-token)"
+          python3 tests/mcp-http-fuzz.py
+          unset RP_MCP_TOKEN
+
+      - name: Remove ephemeral token material
+        if: always()
+        run: rm -f /tmp/rpconnector-access-token
+
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          wp plugin list --path="$WP_PATH" || true
+          wp option get prstudio_uc_schema_version --path="$WP_PATH" || true
+          wp option get prstudio_mcp_v5_clients --format=json --path="$WP_PATH" || true
+          cat /tmp/rpconnector-wordpress-http.log || true

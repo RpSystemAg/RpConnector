@@ -3,33 +3,40 @@ name: Static analysis
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: static-analysis-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # Run the suite on the PHP version the plugin actually claims to support.
   #
-  # This replaced a PHPCompatibility gate that could not do the job. The idea
-  # was sound -- the plugin header declares "Requires PHP: 8.0" and nothing
-  # verified it -- but the stable PHPCompatibility release predates PHP 8.0 and
-  # has no data for 8.1 functions, so it silently reported clean for exactly the
-  # calls it was supposed to catch. A self-test proved that: a fixture calling a
-  # known PHP 8.1 function came back unflagged.
+  # This is the surviving half of a merge. The other side proposed a
+  # PHPCompatibility gate against `testVersion 8.0-`, which is the more obvious
+  # way to check a declared minimum and is what most projects do. It was tried
+  # here and it does not work: the stable PHPCompatibility release predates PHP
+  # 8.0 and carries no data for 8.1 functions, so a fixture calling a known 8.1
+  # function came back unflagged. It reported clean for precisely the calls it
+  # existed to catch.
   #
-  # Executing the code on 8.0 has no such blind spot. A call to a function that
-  # does not exist there is a fatal, and the suites are what surface it.
-  # `php -l` cannot: calling an undefined function is valid syntax.
+  # Executing the code on 8.0 has no such blind spot. Calling a function that
+  # does not exist there is a fatal, and the suites surface it. `php -l` cannot:
+  # calling an undefined function is valid syntax.
   php-matrix:
     name: PHP ${{ matrix.php }} (declared floor is 8.0)
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
         php: ['8.0', '8.1', '8.3']
     steps:
-      - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
         with:
           php-version: ${{ matrix.php }}
           extensions: mbstring, json
@@ -54,40 +61,42 @@ jobs:
 
   # Broad multi-language linting, run as a ratchet.
   #
-  # The repo predates the linter, so a full sweep reports a long tail of
-  # findings nobody in the current change introduced. Two runs, two postures:
+  # Two runs, two postures, because the repo predates the linter:
+  #   master push     -> whole codebase, advisory. Measures the standing backlog.
+  #   everything else -> changed files only, BLOCKING. New code has to be clean.
   #
-  #   master push    -> whole codebase, advisory. Measures the standing backlog
-  #                     without blocking work on debt that is already there.
-  #   everything else-> changed files only, BLOCKING. New code has to be clean.
-  #
-  # So the backlog can only shrink. It was worth saying plainly: the earlier
-  # version of this job was advisory in both directions, which made it a report
-  # nobody had to act on.
+  # The other side of this merge set VALIDATE_ALL_CODEBASE: true with errors
+  # blocking on every event. That posture is only reachable once the backlog is
+  # clear, and it is not: the first full sweep reported 812 phpstan findings.
+  # Turning it on now would leave master permanently red, which teaches people
+  # to ignore the colour. The ratchet reaches the same end state -- backlog can
+  # only shrink -- without a wall in front of unrelated work.
   megalinter:
     name: MegaLinter (${{ github.event_name == 'push' && github.ref == 'refs/heads/master' && 'full sweep, advisory' || 'changed files, blocking' }})
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           # MegaLinter diffs against the base ref to decide what changed.
           fetch-depth: 0
       - name: MegaLinter
-        uses: oxsecurity/megalinter/flavors/php@v8
+        uses: oxsecurity/megalinter/flavors/php@ef3e84b8b836d76db562d0f3ed7da61e8fd538bc # v9.6.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # These two move together and must stay in sync: the full sweep is the
-          # only run allowed to be advisory. Splitting them would either block on
-          # the backlog or let new findings through.
+          # These two move together on purpose: the full sweep is the only run
+          # allowed to be advisory. Split them and you get either a gate that
+          # blocks on pre-existing debt or one that lets new findings through.
           VALIDATE_ALL_CODEBASE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
           DISABLE_ERRORS: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
       - name: Upload the report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: megalinter-report
+          name: megalinter-report-${{ github.sha }}
           path: |
             megalinter-reports
+          if-no-files-found: warn
           retention-days: 14

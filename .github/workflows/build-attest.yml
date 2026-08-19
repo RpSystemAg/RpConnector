@@ -3,49 +3,206 @@ name: Build and attest provenance
 on:
   push:
     branches: [master]
+    tags: ['production-*']
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: build-attest-${{ github.sha }}
+  cancel-in-progress: false
+
 jobs:
   build:
+    name: Build, SBOM, vulnerability scan, checksum and provenance
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     permissions:
       contents: read
       id-token: write
       attestations: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
         with:
           php-version: '8.1'
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
+
+      - name: Mark exact build evidence start
+        run: echo "RP_BUILD_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+
+      - name: Audit immutable release/build dependencies
+        run: python tests/production-supply-chain-source.py --strict --json-output dist/supply-chain-source.json
 
       - name: Verify generated capability/contract artifacts match source
         run: python tests/regenerate-contract-artifacts.py --php-binary php --check
 
-      - name: Verify BUILD-INFO.json counts match the generated registry/catalog/contract
+      - name: Verify BUILD-INFO.json counts match generated registry/catalog/contract
         run: node .github/scripts/check-build-info-counts.mjs
 
-      - name: Generate component MANIFEST/FILE-INTEGRITY (release pipeline order, deterministic)
+      - name: Enterprise structural and protocol gates
+        run: |
+          python tests/enterprise-static-audit.py
+          python tests/mcp-2026-07-28-conformance.py
+          python tests/runtime-invariants-audit.py
+          python tests/runtime-state-model-check.py
+
+      - name: Generate component MANIFEST/FILE-INTEGRITY
         run: python tests/build-release.py --build
 
-      - name: Package build artifacts
+      - name: Generated artifacts must be reproducible
+        run: git diff --exit-code
+
+      - name: Generate deterministic exact-SHA CycloneDX SBOM
         run: |
+          python tests/generate-production-sbom.py --output dist/sbom.cdx.json
+          test -s dist/sbom.cdx.json
+          jq -e --arg sha "$GITHUB_SHA" '
+            .bomFormat == "CycloneDX" and
+            .specVersion == "1.6" and
+            (.components | length > 2) and
+            ([.metadata.properties[] | select(.name == "rpstudio:source_commit") | .value] == [$sha])
+          ' dist/sbom.cdx.json
+
+      - name: Package release candidates
+        run: |
+          set -euo pipefail
           mkdir -p dist
           sha=$(git rev-parse --short HEAD)
           zip -rq "dist/prstudio-unified-browser-agent-${sha}.zip" prstudio-unified-browser-agent -x '*.claude*'
           zip -rq "dist/prstudio-unified-control-${sha}.zip" prstudio-unified-control
+          test -s "dist/prstudio-unified-browser-agent-${sha}.zip"
+          test -s "dist/prstudio-unified-control-${sha}.zip"
 
-      - name: Attest build provenance
-        uses: actions/attest-build-provenance@v1
+      - name: Exact-build HIGH/CRITICAL vulnerability scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0 / Trivy 0.70.0
         with:
-          subject-path: 'dist/*.zip'
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: '1'
+          format: json
+          output: dist/trivy-vulnerabilities.json
 
-      - uses: actions/upload-artifact@v4
+      - name: Freeze checksums after all static build outputs exist
+        run: |
+          set -euo pipefail
+          test -s dist/trivy-vulnerabilities.json
+          sha256sum \
+            dist/*.zip \
+            dist/sbom.cdx.json \
+            dist/supply-chain-source.json \
+            dist/trivy-vulnerabilities.json \
+            > dist/SHA256SUMS
+          sha256sum --check --strict dist/SHA256SUMS
+
+      - name: Attest exact immutable build subjects
+        id: provenance
+        uses: actions/attest-build-provenance@ef244123eb79f2f7a7e75d99086184180e6d0018 # v1
+        with:
+          subject-path: |
+            dist/*.zip
+            dist/sbom.cdx.json
+            dist/supply-chain-source.json
+            dist/trivy-vulnerabilities.json
+            dist/SHA256SUMS
+
+      - name: Preserve the signed provenance bundle beside the release
+        env:
+          BUNDLE_PATH: ${{ steps.provenance.outputs.bundle-path }}
+        run: |
+          set -euo pipefail
+          test -n "$BUNDLE_PATH"
+          test -s "$BUNDLE_PATH"
+          cp "$BUNDLE_PATH" dist/provenance.bundle.jsonl
+          test -s dist/provenance.bundle.jsonl
+
+      - name: Cryptographically verify every attested subject and signer policy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          verify_dir=$(mktemp -d)
+          export RP_ATTEST_VERIFY_DIR="$verify_dir"
+          subjects=(
+            dist/prstudio-unified-*.zip
+            dist/sbom.cdx.json
+            dist/supply-chain-source.json
+            dist/trivy-vulnerabilities.json
+            dist/SHA256SUMS
+          )
+          for file in "${subjects[@]}"; do
+            test -s "$file"
+            name=$(basename "$file")
+            gh attestation verify "$file" \
+              --repo "$GITHUB_REPOSITORY" \
+              --bundle dist/provenance.bundle.jsonl \
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/build-attest.yml" \
+              --source-digest "$GITHUB_SHA" \
+              --format json \
+              > "$verify_dir/$name.json"
+            test -s "$verify_dir/$name.json"
+          done
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          root=Path(os.environ['RP_ATTEST_VERIFY_DIR'])
+          subjects=[]
+          for report in sorted(root.glob('*.json')):
+              artifact=report.name[:-5]
+              file=Path('dist')/artifact
+              raw=json.loads(report.read_text(encoding='utf-8'))
+              if not isinstance(raw,list) or not raw:
+                  raise SystemExit(f'empty attestation verification for {artifact}')
+              subjects.append({
+                  'name':artifact,
+                  'sha256':hashlib.sha256(file.read_bytes()).hexdigest(),
+                  'verification':raw,
+              })
+          value={
+              'schema_version':1,
+              'commit_sha':os.environ['GITHUB_SHA'],
+              'policy':{
+                  'repository':os.environ['GITHUB_REPOSITORY'],
+                  'signer_workflow':os.environ['GITHUB_REPOSITORY']+'/.github/workflows/build-attest.yml',
+                  'source_digest':os.environ['GITHUB_SHA'],
+                  'predicate_type':'https://slsa.dev/provenance/v1',
+              },
+              'subjects':subjects,
+          }
+          Path('dist/attestation-verification.json').write_text(json.dumps(value,indent=2,sort_keys=True)+'\n',encoding='utf-8')
+          print('verified attestation subjects=',len(subjects))
+          PY
+
+      - name: Generate fail-closed supply-chain release receipt
+        run: |
+          python tests/production-supply-chain-release.py \
+            --commit "$GITHUB_SHA" \
+            --started-at "$RP_BUILD_STARTED_AT" \
+            --dist dist \
+            --output dist/supply-chain-release.json
+          jq -e --arg sha "$GITHUB_SHA" '.ok == true and .commit_sha == $sha and .gate_id == "supply_chain_release"' dist/supply-chain-release.json
+
+      - name: Upload self-verifying release candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: prstudio-build-${{ github.sha }}
-          path: dist/*.zip
+          path: |
+            dist/*.zip
+            dist/SHA256SUMS
+            dist/sbom.cdx.json
+            dist/supply-chain-source.json
+            dist/trivy-vulnerabilities.json
+            dist/provenance.bundle.jsonl
+            dist/attestation-verification.json
+            dist/supply-chain-release.json
+          if-no-files-found: error
           retention-days: 30

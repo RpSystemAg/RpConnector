@@ -1,0 +1,288 @@
+{
+  "schema_version": 1,
+  "claim": "production_ready",
+  "normative_date": "2026-08-19",
+  "fail_closed": true,
+  "require_exact_commit": true,
+  "allow_waivers": false,
+  "receipt_directory": "evidence/production",
+  "verdict_file": "evidence/production/production-readiness-verdict.json",
+  "receipt_schema": {
+    "required": ["schema_version", "gate_id", "commit_sha", "ok", "started_at", "finished_at", "environment", "checks", "artifacts", "waivers", "skipped"],
+    "artifact_sha256_required": true,
+    "forbid_skipped": true,
+    "forbid_waivers": true,
+    "forbid_degraded": true
+  },
+  "gates": {
+    "source_integrity": {
+      "mandatory": true,
+      "receipt": "source-integrity.json",
+      "real_environment": false,
+      "max_age_hours": 24,
+      "required_checks": [
+        "exact_source_tree",
+        "generated_artifacts_reproducible",
+        "release_manifest_consistent",
+        "no_release_placeholders",
+        "no_unresolved_stubs",
+        "dependency_actions_pinned"
+      ]
+    },
+    "atomic_capability_coverage": {
+      "mandatory": true,
+      "receipt": "atomic-capability-coverage.json",
+      "real_environment": false,
+      "max_age_hours": 24,
+      "required_checks": [
+        "inventory_complete",
+        "implementation_resolved",
+        "one_exact_case_per_operational_item",
+        "independent_oracle_per_item",
+        "official_docs_traced",
+        "zero_stub_operational_items",
+        "required_environment_evidence_present"
+      ]
+    },
+    "static_security": {
+      "mandatory": true,
+      "receipt": "static-security.json",
+      "real_environment": false,
+      "max_age_hours": 24,
+      "required_checks": [
+        "codeql",
+        "wordpress_plugin_check",
+        "php_static_analysis",
+        "javascript_static_analysis",
+        "dependency_vulnerability_scan",
+        "secret_scan"
+      ]
+    },
+    "auth_security": {
+      "mandatory": true,
+      "receipt": "auth-security.json",
+      "real_environment": true,
+      "max_age_hours": 72,
+      "required_checks": [
+        "pkce_s256",
+        "redirect_uri_exact_match",
+        "resource_binding",
+        "scope_enforcement",
+        "refresh_rotation",
+        "replay_rejected",
+        "expired_token_rejected",
+        "permission_denial_has_zero_side_effects"
+      ]
+    },
+    "browser_isolation": {
+      "mandatory": true,
+      "receipt": "browser-isolation.json",
+      "real_environment": true,
+      "max_age_hours": 72,
+      "required_checks": [
+        "owned_tab_enforced",
+        "wrong_tab_rejected",
+        "wrong_origin_rejected",
+        "stale_session_rejected",
+        "stale_document_rejected",
+        "raw_cdp_policy_enforced",
+        "arbitrary_javascript_rejected",
+        "cookie_export_rejected",
+        "mv3_worker_restart_recovery"
+      ]
+    },
+    "real_environment_matrix": {
+      "mandatory": true,
+      "receipt": "real-environment-matrix.json",
+      "real_environment": true,
+      "max_age_hours": 72,
+      "required_checks": [
+        "wordpress_supported_matrix",
+        "woocommerce_supported_matrix",
+        "php_supported_matrix",
+        "mariadb_real_sql",
+        "mysql_real_sql",
+        "chrome_supported_matrix"
+      ]
+    },
+    "upgrade_migration": {
+      "mandatory": true,
+      "receipt": "upgrade-migration.json",
+      "real_environment": true,
+      "max_age_hours": 72,
+      "required_checks": [
+        "fresh_install",
+        "previous_release_upgrade",
+        "interrupted_migration_resume",
+        "migration_idempotency",
+        "settings_preserved",
+        "jobs_memory_evidence_preserved",
+        "oauth_pairing_preserved",
+        "failed_migration_not_marked_complete"
+      ]
+    },
+    "transaction_integrity": {
+      "mandatory": true,
+      "receipt": "transaction-integrity.json",
+      "real_environment": true,
+      "max_age_hours": 72,
+      "required_checks": [
+        "mutation_independent_readback",
+        "invalid_input_zero_side_effects",
+        "rollback_restores_baseline",
+        "idempotent_replay_semantics",
+        "partial_failure_never_reports_success",
+        "post_effect_verification_required"
+      ]
+    },
+    "concurrency_recovery": {
+      "mandatory": true,
+      "receipt": "concurrency-recovery.json",
+      "real_environment": true,
+      "max_age_hours": 72,
+      "required_checks": [
+        "multi_worker_claim_exclusion",
+        "lease_expiry_recovery",
+        "stale_owner_fencing",
+        "cas_conflict_preserves_updates",
+        "advisory_lock_contention",
+        "crash_window_resume",
+        "dead_letter_and_retry_semantics"
+      ]
+    },
+    "fault_injection": {
+      "mandatory": true,
+      "receipt": "fault-injection.json",
+      "real_environment": true,
+      "max_age_hours": 72,
+      "required_checks": [
+        "database_disconnect",
+        "database_restart",
+        "remote_timeout",
+        "remote_rate_limit",
+        "remote_5xx",
+        "chrome_process_kill",
+        "extension_worker_suspend",
+        "network_interruption",
+        "process_kill_between_effect_and_checkpoint"
+      ]
+    },
+    "load_backpressure": {
+      "mandatory": true,
+      "receipt": "load-backpressure.json",
+      "real_environment": true,
+      "max_age_hours": 72,
+      "required_checks": [
+        "concurrent_mcp_requests",
+        "queue_saturation_is_bounded",
+        "backpressure_is_explicit",
+        "tools_list_budget",
+        "result_size_limits",
+        "memory_growth_bounded",
+        "latency_slo_met"
+      ]
+    },
+    "h24_soak": {
+      "mandatory": true,
+      "receipt": "h24-soak.json",
+      "real_environment": true,
+      "max_age_hours": 168,
+      "min_duration_seconds": 86400,
+      "required_checks": [
+        "continuous_24h",
+        "periodic_jobs_progress",
+        "forced_restart_recovery",
+        "zero_orphan_leases",
+        "zero_unbounded_queue_growth",
+        "zero_fatal_errors",
+        "memory_growth_bounded",
+        "evidence_chain_complete"
+      ]
+    },
+    "remote_live_integration": {
+      "mandatory": true,
+      "receipt": "remote-live-integration.json",
+      "real_environment": true,
+      "max_age_hours": 72,
+      "required_checks": [
+        "https_remote_mcp",
+        "oauth_real_client",
+        "browser_pairing_real_chrome",
+        "live_read_operation",
+        "live_mutating_operation_with_rollback",
+        "evidence_correlated_to_exact_commit"
+      ]
+    },
+    "observability_operability": {
+      "mandatory": true,
+      "receipt": "observability-operability.json",
+      "real_environment": true,
+      "max_age_hours": 72,
+      "required_checks": [
+        "health_signal",
+        "correlation_ids",
+        "audit_evidence_chain",
+        "secret_redaction",
+        "failure_classification",
+        "alert_condition_exercised",
+        "runbook_recovery_exercised"
+      ]
+    },
+    "backup_restore": {
+      "mandatory": true,
+      "receipt": "backup-restore.json",
+      "real_environment": true,
+      "max_age_hours": 168,
+      "required_checks": [
+        "backup_created",
+        "clean_environment_restore",
+        "configuration_preserved",
+        "runtime_state_integrity",
+        "jobs_memory_evidence_integrity",
+        "restore_verification",
+        "rpo_rto_recorded"
+      ]
+    },
+    "supply_chain_release": {
+      "mandatory": true,
+      "receipt": "supply-chain-release.json",
+      "real_environment": false,
+      "max_age_hours": 24,
+      "required_checks": [
+        "github_actions_commit_pinned",
+        "dependencies_locked",
+        "sbom_generated",
+        "artifact_checksums",
+        "build_attestation",
+        "known_critical_vulnerabilities_zero"
+      ]
+    },
+    "compatibility_degradation": {
+      "mandatory": true,
+      "receipt": "compatibility-degradation.json",
+      "real_environment": true,
+      "max_age_hours": 72,
+      "required_checks": [
+        "unsupported_wordpress_fails_explicitly",
+        "unsupported_php_fails_explicitly",
+        "browser_unavailable_degrades_without_false_success",
+        "provider_unavailable_degrades_without_false_success",
+        "read_only_fallback_preserves_safety"
+      ]
+    },
+    "documentation_claims": {
+      "mandatory": true,
+      "receipt": "documentation-claims.json",
+      "real_environment": false,
+      "max_age_hours": 24,
+      "required_checks": [
+        "official_source_map_valid",
+        "all_operational_items_document_traced",
+        "counts_match_generated_manifest",
+        "versions_match_source",
+        "endpoints_match_source",
+        "production_claim_matches_verdict"
+      ]
+    }
+  }
+}

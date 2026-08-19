@@ -1,0 +1,71 @@
+name: Workflow security
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '11 4 * * 3'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: workflow-security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  immutable-inputs:
+    name: Production immutable input audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Block floating Actions, containers and package inputs
+        run: python tests/production-supply-chain-source.py --strict
+
+  actionlint:
+    name: actionlint 1.7.12
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install checksum-verified actionlint 1.7.12
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz'
+          curl --fail --location --silent --show-error "$url" -o /tmp/actionlint.tar.gz
+          echo '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  /tmp/actionlint.tar.gz' | sha256sum --check --strict
+          tar -xzf /tmp/actionlint.tar.gz -C /tmp actionlint
+          /tmp/actionlint -version
+      - name: Validate every workflow and expression
+        # Shell scripts are independently covered by MegaLinter/ShellCheck; disabling
+        # actionlint's ShellCheck subprocess also avoids a known upstream pipe deadlock.
+        run: /tmp/actionlint -shellcheck= -color
+
+  zizmor:
+    name: zizmor 1.28.0 auditor
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Audit GitHub Actions security semantics
+        uses: zizmorcore/zizmor-action@3dc1ecc9bcb9e94e9b2c709687979e1298497054 # v0.6.2
+        with:
+          version: '1.28.0'
+          advanced-security: false
+          online-audits: true
+          persona: auditor
+          min-severity: medium
+          min-confidence: medium
+          annotations: false
+          inputs: '.github'

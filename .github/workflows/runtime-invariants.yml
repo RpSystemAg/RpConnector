@@ -1,0 +1,64 @@
+name: Runtime invariants
+
+on:
+  push:
+    branches:
+      - master
+      - 'hardening/**'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-invariants-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  formal-runtime-model:
+    name: Exhaustive finite-state model
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Exhaustively prove finite runtime model invariants
+        run: python3 tests/runtime-state-model-check.py
+
+  architectural-invariants:
+    name: Architectural invariants
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Runtime invariant audit
+        run: python3 tests/runtime-invariants-audit.py
+
+  recovery-prepare-arity:
+    name: Recovery SQL prepare arity
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: php -l tests/php-runtime-recovery-prepare-smoke.php
+      - name: Strict wpdb prepare arity
+        run: php tests/php-runtime-recovery-prepare-smoke.php
+
+  verification-monotonicity:
+    name: Verification monotonicity
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: php -l tests/php-agency-verification-monotonicity-smoke.php
+      - name: Weak child evidence cannot become verified mission evidence
+        run: php tests/php-agency-verification-monotonicity-smoke.php
+
+  browser-parent-regression:
+    name: Browser parent reconciliation regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Existing parent reconciliation smoke
+        run: php tests/php-browser-parent-reconciliation-smoke.php
