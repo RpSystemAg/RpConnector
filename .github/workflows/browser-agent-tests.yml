@@ -63,9 +63,7 @@ jobs:
       - name: Every SQL statement the plugin builds must parse as MySQL
         run: python tests/validate-sql-syntax.py
       - name: Every wpdb::prepare must pass as many arguments as it has placeholders
-        # Valid MySQL with the wrong argument count never reaches the database:
-        # prepare() returns '' and the caller reads the failure as "no rows".
-        # That is how stale-lease recovery sat dead. Counting is the only catch.
+        # Preserved from current master: valid SQL with wrong prepare arity never reaches MySQL.
         run: python tests/validate-prepare-arity.py
       - name: Task queue dispatches against a real database
         env:
