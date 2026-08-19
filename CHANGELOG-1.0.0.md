@@ -91,6 +91,19 @@ Nota: `production_proven` resta `false`; il repository master ha già check
 rossi preesistenti (full-surface execution, taint, mutation) non introdotti
 da questa passata.
 
+### 2026-08-19 — Laboratorio di production-readiness
+
+Creato un ambiente di laboratorio completo nel sandbox (WordPress 7.0.4
+reale da GitHub, PHP 8.3.32, backend MySQL-on-SQLite ufficiale) ed eseguiti:
+installazione WordPress reale, attivazione plugin, schema Store 4.0.0 con 6
+tabelle, flusso MCP end-to-end (tools/list 36 tool, health, research radar,
+intervention_record con scrittura reale, backlog, context_open/status,
+agency_status — tutti 200), corpus PHP completo (~66 PASS; 19 FAIL tutti
+classificati, nessuna regressione del contributo; 4 confermati identici su
+master), 173 test Node, gate Python. Dettagli e matrice E0–E8 in
+`docs/PRODUCTION-READINESS-LAB-2026-08-19.md`. Blocchi residui: MySQL/MariaDB
+reale, Chrome reale, OAuth remoto, soak 24h, AGENT-BENCH (E3, E5–E8).
+
 - Convergenza diretta alla sola release installabile 1.0.0; milestone 11–14 conservate come gate interni.
 - Corretto il contratto `lane_handle`, gli executor legacy, `browser_verify_url`, metadata read/write, PHP lint e path errors.
 - Semplificati service worker, ownership lane/session, screenshot perception-first, GSC, esecuzione locale/remota e cleanup tecnico Suite 17; eliminati takeover, approval/review e gate di verification.
