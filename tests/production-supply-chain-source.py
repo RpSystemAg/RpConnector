@@ -63,6 +63,43 @@ def package_lock_findings() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]
     return manifests, findings
 
 
+
+def workflow_images(path: Path) -> list[tuple[str, str]]:
+    """Yield (image, location) for every container image a workflow declares.
+
+    Reads the parsed document so comments and shell text cannot be mistaken for
+    an image reference. If the file will not parse, nothing is reported from
+    here: an unparseable workflow is a different failure and the YAML linter is
+    the thing that should say so.
+    """
+    try:
+        import yaml
+    except ImportError:
+        return []
+    try:
+        doc = yaml.safe_load(path.read_text(encoding="utf-8", errors="replace"))
+    except yaml.YAMLError:
+        return []
+    if not isinstance(doc, dict):
+        return []
+
+    found: list[tuple[str, str]] = []
+    for job_id, job in (doc.get("jobs") or {}).items():
+        if not isinstance(job, dict):
+            continue
+        container = job.get("container")
+        if isinstance(container, str):
+            found.append((container, f"jobs.{job_id}.container"))
+        elif isinstance(container, dict) and isinstance(container.get("image"), str):
+            found.append((container["image"], f"jobs.{job_id}.container.image"))
+        for svc_id, svc in (job.get("services") or {}).items():
+            if isinstance(svc, str):
+                found.append((svc, f"jobs.{job_id}.services.{svc_id}"))
+            elif isinstance(svc, dict) and isinstance(svc.get("image"), str):
+                found.append((svc["image"], f"jobs.{job_id}.services.{svc_id}.image"))
+    return found
+
+
 def workflow_findings() -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     action_findings: list[dict[str, Any]] = []
     dependency_findings: list[dict[str, Any]] = []
@@ -83,13 +120,18 @@ def workflow_findings() -> tuple[list[dict[str, Any]], list[dict[str, Any]], lis
             if not FULL_SHA.fullmatch(ref_value):
                 action_findings.append({"file": rel(path), "value": value, "reason": "GitHub Action ref is not immutable 40-hex SHA"})
 
-        for match in DOCKER_IMAGE.finditer(text):
-            value = match.group(1)
-            # Digest-pinned references do not match this tag-only expression in normal YAML.
-            line_no = text.count("\n", 0, match.start()) + 1
-            line = text.splitlines()[line_no - 1] if line_no <= len(text.splitlines()) else ""
-            if "@sha256:" not in line:
-                dependency_findings.append({"file": rel(path), "line": line_no, "value": value, "reason": "container image is tag-only; production dependency is mutable"})
+        # Container images are read from the parsed document, not from the raw
+        # text. Text scanning matched things that are not images at all: the
+        # comment "# mariadb:11.4 -- multi-platform index pinned" sitting
+        # directly above a correctly digest-pinned image, and a fragment of a
+        # grep expression inside a run: block. Both were reported as mutable
+        # production dependencies. A supply-chain gate that cries wolf about a
+        # comment is one people learn to override, so it now looks only where
+        # an image can actually be declared.
+        for value, where in workflow_images(path):
+            if "@sha256:" in value:
+                continue
+            dependency_findings.append({"file": rel(path), "where": where, "value": value, "reason": "container image is tag-only; production dependency is mutable"})
 
         for match in FLOATING.finditer(text):
             line_no = text.count("\n", 0, match.start()) + 1

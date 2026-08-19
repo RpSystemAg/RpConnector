@@ -21,8 +21,16 @@
 #        the correct ones broken.
 #
 # A report where everything is wrong is worse than no report: nobody reads the
-# 813th line to find the one that matters. Two changes fix it -- analyse only
-# the plugin, and give PHPStan the real WordPress signatures.
+# 813th line to find the one that matters.
+#
+# This config fixes the second family and only the second family. Scoping the
+# analysis to the plugin and excluding the shims removes the ~89 confidently
+# wrong findings, which were the actively harmful ones -- they accused correct
+# code. The 574 "not found" remain: silencing them needs real WordPress
+# signatures from php-stubs, and that means a composer.json plus a committed
+# lock file, which the supply-chain gate requires and which cannot be generated
+# here. Left as the next step rather than faked, and PHPStan stays advisory
+# until it is done.
 #
 # What this is expected to surface once configured
 # ------------------------------------------------
@@ -32,9 +40,6 @@
 # recovered -- silently, for the life of the function. tests/validate-prepare-
 # arity.py now catches that specific shape inside SQL strings; PHPStan is the
 # general case for PHP calls.
-
-includes:
-  - vendor/szepeviktor/phpstan-wordpress/extension.neon
 
 parameters:
   level: 1
