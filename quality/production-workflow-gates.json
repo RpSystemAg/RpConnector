@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "rule": "A workflow-backed production check passes only when every required workflow has a successful completed run for the exact release SHA and every configured job selector matches at least its declared cardinality with all matched jobs successful.",
+  "gates": {
+    "static_security": {
+      "receipt": "static-security.json",
+      "environment": {"real": false, "class": "github-actions-static-security"},
+      "checks": {
+        "codeql": {
+          "requirements": [
+            {"workflow": "codeql.yml", "job_regex": "^analyze", "min_count": 3}
+          ]
+        },
+        "wordpress_plugin_check": {
+          "requirements": [
+            {"workflow": "enterprise-verification.yml", "job_regex": "^WordPress Plugin Check \\(blocking\\)$", "min_count": 1}
+          ]
+        },
+        "php_static_analysis": {
+          "requirements": [
+            {"workflow": "static-analysis.yml", "job_regex": "^PHP 8\\.0 compatibility \\(declared minimum\\)$", "min_count": 1},
+            {"workflow": "static-analysis.yml", "job_regex": "^MegaLinter PHP flavor \\(blocking\\)$", "min_count": 1}
+          ]
+        },
+        "javascript_static_analysis": {
+          "requirements": [
+            {"workflow": "codeql.yml", "job_regex": "^analyze.*javascript-typescript", "min_count": 1}
+          ]
+        },
+        "dependency_vulnerability_scan": {
+          "requirements": [
+            {"workflow": "security-supply-chain.yml", "job_regex": "^Trivy filesystem \\+ secrets \\+ misconfiguration$", "min_count": 1}
+          ]
+        },
+        "secret_scan": {
+          "requirements": [
+            {"workflow": "security-supply-chain.yml", "job_regex": "^Trivy filesystem \\+ secrets \\+ misconfiguration$", "min_count": 1}
+          ]
+        }
+      }
+    },
+    "real_environment_matrix": {
+      "receipt": "real-environment-matrix.json",
+      "environment": {"real": true, "class": "github-actions-real-platform-matrix"},
+      "checks": {
+        "wordpress_supported_matrix": {
+          "requirements": [
+            {"workflow": "wordpress-live-acceptance.yml", "job_regex": "^WP .* / PHP .*$", "min_count": 4}
+          ]
+        },
+        "woocommerce_supported_matrix": {
+          "requirements": [
+            {"workflow": "woocommerce-live-acceptance.yml", "job_regex": "^WooCommerce 11\\.0\\.1 real mutation/rollback$", "min_count": 1}
+          ]
+        },
+        "php_supported_matrix": {
+          "requirements": [
+            {"workflow": "enterprise-verification.yml", "job_regex": "^PHP .* runtime$", "min_count": 6}
+          ]
+        },
+        "mariadb_real_sql": {
+          "requirements": [
+            {"workflow": "enterprise-verification.yml", "job_regex": "^Real DB mariadb:", "min_count": 2}
+          ]
+        },
+        "mysql_real_sql": {
+          "requirements": [
+            {"workflow": "enterprise-verification.yml", "job_regex": "^Real DB mysql:", "min_count": 2}
+          ]
+        },
+        "chrome_supported_matrix": {
+          "requirements": [
+            {"workflow": "enterprise-verification.yml", "job_regex": "^Real Chrome extension load$", "min_count": 1},
+            {"workflow": "enterprise-verification.yml", "job_regex": "^Browser Agent .* / Node .*$", "min_count": 6}
+          ]
+        }
+      }
+    }
+  }
+}
