@@ -954,16 +954,74 @@ final class PRSTUDIO_UC_Store {
 	}
 
 	public static function recover_stale_jobs( int $stale_seconds = 600 ): int {
-		global $wpdb; $cutoff=gmdate('Y-m-d H:i:s',time()-max(60,$stale_seconds));
+		global $wpdb;
+		$cutoff = gmdate( 'Y-m-d H:i:s', time() - max( 60, $stale_seconds ) );
+		$cutoff_epoch = strtotime( $cutoff . ' UTC' );
 		// phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.NotPrepared -- table/column identifier only, from a fixed helper or the identifier() allowlist + SHOW TABLES check -- never external input; values are parameterized via $wpdb->prepare()
-		$rows=$wpdb->get_results($wpdb->prepare('SELECT * FROM '.self::jobs_table()." WHERE status IN ('RUNNING','running') AND ((lease_expires_gmt IS NOT NULL AND lease_expires_gmt < UTC_TIMESTAMP()) OR (lease_token IS NULL AND updated_gmt < %s)) LIMIT 200",$cutoff),ARRAY_A);
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
-		$recovered=0;
-		foreach(is_array($rows)?$rows:array() as $row){
-			$job=self::hydrate_job($row); $error=array('code'=>'stale_lease','message'=>'Worker lease expired; durable recovery requested.','retryable'=>true,'class'=>'stale_lease');
-			if((int)$job['attempts'] >= (int)$job['max_attempts']){ if(self::dead_letter_job((string)$job['job_uuid'],$error,'attempts_exhausted'))$recovered++; continue; }
-			$delay=self::retry_delay($job); $updated=$wpdb->update(self::jobs_table(),array('status'=>'READY','available_gmt'=>gmdate('Y-m-d H:i:s',time()+$delay),'lease_token'=>null,'lease_expires_gmt'=>null,'worker_id'=>null,'heartbeat_gmt'=>null,'failure_class'=>'stale_lease','error'=>self::encode($error),'updated_gmt'=>self::now()),array('job_uuid'=>(string)$job['job_uuid'],'status'=>(string)$row['status']),array('%s','%s','%s','%s','%s','%s','%s','%s','%s'),array('%s','%s'));
-			if(1===(int)$updated){$recovered++;self::event('job:'.$job['job_uuid'],'job.recovered',array('delay_seconds'=>$delay));}
+		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT job_uuid FROM ' . self::jobs_table() . " WHERE status IN ('RUNNING','running') AND ((lease_expires_gmt IS NOT NULL AND lease_expires_gmt < UTC_TIMESTAMP()) OR (lease_token IS NULL AND updated_gmt < %s)) LIMIT 200", $cutoff ), ARRAY_A );
+		$recovered = 0;
+		foreach ( is_array( $rows ) ? $rows : array() as $candidate ) {
+			$job_uuid = (string) ( $candidate['job_uuid'] ?? '' );
+			if ( '' === $job_uuid ) { continue; }
+			$wpdb->query( 'START TRANSACTION' );
+			$event_type = '';
+			$event_payload = array();
+			try {
+				// Re-read and lock the row. The candidate query is advisory only: a
+				// heartbeat or another recovery worker may have changed it meanwhile.
+				$locked = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . self::jobs_table() . ' WHERE job_uuid = %s LIMIT 1 FOR UPDATE', $job_uuid ), ARRAY_A );
+				if ( ! is_array( $locked ) ) { $wpdb->query( 'COMMIT' ); continue; }
+				$job = self::hydrate_job( $locked );
+				if ( 'RUNNING' !== (string) $job['status'] ) { $wpdb->query( 'COMMIT' ); continue; }
+				$lease_expires = ! empty( $locked['lease_expires_gmt'] ) ? strtotime( (string) $locked['lease_expires_gmt'] . ' UTC' ) : 0;
+				$updated_epoch = ! empty( $locked['updated_gmt'] ) ? strtotime( (string) $locked['updated_gmt'] . ' UTC' ) : 0;
+				$has_lease = '' !== (string) ( $locked['lease_token'] ?? '' );
+				$is_stale = ( $lease_expires > 0 && $lease_expires < time() ) || ( ! $has_lease && $updated_epoch > 0 && false !== $cutoff_epoch && $updated_epoch < $cutoff_epoch );
+				if ( ! $is_stale ) { $wpdb->query( 'COMMIT' ); continue; }
+
+				$error = array( 'code'=>'stale_lease', 'message'=>'Worker lease expired; durable recovery requested.', 'retryable'=>true, 'class'=>'stale_lease' );
+				$current_attempts = (int) $job['attempts'];
+				$next_attempts = $current_attempts + 1;
+				$max_attempts = (int) $job['max_attempts'];
+				$now = self::now();
+
+				if ( $next_attempts >= $max_attempts ) {
+					$updated = $wpdb->update(
+						self::jobs_table(),
+						array( 'status'=>'DEAD_LETTER', 'attempts'=>$next_attempts, 'failure_class'=>'attempts_exhausted', 'error'=>self::encode($error), 'lease_token'=>null, 'lease_expires_gmt'=>null, 'worker_id'=>null, 'heartbeat_gmt'=>null, 'updated_gmt'=>$now, 'completed_gmt'=>$now ),
+						array( 'id'=>(int)$locked['id'], 'status'=>(string)$locked['status'], 'attempts'=>$current_attempts ),
+						array( '%s','%d','%s','%s','%s','%s','%s','%s','%s','%s' ),
+						array( '%d','%s','%d' )
+					);
+					if ( 1 !== (int) $updated ) { $wpdb->query( 'ROLLBACK' ); continue; }
+					$terminal = self::get_job( $job_uuid );
+					if ( ! is_array( $terminal ) ) { $wpdb->query( 'ROLLBACK' ); continue; }
+					$snapshot = $terminal; unset( $snapshot['lease_token'] );
+					$written = $wpdb->replace( self::dead_letters_table(), array( 'job_uuid'=>$job_uuid, 'mission_id'=>(string)($terminal['mission_id']??'')?:null, 'capability'=>(string)($terminal['capability']??'')?:null, 'failure_class'=>'attempts_exhausted', 'error'=>self::encode($error), 'job_snapshot'=>self::encode($snapshot), 'created_gmt'=>$now ) );
+					if ( false === $written ) { $wpdb->query( 'ROLLBACK' ); continue; }
+					$event_type = 'job.dead_letter';
+					$event_payload = array( 'failure_class'=>'attempts_exhausted', 'attempts'=>$next_attempts, 'recovered_from_stale_lease'=>true );
+				} else {
+					$retry_job = $job; $retry_job['attempts'] = $next_attempts;
+					$delay = self::retry_delay( $retry_job );
+					$updated = $wpdb->update(
+						self::jobs_table(),
+						array( 'status'=>'READY', 'attempts'=>$next_attempts, 'available_gmt'=>gmdate('Y-m-d H:i:s',time()+$delay), 'lease_token'=>null, 'lease_expires_gmt'=>null, 'worker_id'=>null, 'heartbeat_gmt'=>null, 'failure_class'=>'stale_lease', 'error'=>self::encode($error), 'updated_gmt'=>$now ),
+						array( 'id'=>(int)$locked['id'], 'status'=>(string)$locked['status'], 'attempts'=>$current_attempts ),
+						array( '%s','%d','%s','%s','%s','%s','%s','%s','%s','%s' ),
+						array( '%d','%s','%d' )
+					);
+					if ( 1 !== (int) $updated ) { $wpdb->query( 'ROLLBACK' ); continue; }
+					$event_type = 'job.recovered';
+					$event_payload = array( 'delay_seconds'=>$delay, 'attempts'=>$next_attempts );
+				}
+				$wpdb->query( 'COMMIT' );
+				$recovered++;
+			} catch ( Throwable $e ) {
+				$wpdb->query( 'ROLLBACK' );
+				throw $e;
+			}
+			if ( '' !== $event_type ) { self::event( 'job:' . $job_uuid, $event_type, $event_payload ); }
 		}
 		return $recovered;
 	}
@@ -1017,7 +1075,7 @@ final class PRSTUDIO_UC_Store {
 			if(''!==$job_uuid){$sql=$wpdb->prepare("SELECT * FROM $table WHERE job_uuid = %s AND $where LIMIT 1 FOR UPDATE",$job_uuid);}else{$sql="SELECT * FROM $table WHERE $where ORDER BY priority DESC, available_gmt ASC, id ASC LIMIT 1 FOR UPDATE";}
 			// phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.NotPrepared -- table/column identifier only, from a fixed helper or the identifier() allowlist + SHOW TABLES check -- never external input; values are parameterized via $wpdb->prepare()
 			$row=$wpdb->get_row($sql,ARRAY_A); if(!is_array($row)){$wpdb->query('COMMIT');return null;}
-			$updated=$wpdb->update($table,array('status'=>'RUNNING','lease_token'=>$lease,'lease_expires_gmt'=>$expires,'heartbeat_gmt'=>self::now(),'worker_id'=>substr(sanitize_text_field($worker_id),0,160),'attempts'=>(int)($row['attempts']??0)+1,'updated_gmt'=>self::now()),array('id'=>(int)$row['id'],'status'=>(string)$row['status']),array('%s','%s','%s','%s','%s','%d','%s'),array('%d','%s'));
+			$updated=$wpdb->update($table,array('status'=>'RUNNING','lease_token'=>$lease,'lease_expires_gmt'=>$expires,'heartbeat_gmt'=>self::now(),'worker_id'=>substr(sanitize_text_field($worker_id),0,160),'updated_gmt'=>self::now()),array('id'=>(int)$row['id'],'status'=>(string)$row['status']),array('%s','%s','%s','%s','%s','%s'),array('%d','%s'));
 			if(1!==(int)$updated){$wpdb->query('ROLLBACK');return null;}$wpdb->query('COMMIT');
 		}catch(Throwable $e){$wpdb->query('ROLLBACK');throw $e;}
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
@@ -1076,11 +1134,59 @@ final class PRSTUDIO_UC_Store {
 // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
 
 	public static function retry_leased_job( string $job_uuid, string $lease_token, array $error ): ?array {
-		global $wpdb;$job=self::get_job($job_uuid);if(!$job||!hash_equals((string)($job['lease_token']??''),$lease_token))return null;
-		if((int)$job['attempts'] >= (int)$job['max_attempts']){self::dead_letter_job($job_uuid,$error,'attempts_exhausted',$lease_token);return self::get_job($job_uuid);}
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
-		$delay=self::retry_delay($job);$updated=$wpdb->update(self::jobs_table(),array('status'=>'READY','available_gmt'=>gmdate('Y-m-d H:i:s',time()+$delay),'error'=>self::encode($error),'failure_class'=>sanitize_key((string)($error['class']??$error['code']??'retryable')),'lease_token'=>null,'lease_expires_gmt'=>null,'worker_id'=>null,'heartbeat_gmt'=>null,'updated_gmt'=>self::now()),array('job_uuid'=>$job_uuid,'lease_token'=>$lease_token,'status'=>'RUNNING'),array('%s','%s','%s','%s','%s','%s','%s','%s','%s'),array('%s','%s','%s'));
-		if(1!==(int)$updated)return null;self::event('job:'.$job_uuid,'job.retry_scheduled',array('delay_seconds'=>$delay));return self::get_job($job_uuid);
+		global $wpdb;
+		if ( '' === $lease_token ) { return null; }
+		$wpdb->query( 'START TRANSACTION' );
+		$event_type = '';
+		$event_payload = array();
+		try {
+			$locked = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . self::jobs_table() . ' WHERE job_uuid = %s LIMIT 1 FOR UPDATE', $job_uuid ), ARRAY_A );
+			if ( ! is_array( $locked ) ) { $wpdb->query( 'COMMIT' ); return null; }
+			$job = self::hydrate_job( $locked );
+			if ( 'RUNNING' !== (string) $job['status'] || ! hash_equals( (string) ( $locked['lease_token'] ?? '' ), $lease_token ) ) { $wpdb->query( 'COMMIT' ); return null; }
+			$current_attempts = (int) $job['attempts'];
+			$next_attempts = $current_attempts + 1;
+			$max_attempts = (int) $job['max_attempts'];
+			$failure_class = sanitize_key( (string) ( $error['class'] ?? $error['code'] ?? 'retryable' ) );
+			$now = self::now();
+
+			if ( $next_attempts >= $max_attempts ) {
+				$updated = $wpdb->update(
+					self::jobs_table(),
+					array( 'status'=>'DEAD_LETTER', 'attempts'=>$next_attempts, 'failure_class'=>'attempts_exhausted', 'error'=>self::encode($error), 'lease_token'=>null, 'lease_expires_gmt'=>null, 'worker_id'=>null, 'heartbeat_gmt'=>null, 'updated_gmt'=>$now, 'completed_gmt'=>$now ),
+					array( 'id'=>(int)$locked['id'], 'status'=>(string)$locked['status'], 'lease_token'=>$lease_token, 'attempts'=>$current_attempts ),
+					array( '%s','%d','%s','%s','%s','%s','%s','%s','%s','%s' ),
+					array( '%d','%s','%s','%d' )
+				);
+				if ( 1 !== (int) $updated ) { $wpdb->query( 'ROLLBACK' ); return null; }
+				$terminal = self::get_job( $job_uuid );
+				if ( ! is_array( $terminal ) ) { $wpdb->query( 'ROLLBACK' ); return null; }
+				$snapshot = $terminal; unset( $snapshot['lease_token'] );
+				$written = $wpdb->replace( self::dead_letters_table(), array( 'job_uuid'=>$job_uuid, 'mission_id'=>(string)($terminal['mission_id']??'')?:null, 'capability'=>(string)($terminal['capability']??'')?:null, 'failure_class'=>'attempts_exhausted', 'error'=>self::encode($error), 'job_snapshot'=>self::encode($snapshot), 'created_gmt'=>$now ) );
+				if ( false === $written ) { $wpdb->query( 'ROLLBACK' ); return null; }
+				$event_type = 'job.dead_letter';
+				$event_payload = array( 'failure_class'=>'attempts_exhausted', 'attempts'=>$next_attempts );
+			} else {
+				$retry_job = $job; $retry_job['attempts'] = $next_attempts;
+				$delay = self::retry_delay( $retry_job );
+				$updated = $wpdb->update(
+					self::jobs_table(),
+					array( 'status'=>'READY', 'attempts'=>$next_attempts, 'available_gmt'=>gmdate('Y-m-d H:i:s',time()+$delay), 'error'=>self::encode($error), 'failure_class'=>$failure_class, 'lease_token'=>null, 'lease_expires_gmt'=>null, 'worker_id'=>null, 'heartbeat_gmt'=>null, 'updated_gmt'=>$now ),
+					array( 'id'=>(int)$locked['id'], 'status'=>(string)$locked['status'], 'lease_token'=>$lease_token, 'attempts'=>$current_attempts ),
+					array( '%s','%d','%s','%s','%s','%s','%s','%s','%s','%s' ),
+					array( '%d','%s','%s','%d' )
+				);
+				if ( 1 !== (int) $updated ) { $wpdb->query( 'ROLLBACK' ); return null; }
+				$event_type = 'job.retry_scheduled';
+				$event_payload = array( 'delay_seconds'=>$delay, 'attempts'=>$next_attempts );
+			}
+			$wpdb->query( 'COMMIT' );
+		} catch ( Throwable $e ) {
+			$wpdb->query( 'ROLLBACK' );
+			throw $e;
+		}
+		if ( '' !== $event_type ) { self::event( 'job:' . $job_uuid, $event_type, $event_payload ); }
+		return self::get_job( $job_uuid );
 	}
 
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
