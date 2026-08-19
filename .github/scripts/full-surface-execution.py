@@ -7,10 +7,11 @@ runtime. Every tracked source/data file receives its required parser/compiler
 check. Every tracked file under tests/ and prstudio-unified-browser-agent/tests/
 must additionally be proven by a successful runtime execution record.
 
-Code files are invoked directly by their runtime. Data files are counted as
-runtime-executed only when a successful traced test process actually opens the
-exact file; merely parsing the file in the syntax phase does not satisfy the
-execution requirement.
+Code files are invoked directly by their runtime and require syscall evidence
+that the exact candidate file was executed/opened by that successful process.
+Data files are counted as runtime-executed only when a successful traced test
+process actually opens the exact file; merely parsing the file in the syntax
+phase does not satisfy the execution requirement.
 """
 from __future__ import annotations
 
@@ -19,7 +20,6 @@ import hashlib
 import json
 import os
 import py_compile
-import re
 import shutil
 import subprocess
 import sys
@@ -70,6 +70,29 @@ def is_test_surface(path: Path) -> bool:
     return any(text == root.as_posix() or text.startswith(root.as_posix() + "/") for root in TEST_ROOTS)
 
 
+def source_kind(rel: Path) -> str | None:
+    """Return the parser/runtime kind, including extensionless shebang scripts."""
+    suffix = rel.suffix.lower()
+    if suffix in SYNTAX_SUFFIXES:
+        return suffix
+    path = ROOT / rel
+    try:
+        first = path.open("rb").readline(512).decode("utf-8", errors="ignore").strip().lower()
+    except OSError:
+        return None
+    if not first.startswith("#!"):
+        return None
+    if "python" in first:
+        return ".py"
+    if "node" in first or "deno" in first:
+        return ".js"
+    if "php" in first:
+        return ".php"
+    if "bash" in first or first.endswith("/sh") or " /sh" in first:
+        return ".sh"
+    return None
+
+
 def run_command(command: list[str], *, timeout: int, env: dict[str, str] | None = None, trace: Path | None = None) -> dict[str, Any]:
     effective = list(command)
     if trace is not None:
@@ -114,49 +137,49 @@ def run_command(command: list[str], *, timeout: int, env: dict[str, str] | None 
 
 def syntax_check(rel: Path, pycache: Path) -> dict[str, Any]:
     path = ROOT / rel
-    suffix = path.suffix.lower()
+    kind = source_kind(rel)
     started = time.monotonic()
     try:
-        if suffix == ".php":
+        if kind == ".php":
             result = run_command(["php", "-l", rel.as_posix()], timeout=60)
             parser = "php -l"
             ok = bool(result["ok"])
             detail = result.get("output_tail", "")
-        elif suffix in {".js", ".mjs", ".cjs"}:
+        elif kind in {".js", ".mjs", ".cjs"}:
             result = run_command(["node", "--check", rel.as_posix()], timeout=60)
             parser = "node --check"
             ok = bool(result["ok"])
             detail = result.get("output_tail", "")
-        elif suffix == ".py":
+        elif kind == ".py":
             target = pycache / (hashlib.sha256(rel.as_posix().encode()).hexdigest() + ".pyc")
             py_compile.compile(str(path), cfile=str(target), dfile=rel.as_posix(), doraise=True)
             parser = "python py_compile"
             ok = True
             detail = "compiled"
-        elif suffix in {".sh", ".bash"}:
+        elif kind in {".sh", ".bash"}:
             result = run_command(["bash", "-n", rel.as_posix()], timeout=60)
             parser = "bash -n"
             ok = bool(result["ok"])
             detail = result.get("output_tail", "")
-        elif suffix == ".json":
+        elif kind == ".json":
             with path.open("r", encoding="utf-8") as handle:
                 json.load(handle)
             parser = "python json"
             ok = True
             detail = "parsed"
-        elif suffix in {".yaml", ".yml"}:
+        elif kind in {".yaml", ".yml"}:
             with path.open("r", encoding="utf-8") as handle:
                 list(yaml.safe_load_all(handle))
             parser = "PyYAML safe_load_all"
             ok = True
             detail = "parsed"
-        elif suffix == ".xml":
+        elif kind == ".xml":
             ET.parse(path)
             parser = "python ElementTree"
             ok = True
             detail = "parsed"
         else:
-            raise AssertionError(f"syntax_check called for unsupported suffix {suffix}")
+            raise AssertionError(f"syntax_check called for unsupported source {rel}")
     except Exception as exc:
         parser = {
             ".php": "php -l",
@@ -170,7 +193,7 @@ def syntax_check(rel: Path, pycache: Path) -> dict[str, Any]:
             ".yaml": "PyYAML safe_load_all",
             ".yml": "PyYAML safe_load_all",
             ".xml": "python ElementTree",
-        }.get(suffix, "unknown")
+        }.get(kind or "", "unknown")
         ok = False
         detail = f"{type(exc).__name__}: {exc}"
     return {
@@ -182,29 +205,29 @@ def syntax_check(rel: Path, pycache: Path) -> dict[str, Any]:
 
 
 def execution_command(rel: Path) -> list[str] | None:
-    suffix = rel.suffix.lower()
+    kind = source_kind(rel)
     name = rel.name
-    if suffix == ".php":
+    if kind == ".php":
         return ["php", "-d", "auto_prepend_file=tests/strict-php-errors.php", "-f", rel.as_posix()]
-    if suffix == ".py":
+    if kind == ".py":
         return [sys.executable, rel.as_posix()]
-    if suffix in {".js", ".mjs", ".cjs"}:
+    if kind in {".js", ".mjs", ".cjs"}:
         if ".test." in name or rel.as_posix().startswith("prstudio-unified-browser-agent/tests/"):
             return ["node", "--test", rel.as_posix()]
         return ["node", rel.as_posix()]
-    if suffix in {".sh", ".bash"}:
+    if kind in {".sh", ".bash"}:
         return ["bash", rel.as_posix()]
     return None
 
 
-def successful_open_evidence(trace_text: str, rel: Path) -> str | None:
+def successful_runtime_evidence(trace_text: str, rel: Path) -> str | None:
     rel_text = rel.as_posix()
     abs_text = str((ROOT / rel).resolve())
     candidates = (f'"{rel_text}"', f'"{abs_text}"')
     for line in trace_text.splitlines():
-        if "openat(" not in line or " = -1 " in line:
+        if " = -1 " in line:
             continue
-        if any(candidate in line for candidate in candidates):
+        if ("execve(" in line or "openat(" in line) and any(candidate in line for candidate in candidates):
             return line[-2000:]
     return None
 
@@ -219,7 +242,7 @@ def main() -> int:
         raise SystemExit("strace is mandatory: runtime execution cannot be certified without syscall evidence")
 
     all_tracked = tracked_files()
-    syntax_targets = [p for p in all_tracked if p.suffix.lower() in SYNTAX_SUFFIXES]
+    syntax_targets = [p for p in all_tracked if source_kind(p) is not None]
     surface = [p for p in all_tracked if is_test_surface(p)]
     if not surface:
         raise SystemExit("test surface is empty")
@@ -261,29 +284,34 @@ def main() -> int:
             result = run_command(command, timeout=args.timeout_seconds, env=env, trace=trace)
             trace_text = trace.read_text(encoding="utf-8", errors="replace") if trace.exists() else ""
             trace_texts.append(trace_text)
+            evidence = successful_runtime_evidence(trace_text, rel)
             result["sha256"] = sha256(ROOT / rel)
             result["mode"] = "direct-runtime"
+            result["trace_evidence"] = evidence
+            if result["ok"] and evidence is None:
+                result["ok"] = False
+                result["evidence_error"] = "successful process had no syscall evidence for the exact file"
             execution_records[rel.as_posix()] = result
             if not result["ok"]:
                 failures.append(
                     f"execution:{rel.as_posix()}: rc={result.get('returncode')} timeout={result.get('timeout', False)} "
-                    f"output={result.get('output_tail', '')[-3000:]}"
+                    f"evidence={bool(evidence)} output={result.get('output_tail', '')[-3000:]}"
                 )
 
-    combined_trace = "\n".join(trace_texts)
-    for rel in surface:
-        key = rel.as_posix()
-        if key in execution_records:
-            continue
-        evidence = successful_open_evidence(combined_trace, rel)
-        execution_records[key] = {
-            "sha256": sha256(ROOT / rel),
-            "mode": "runtime-consumed-data",
-            "ok": evidence is not None,
-            "trace_evidence": evidence,
-        }
-        if evidence is None:
-            failures.append(f"execution:{key}: file was never successfully opened by any executed test process")
+        combined_trace = "\n".join(trace_texts)
+        for rel in surface:
+            key = rel.as_posix()
+            if key in execution_records:
+                continue
+            evidence = successful_runtime_evidence(combined_trace, rel)
+            execution_records[key] = {
+                "sha256": sha256(ROOT / rel),
+                "mode": "runtime-consumed-data",
+                "ok": evidence is not None,
+                "trace_evidence": evidence,
+            }
+            if evidence is None:
+                failures.append(f"execution:{key}: file was never successfully opened by any successful traced test process")
 
     syntax_ok = sum(1 for record in syntax_records.values() if record["ok"])
     executed_ok = sum(1 for record in execution_records.values() if record["ok"])
@@ -292,7 +320,7 @@ def main() -> int:
     exact_100 = executed_ok == total_surface
 
     registry = {
-        "schema_version": 1,
+        "schema_version": 2,
         "gate_id": "full_surface_execution_100_percent",
         "generated_at": utc_now(),
         "commit_sha": commit_sha,
@@ -300,9 +328,10 @@ def main() -> int:
             "no_exception_table": True,
             "no_helper_classification": True,
             "no_baseline": True,
-            "syntax_target_source": "git ls-files",
+            "syntax_target_source": "git ls-files + recognized shebangs",
             "test_execution_target_source": [root.as_posix() for root in TEST_ROOTS],
             "parse_does_not_count_as_execution": True,
+            "direct_execution_requires_syscall_evidence": True,
             "required_execution_percent": 100.0,
         },
         "counts": {
