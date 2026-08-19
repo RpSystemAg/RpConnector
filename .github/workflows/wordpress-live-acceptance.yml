@@ -95,6 +95,11 @@ jobs:
             echo "schema=".$version."\n";
           '
 
+      - name: OAuth shared-state concurrency on real WordPress and MariaDB
+        env:
+          RP_WP_PATH: ${{ env.WP_PATH }}
+        run: php -d auto_prepend_file=tests/strict-php-errors.php tests/php-oauth-concurrency-integration.php
+
       - name: Deactivate/reactivate without corrupting durable schema
         run: |
           before=$(wp option get prstudio_uc_schema_version --path="$WP_PATH")
@@ -165,6 +170,7 @@ jobs:
               -w "%{http_code}" \
               -X POST "http://127.0.0.1:8080/?rest_route=/prstudio-unified/v1/oauth/register" \
               -H "Content-Type: application/json" \
+              -H "X-Forwarded-For: 127.0.0.1" \
               --data-binary "{\"client_name\":\"rate-{}\",\"redirect_uris\":[\"http://127.0.0.1/rate/{}\"],\"scope\":\"prstudio.read\"}" \
               > "/tmp/rate-{}.code"
           '
