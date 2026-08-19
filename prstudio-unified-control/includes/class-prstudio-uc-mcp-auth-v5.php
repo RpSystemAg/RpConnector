@@ -16,6 +16,7 @@ final class PRSTUDIO_UC_MCP_Auth_V5 {
     private const CIMD_CACHE_TTL = 300;
     private const LAST_USED_TOUCH_INTERVAL = 300;
     private static string $current_token_id = '';
+    private static array $db_lock_stack = array();
 
     private static function b64url( string $raw ): string { return rtrim( strtr( base64_encode( $raw ), '+/', '-_' ), '=' ); }
     private static function random_id( int $bytes = 12 ): string { return bin2hex( random_bytes( $bytes ) ); }
@@ -24,61 +25,127 @@ final class PRSTUDIO_UC_MCP_Auth_V5 {
     private static function admin_capability(): string { return is_multisite() ? 'manage_network_options' : 'manage_options'; }
     private static function can_administer(): bool { return current_user_can( self::admin_capability() ) || current_user_can( 'manage_options' ); }
 
+    private static function oauth_state_error( string $code, string $message, int $status = 503 ): WP_Error {
+        return new WP_Error( $code, $message, array( 'status' => $status, 'retryable' => $status >= 500 || 409 === $status ) );
+    }
+
+    private static function invalidate_option_cache( string $option ): void {
+        if ( function_exists( 'wp_cache_delete' ) ) {
+            wp_cache_delete( $option, 'options' );
+            wp_cache_delete( 'alloptions', 'options' );
+            wp_cache_delete( 'notoptions', 'options' );
+        }
+    }
+
     /**
      * Serialize shared OAuth state across PHP workers with a connection-scoped
-     * MySQL/MariaDB advisory lock. No mutation proceeds if the lock cannot be
-     * acquired, so a transient infrastructure problem cannot become a lost update.
+     * MySQL/MariaDB advisory lock. The lock is namespaced to this WordPress DB/site,
+     * nested use is allowed only for the same scope, and a reconnect invalidates
+     * the operation even if wpdb transparently retries a query on a new session.
      */
     private static function with_db_lock( string $scope, callable $callback, int $timeout = 5 ) {
         global $wpdb;
         if ( ! is_object( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) || ! method_exists( $wpdb, 'prepare' ) ) {
-            return new WP_Error( 'oauth_state_lock_unavailable', 'Database lock OAuth non disponibile.', array( 'status' => 503, 'retryable' => true ) );
+            return self::oauth_state_error( 'oauth_state_lock_unavailable', 'Database lock OAuth non disponibile.' );
         }
-        $lock_name = 'prstudio_mcp_v5_' . substr( hash( 'sha256', $scope ), 0, 40 );
+        $blog_id = function_exists( 'get_current_blog_id' ) ? (int) get_current_blog_id() : 1;
+        $namespace = ( defined( 'DB_NAME' ) ? (string) DB_NAME : '' ) . '|' . (string) ( $wpdb->prefix ?? '' ) . '|' . $blog_id . '|' . $scope;
+        $lock_name = 'prstudio_mcp_v5_' . substr( hash( 'sha256', $namespace ), 0, 40 );
+        $depth = count( self::$db_lock_stack );
+        if ( $depth > 0 ) {
+            $current = self::$db_lock_stack[ $depth - 1 ];
+            if ( hash_equals( (string) ( $current['lock_name'] ?? '' ), $lock_name ) ) { return $callback(); }
+            return self::oauth_state_error( 'oauth_state_lock_order', 'Ordine lock OAuth non valido.' );
+        }
         $timeout = max( 0, min( 10, $timeout ) );
-        $acquired = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', $lock_name, $timeout ) );
-        if ( 1 !== $acquired ) {
-            return new WP_Error( 'oauth_state_busy', 'Stato OAuth occupato; riprova.', array( 'status' => 409, 'retryable' => true ) );
+        $raw_acquired = $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', $lock_name, $timeout ) );
+        if ( null === $raw_acquired ) {
+            return self::oauth_state_error( 'oauth_state_lock_unavailable', 'Database lock OAuth non disponibile.' );
         }
-        try {
-            return $callback();
-        } finally {
+        if ( '1' !== (string) $raw_acquired ) {
+            return self::oauth_state_error( 'oauth_state_busy', 'Stato OAuth occupato; riprova.', 409 );
+        }
+        $connection_id = (string) $wpdb->get_var( 'SELECT CONNECTION_ID()' );
+        if ( '' === $connection_id || ! ctype_digit( $connection_id ) ) {
             $wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock_name ) );
+            return self::oauth_state_error( 'oauth_state_lock_unavailable', 'Sessione database OAuth non verificabile.' );
         }
+        self::$db_lock_stack[] = array( 'lock_name' => $lock_name, 'connection_id' => $connection_id );
+        $result = null;
+        $thrown = null;
+        try {
+            $result = $callback();
+        } catch ( Throwable $error ) {
+            $thrown = $error;
+        }
+        $connection_after = (string) $wpdb->get_var( 'SELECT CONNECTION_ID()' );
+        $released = $wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock_name ) );
+        array_pop( self::$db_lock_stack );
+        if ( $thrown instanceof Throwable ) { throw $thrown; }
+        if ( ! hash_equals( $connection_id, $connection_after ) || '1' !== (string) $released ) {
+            return self::oauth_state_error( 'oauth_state_lock_lost', 'Sessione database OAuth cambiata durante la mutazione.' );
+        }
+        return $result;
     }
 
-    /** Atomic client registry mutation under one cross-request lock. */
+    /**
+     * Optimistic byte-exact CAS for serialized option registries. GET_LOCK keeps
+     * the common path simple; the CAS is the correctness backstop if wpdb reconnects
+     * and the connection-scoped advisory lock disappears mid-query.
+     */
+    private static function atomic_option_registry( string $option, string $scope, callable $mutator ) {
+        return self::with_db_lock( $scope, static function () use ( $option, $mutator ) {
+            global $wpdb;
+            if ( ! is_object( $wpdb ) || empty( $wpdb->options ) ) {
+                return self::oauth_state_error( 'oauth_state_store_unavailable', 'Registro OAuth non disponibile.' );
+            }
+            $table = (string) $wpdb->options;
+            for ( $attempt = 0; $attempt < 8; $attempt++ ) {
+                $row = $wpdb->get_row( $wpdb->prepare( "SELECT option_value FROM {$table} WHERE option_name = %s LIMIT 1", $option ), ARRAY_A );
+                if ( ! is_array( $row ) ) {
+                    if ( '' !== (string) ( $wpdb->last_error ?? '' ) ) {
+                        return self::oauth_state_error( 'oauth_state_read_failed', 'Lettura registro OAuth fallita.' );
+                    }
+                    $empty = maybe_serialize( array() );
+                    $inserted = $wpdb->query( $wpdb->prepare( "INSERT IGNORE INTO {$table} (option_name, option_value, autoload) VALUES (%s, %s, %s)", $option, $empty, 'no' ) );
+                    if ( false === $inserted ) { return self::oauth_state_error( 'oauth_state_init_failed', 'Inizializzazione registro OAuth fallita.' ); }
+                    self::invalidate_option_cache( $option );
+                    continue;
+                }
+                $raw = (string) ( $row['option_value'] ?? '' );
+                $registry = maybe_unserialize( $raw );
+                $registry = is_array( $registry ) ? $registry : array();
+                $mutation = $mutator( $registry );
+                if ( is_wp_error( $mutation ) ) { return $mutation; }
+                if ( ! is_array( $mutation ) || ! array_key_exists( 'registry', $mutation ) || ! array_key_exists( 'result', $mutation ) || ! is_array( $mutation['registry'] ) ) {
+                    return new WP_Error( 'oauth_state_invalid_mutation', 'Mutazione registro OAuth non valida.', array( 'status' => 500 ) );
+                }
+                $next_raw = maybe_serialize( $mutation['registry'] );
+                if ( hash_equals( $raw, $next_raw ) ) { return $mutation['result']; }
+                $updated = $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET option_value = %s WHERE option_name = %s AND BINARY option_value = BINARY %s", $next_raw, $option, $raw ) );
+                if ( false === $updated ) { return self::oauth_state_error( 'oauth_state_write_failed', 'Scrittura registro OAuth fallita.' ); }
+                if ( 1 === (int) $updated ) {
+                    self::invalidate_option_cache( $option );
+                    return $mutation['result'];
+                }
+                $after = $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$table} WHERE option_name = %s LIMIT 1", $option ) );
+                if ( is_string( $after ) && hash_equals( $next_raw, $after ) ) {
+                    self::invalidate_option_cache( $option );
+                    return $mutation['result'];
+                }
+            }
+            return self::oauth_state_error( 'oauth_state_conflict', 'Conflitto concorrente sul registro OAuth.' );
+        } );
+    }
+
+    /** Atomic client registry mutation with advisory-lock plus CAS fencing. */
     private static function atomic_client_registry( callable $mutator ) {
-        return self::with_db_lock( 'client-registry', static function () use ( $mutator ) {
-            $clients = get_option( self::CLIENTS_OPTION, array() );
-            $clients = is_array( $clients ) ? $clients : array();
-            $mutation = $mutator( $clients );
-            if ( is_wp_error( $mutation ) ) { return $mutation; }
-            if ( ! is_array( $mutation ) || ! array_key_exists( 'registry', $mutation ) || ! array_key_exists( 'result', $mutation ) || ! is_array( $mutation['registry'] ) ) {
-                return new WP_Error( 'oauth_state_invalid_mutation', 'Mutazione registro client non valida.', array( 'status' => 500 ) );
-            }
-            if ( $mutation['registry'] !== $clients ) {
-                update_option( self::CLIENTS_OPTION, $mutation['registry'], false );
-            }
-            return $mutation['result'];
-        } );
+        return self::atomic_option_registry( self::CLIENTS_OPTION, 'client-registry', $mutator );
     }
 
-    /** Atomic token registry mutation under one cross-request lock. */
+    /** Atomic token registry mutation with advisory-lock plus CAS fencing. */
     private static function atomic_token_registry( callable $mutator ) {
-        return self::with_db_lock( 'token-registry', static function () use ( $mutator ) {
-            $tokens = get_option( self::TOKENS_OPTION, array() );
-            $tokens = is_array( $tokens ) ? $tokens : array();
-            $mutation = $mutator( $tokens );
-            if ( is_wp_error( $mutation ) ) { return $mutation; }
-            if ( ! is_array( $mutation ) || ! array_key_exists( 'registry', $mutation ) || ! array_key_exists( 'result', $mutation ) || ! is_array( $mutation['registry'] ) ) {
-                return new WP_Error( 'oauth_state_invalid_mutation', 'Mutazione registro token non valida.', array( 'status' => 500 ) );
-            }
-            if ( $mutation['registry'] !== $tokens ) {
-                update_option( self::TOKENS_OPTION, $mutation['registry'], false );
-            }
-            return $mutation['result'];
-        } );
+        return self::atomic_option_registry( self::TOKENS_OPTION, 'token-registry', $mutator );
     }
 
     /** Atomic transient counter used by OAuth and DCR rate limits. */
@@ -86,7 +153,9 @@ final class PRSTUDIO_UC_MCP_Auth_V5 {
         return self::with_db_lock( 'counter:' . $key, static function () use ( $key, $limit, $ttl ) {
             $count = (int) get_transient( $key );
             if ( $count >= $limit ) { return false; }
-            set_transient( $key, $count + 1, $ttl );
+            if ( ! set_transient( $key, $count + 1, $ttl ) ) {
+                return self::oauth_state_error( 'oauth_rate_store_failed', 'Persistenza rate limit OAuth fallita.' );
+            }
             return true;
         }, 2 );
     }
@@ -114,8 +183,6 @@ final class PRSTUDIO_UC_MCP_Auth_V5 {
             'issuer' => self::issuer(),
             'authorization_endpoint' => self::authorization_endpoint(),
             'token_endpoint' => self::token_endpoint(),
-            // DCR remains advertised for 2025-era and client compatibility, while
-            // MCP 2026 clients can use URL-form Client ID Metadata Documents.
             'registration_endpoint' => self::registration_endpoint(),
             'client_id_metadata_document_supported' => true,
             'authorization_response_iss_parameter_supported' => true,
@@ -198,7 +265,6 @@ final class PRSTUDIO_UC_MCP_Auth_V5 {
                 'response_types' => array( 'code' ),
                 'token_endpoint_auth_method' => 'none',
                 'application_type' => $application_type,
-                /* OAuth authorization is protocol-required access control, not a mutation approval gate. */
                 'scope' => $scope,
                 'client_id_issued_at' => time(),
             );
@@ -315,12 +381,25 @@ final class PRSTUDIO_UC_MCP_Auth_V5 {
         return new WP_Error( 'unsupported_grant_type', 'grant_type non supportato.', array( 'status' => 400 ) );
     }
 
+    /** One authorization code has exactly one successful consumer across workers. */
+    private static function consume_authorization_code( string $id ) {
+        return self::with_db_lock( 'authorization-code:' . $id, static function () use ( $id ) {
+            $key = 'prstudio_mcp_v5_code_' . $id;
+            $record = get_transient( $key );
+            if ( ! is_array( $record ) ) { return null; }
+            if ( ! delete_transient( $key ) && false !== get_transient( $key ) ) {
+                return self::oauth_state_error( 'oauth_code_consume_failed', 'Consumo authorization code non persistito.' );
+            }
+            return $record;
+        }, 2 );
+    }
+
     private static function exchange_code( WP_REST_Request $request, string $client_id ) {
         $code = (string) $request->get_param( 'code' );
         if ( ! preg_match( '/^prstudio_ac_([^_]+)_(.+)$/', $code, $m ) ) { return new WP_Error( 'invalid_grant', 'Codice non valido.', array( 'status' => 400 ) ); }
         $id = sanitize_key( $m[1] );
-        $record = get_transient( 'prstudio_mcp_v5_code_' . $id );
-        delete_transient( 'prstudio_mcp_v5_code_' . $id );
+        $record = self::consume_authorization_code( $id );
+        if ( is_wp_error( $record ) ) { return $record; }
         if ( ! is_array( $record ) || ! hash_equals( (string) ( $record['hash'] ?? '' ), self::secret_hash( $code ) ) ) { return new WP_Error( 'invalid_grant', 'Codice scaduto o già utilizzato.', array( 'status' => 400 ) ); }
         $redirect = esc_url_raw( (string) $request->get_param( 'redirect_uri' ) );
         if ( $client_id !== (string) $record['client_id'] || $redirect !== (string) $record['redirect_uri'] ) { return new WP_Error( 'invalid_grant', 'Client o redirect URI non corrispondente.', array( 'status' => 400 ) ); }
@@ -471,7 +550,9 @@ final class PRSTUDIO_UC_MCP_Auth_V5 {
         if ( untrailingslashit( (string) ( $record['resource'] ?? '' ) ) !== untrailingslashit( self::mcp_url() ) ) { return new WP_Error( 'invalid_token', 'Audience token non valida.', array( 'status' => 401 ) ); }
         $scopes = preg_split( '/\s+/', (string) ( $record['scope'] ?? '' ) );
         if ( $write && ! in_array( 'prstudio.write', is_array( $scopes ) ? $scopes : array(), true ) ) { return new WP_Error( 'insufficient_scope', 'Scope prstudio.write richiesto.', array( 'status' => 403 ) ); }
-        if ( ! self::rate_limit( (string) $record['id'] ) ) { return new WP_Error( 'rate_limited', 'Troppe richieste.', array( 'status' => 429 ) ); }
+        $rate = self::rate_limit( (string) $record['id'] );
+        if ( is_wp_error( $rate ) ) { return $rate; }
+        if ( true !== $rate ) { return new WP_Error( 'rate_limited', 'Troppe richieste.', array( 'status' => 429 ) ); }
         self::$current_token_id = (string) $record['id'];
         $now = time();
         if ( $now - (int) ( $record['last_used'] ?? 0 ) >= self::LAST_USED_TOUCH_INTERVAL ) {
@@ -486,21 +567,32 @@ final class PRSTUDIO_UC_MCP_Auth_V5 {
         return self::verify_access_token( $token, $write );
     }
 
-    private static function rate_limit( string $id ): bool {
+    private static function rate_limit( string $id ) {
         $limit = (int) apply_filters( 'prstudio_mcp_v5_rate_limit_per_minute', 240 );
         $limit = max( 30, min( 2000, $limit ) );
         $key = 'prstudio_mcp_v5_rl_' . md5( $id . '|' . gmdate( 'YmdHi' ) );
-        $result = self::atomic_rate_limit( $key, $limit, 90 );
-        return ! is_wp_error( $result ) && true === $result;
+        return self::atomic_rate_limit( $key, $limit, 90 );
     }
 
-    public static function revoke_all(): void {
-        self::with_db_lock( 'token-registry', static function () {
-            update_option( self::GENERATION_OPTION, self::generation() + 1, false );
-            delete_option( self::TOKENS_OPTION );
+    public static function revoke_all() {
+        $result = self::with_db_lock( 'token-registry', static function () {
+            $before = self::generation();
+            $target = $before + 1;
+            $updated = update_option( self::GENERATION_OPTION, $target, false );
+            if ( ! $updated && self::generation() < $target ) {
+                return self::oauth_state_error( 'oauth_revoke_generation_failed', 'Revoca OAuth non persistita.' );
+            }
+            self::invalidate_option_cache( self::GENERATION_OPTION );
+            $cleared = self::atomic_token_registry( static function ( array $tokens ) {
+                return array( 'registry' => array(), 'result' => true );
+            } );
+            if ( is_wp_error( $cleared ) ) { return $cleared; }
             return true;
         } );
+        if ( is_wp_error( $result ) ) { return $result; }
+        if ( true !== $result ) { return self::oauth_state_error( 'oauth_revoke_failed', 'Revoca OAuth non completata.' ); }
         self::audit( 'oauth.revoke_all', array() );
+        return true;
     }
 
     public static function status(): array {
