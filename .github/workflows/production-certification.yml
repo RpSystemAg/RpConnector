@@ -99,6 +99,31 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: python tests/collect-production-evidence.py --commit "$GITHUB_SHA" --strict
 
+      - name: Reverify downloaded build subjects against Sigstore provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          zips=(evidence/production/prstudio-unified-*.zip)
+          test "${#zips[@]}" -eq 2
+          subjects=(
+            "${zips[@]}"
+            evidence/production/sbom.cdx.json
+            evidence/production/supply-chain-source.json
+            evidence/production/trivy-vulnerabilities.json
+            evidence/production/SHA256SUMS
+          )
+          test -s evidence/production/provenance.bundle.jsonl
+          for file in "${subjects[@]}"; do
+            test -s "$file"
+            gh attestation verify "$file" \
+              --repo "$GITHUB_REPOSITORY" \
+              --bundle evidence/production/provenance.bundle.jsonl \
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/build-attest.yml" \
+              --source-digest "$GITHUB_SHA"
+          done
+
       - name: Convert exact-SHA workflow jobs into static and platform receipts
         env:
           GITHUB_TOKEN: ${{ github.token }}
