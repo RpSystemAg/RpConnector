@@ -49,8 +49,8 @@
  *   PRSTUDIO_TEST_DB_NAME=prstudio_writeobs \
  *   php tests/php-write-observability-integration.php
  *
- * Skips cleanly (exit 0) with no database configured, so it never blocks a
- * machine without one. CI must provide one.
+ * Runtime database evidence is mandatory. Missing DB configuration or an
+ * unavailable general log is a hard failure, never a successful skip.
  */
 
 declare( strict_types = 1 );
@@ -79,8 +79,8 @@ define( 'MINUTE_IN_SECONDS', 60 );
 
 $host = getenv( 'PRSTUDIO_TEST_DB_HOST' );
 if ( ! is_string( $host ) || '' === $host ) {
-	fwrite( STDOUT, "SKIP no PRSTUDIO_TEST_DB_HOST configured\n" );
-	exit( 0 );
+	fwrite( STDERR, "FAIL no PRSTUDIO_TEST_DB_HOST configured for mandatory write-observability runtime\n" );
+	exit( 1 );
 }
 $port = (int) ( getenv( 'PRSTUDIO_TEST_DB_PORT' ) ?: '3306' );
 $user = (string) ( getenv( 'PRSTUDIO_TEST_DB_USER' ) ?: 'root' );
@@ -354,8 +354,8 @@ try {
 	$conn->query( "SET GLOBAL log_output = 'TABLE'" );
 	$conn->query( 'SET GLOBAL general_log = ON' );
 } catch ( mysqli_sql_exception $e ) {
-	fwrite( STDOUT, "SKIP cannot enable the general log (needs SUPER): " . $e->getMessage() . "\n" );
-	exit( 0 );
+	fwrite( STDERR, "FAIL cannot enable mandatory MariaDB general log: " . $e->getMessage() . "\n" );
+	exit( 1 );
 }
 $conn->query( 'TRUNCATE TABLE mysql.general_log' );
 
