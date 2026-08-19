@@ -232,12 +232,17 @@ try {
     );
     check_runtime(0 === $stranded, 'no non-terminal READY job is stranded by retry accounting', "stranded={$stranded}");
 
-    // A live job lease fences another worker.
+    // A live job lease fences another worker and a valid heartbeat keeps ownership.
     $fence = PRSTUDIO_UC_Store::create_job('lease fence', 'agency', [], ['steps' => [], 'hash' => hash('sha256', 'fence')], '', hash('sha256', 'fence'), ['max_attempts' => 5]);
     $fenceId = (string)$fence['job_uuid'];
     $first = PRSTUDIO_UC_Store::claim_job($fenceId, 'worker-a');
-    $second = PRSTUDIO_UC_Store::claim_job($fenceId, 'worker-b');
     check_runtime(is_array($first), 'first worker acquires job lease');
+    if (is_array($first)) {
+        $firstLease = (string)($first['lease_token'] ?? '');
+        check_runtime(PRSTUDIO_UC_Store::heartbeat_job($fenceId, $firstLease), 'live worker heartbeat extends its lease');
+        check_runtime(!PRSTUDIO_UC_Store::heartbeat_job($fenceId, 'wrong-lease-token'), 'wrong lease token cannot heartbeat job');
+    }
+    $second = PRSTUDIO_UC_Store::claim_job($fenceId, 'worker-b');
     check_runtime(null === $second, 'second worker cannot acquire live job lease');
 
     // Stale job lease is a failure/recovery event, not a healthy scheduling event.
@@ -251,6 +256,34 @@ try {
         check_runtime('READY' === (string)($afterRecovery['status'] ?? ''), 'stale job returns to READY');
         check_runtime((int)($afterRecovery['attempts'] ?? -1) === $beforeFailures + 1, 'stale lease consumes exactly one failure attempt', 'before=' . $beforeFailures . ' after=' . (int)($afterRecovery['attempts'] ?? -1));
     }
+
+    // Explicit execution failures consume the same failure budget and terminate at the ceiling.
+    $retryHash = hash('sha256', 'retry-budget-plan');
+    $retryJob = PRSTUDIO_UC_Store::create_job('retry budget', 'agency', [], ['steps' => [], 'hash' => $retryHash], '', $retryHash, ['max_attempts' => 2, 'backoff_seconds' => 5]);
+    $retryId = (string)($retryJob['job_uuid'] ?? '');
+    $retryClaimOne = '' !== $retryId ? PRSTUDIO_UC_Store::claim_job($retryId, 'retry-worker-1') : null;
+    check_runtime(is_array($retryClaimOne), 'retry job first claim succeeds');
+    if (is_array($retryClaimOne)) {
+        check_runtime(0 === (int)($retryClaimOne['attempts'] ?? -1), 'first retry claim does not pre-spend failure budget', 'attempts=' . (int)($retryClaimOne['attempts'] ?? -1));
+        $retryOne = PRSTUDIO_UC_Store::retry_leased_job($retryId, (string)$retryClaimOne['lease_token'], ['code' => 'synthetic_retryable', 'class' => 'synthetic_retryable']);
+        check_runtime(is_array($retryOne) && 'READY' === (string)($retryOne['status'] ?? ''), 'first retryable failure returns job to READY');
+        check_runtime(1 === (int)($retryOne['attempts'] ?? -1), 'first retryable failure consumes exactly one attempt', 'attempts=' . (int)($retryOne['attempts'] ?? -1));
+        $GLOBALS['wpdb']->update(PRSTUDIO_UC_Store::jobs_table(), ['available_gmt' => gmdate('Y-m-d H:i:s', time() - 1)], ['job_uuid' => $retryId]);
+        $retryClaimTwo = PRSTUDIO_UC_Store::claim_job($retryId, 'retry-worker-2');
+        check_runtime(is_array($retryClaimTwo), 'retry job second claim succeeds before exhaustion');
+        if (is_array($retryClaimTwo)) {
+            check_runtime(1 === (int)($retryClaimTwo['attempts'] ?? -1), 'second claim preserves prior failure count', 'attempts=' . (int)($retryClaimTwo['attempts'] ?? -1));
+            $retryTwo = PRSTUDIO_UC_Store::retry_leased_job($retryId, (string)$retryClaimTwo['lease_token'], ['code' => 'synthetic_retryable', 'class' => 'synthetic_retryable']);
+            check_runtime(is_array($retryTwo) && 'DEAD_LETTER' === (string)($retryTwo['status'] ?? ''), 'retry exhaustion terminates in DEAD_LETTER');
+            check_runtime(2 === (int)($retryTwo['attempts'] ?? -1), 'dead-lettered retry records final failure attempt', 'attempts=' . (int)($retryTwo['attempts'] ?? -1));
+            $deadRows = (int)$GLOBALS['wpdb']->get_var("SELECT COUNT(*) FROM " . PRSTUDIO_UC_Store::dead_letters_table() . " WHERE job_uuid='" . $retryId . "'");
+            check_runtime(1 === $deadRows, 'retry exhaustion writes one dead-letter record', "rows={$deadRows}");
+        }
+    }
+    $strandedAfterRetry = (int)$GLOBALS['wpdb']->get_var(
+        'SELECT COUNT(*) FROM ' . PRSTUDIO_UC_Store::jobs_table() . " WHERE status='READY' AND attempts >= max_attempts"
+    );
+    check_runtime(0 === $strandedAfterRetry, 'retry exhaustion leaves no READY job at failure ceiling', "stranded={$strandedAfterRetry}");
 
     // Browser stale-lease recovery must execute against the real engine.
     $task = PRSTUDIO_UC_Store::create_task('playwright_observation_bundle', ['url' => 'https://localhost.invalid/'], null, '', hash('sha256', 'browser-recovery'), '');
