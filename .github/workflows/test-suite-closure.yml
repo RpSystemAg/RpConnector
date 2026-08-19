@@ -1,0 +1,78 @@
+name: Test suite closure
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-suite-closure-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  residual-php:
+    name: Residual PHP assurance
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: '8.0'
+          extensions: mysqli, mbstring
+      - name: Execute residual standalone PHP suites under strict diagnostics
+        run: |
+          set -euo pipefail
+          PHP_STRICT="php -d auto_prepend_file=tests/strict-php-errors.php"
+          $PHP_STRICT tests/browser-orchestrator-v3-single-file.php prstudio-unified-control/includes/class-prstudio-uc-browser-orchestrator-v3.php
+          $PHP_STRICT tests/browser-protocol-single-file.php
+          $PHP_STRICT tests/canary-engine-single-file.php
+          $PHP_STRICT tests/database-engine-v3-single-file.php
+          $PHP_STRICT tests/domain-data-storage-single-file.php
+          $PHP_STRICT tests/evidence-engine-single-file.php
+          $PHP_STRICT tests/file-engine-single-file.php
+          $PHP_STRICT tests/idempotency-single-file.php prstudio-unified-control/includes/class-prstudio-uc-idempotency.php
+          $PHP_STRICT tests/impact-engine-single-file.php prstudio-unified-control/includes/class-prstudio-uc-impact-engine.php
+          $PHP_STRICT tests/performance-budget-single-file.php
+          $PHP_STRICT tests/php-bootstrap-fastlane-benchmark.php
+          $PHP_STRICT tests/php-database-querycount-benchmark.php
+          $PHP_STRICT tests/php-mcp-browser-sync-budget-smoke.php
+          $PHP_STRICT tests/php-mcp-legacy-protocol-surface-smoke.php
+          $PHP_STRICT tests/php-mcp-operator-bootstrap-smoke.php
+          $PHP_STRICT tests/php-pre-mutation-routing-smoke.php
+          $PHP_STRICT tests/php-prstudio-flow-smoke.php
+          $PHP_STRICT tests/php-scheduler-topology-v17-smoke.php
+          $PHP_STRICT tests/php-suite-latency-runtime-smoke.php
+          $PHP_STRICT tests/php-universal-execution-benchmark.php
+          $PHP_STRICT tests/php-wait-channel-lost-wakeup-smoke.php
+          $PHP_STRICT tests/policy-engine-single-file.php prstudio-unified-control/includes/class-prstudio-uc-risk-engine-v3.php
+          $PHP_STRICT tests/request-guard-single-file.php
+          $PHP_STRICT tests/risk-engine-v3-single-file.php
+          $PHP_STRICT tests/schema-validator-single-file.php
+          $PHP_STRICT tests/site-context-single-file.php
+          $PHP_STRICT tests/state-machine-single-file.php prstudio-unified-control/includes/class-prstudio-uc-state-machine.php
+          $PHP_STRICT tests/verifier-single-file.php
+
+  exhaustive-checkpoint:
+    name: Exhaustive semantic checkpoint
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Execute 250-question semantic checkpoint
+        run: python3 tests/exhaustive-checkpoint.py --write
+
+  inventory-closure:
+    name: Zero unwired assurance suites
+    needs: [residual-php, exhaustive-checkpoint]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Test inventory ratchet
+        run: python3 tests/validate-test-inventory.py
+      - name: Reachability audit
+        run: python3 tests/test-wiring-audit.py
