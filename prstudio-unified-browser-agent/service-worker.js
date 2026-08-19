@@ -890,7 +890,11 @@ async function startLocalRecorder(nameInput = "", executionContext = null) {
   const { tab } = await localLaneContext({ executionContext });
   const existing = (await chrome.storage.local.get(STORAGE_KEYS.LOCAL_RECORDER))[STORAGE_KEYS.LOCAL_RECORDER];
   if (existing?.active) throw codedError("local_recorder_already_active", "È già attiva una registrazione locale.");
-  const sessionId = `rec_${crypto.randomUUID?.() || Math.random().toString(36).slice(2)}_${Date.now().toString(36)}`;
+  // Fall back to getRandomValues rather than Math.random. The fallback should
+  // never fire -- randomUUID exists in every Chrome this extension supports --
+  // but a predictable session id is not the thing to degrade to when it does,
+  // and getRandomValues is available wherever randomUUID is not.
+  const sessionId = `rec_${crypto.randomUUID?.() || Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("")}_${Date.now().toString(36)}`;
   const recorder = {
     active: true,
     sessionId,
@@ -6369,7 +6373,15 @@ async function runAutonomousLinkCrawler(state, seedUrl, args = {}) {
 }
 
 function xmlDecode(value) {
-  return String(value || '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'");
+  // Decode &amp; LAST. Doing it first re-introduced an ampersand that the
+  // remaining passes then treated as the start of a fresh entity, so a
+  // legitimately double-escaped "&amp;lt;script&amp;gt;" came back as real
+  // "<script>" markup. Resolving every entity in one pass makes the output a
+  // faithful decode of the input rather than a decode of its own output.
+  return String(value || '').replace(
+    /&(amp|lt|gt|quot|apos|#39);/g,
+    (_, entity) => ({ amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", '#39': "'" }[entity])
+  );
 }
 
 async function readBoundedPublicText(response, maxBytes = 4 * 1024 * 1024) {
@@ -7592,12 +7604,18 @@ async function captureSocialSnapshot(tabId, step, state) {
       };
       const clean = (value, max = 4000) => String(value || "").replace(/\s+/g, " ").trim().slice(0, max);
       const hostname = location.hostname.toLowerCase();
-      const platform = hostname.includes("instagram.com") ? "instagram"
-        : hostname.includes("facebook.com") ? "facebook"
-          : hostname.includes("linkedin.com") ? "linkedin"
-            : hostname.includes("x.com") || hostname.includes("twitter.com") ? "x"
-              : hostname.includes("tiktok.com") ? "tiktok"
-                : hostname.includes("youtube.com") ? "youtube"
+      // Match the registrable domain, not a substring. hostname.includes("x.com")
+      // is true for "x.com.attacker.net" and for "notx.com", so a page could
+      // present itself as a platform it is not. Nothing security-critical hangs
+      // off this label today -- it only tags a snapshot -- but a wrong host test
+      // is the kind of thing that gets reused somewhere it does matter.
+      const isHost = (domain) => hostname === domain || hostname.endsWith("." + domain);
+      const platform = isHost("instagram.com") ? "instagram"
+        : isHost("facebook.com") ? "facebook"
+          : isHost("linkedin.com") ? "linkedin"
+            : isHost("x.com") || isHost("twitter.com") ? "x"
+              : isHost("tiktok.com") ? "tiktok"
+                : isHost("youtube.com") ? "youtube"
                   : "generic_social_or_public_page";
       const meta = Object.fromEntries([...document.querySelectorAll("meta[property^='og:'],meta[name^='twitter:']")]
         .slice(0, 50)

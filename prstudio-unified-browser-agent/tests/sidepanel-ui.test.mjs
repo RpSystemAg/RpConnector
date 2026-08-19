@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile, writeFile, unlink, readdir } from 'node:fs/promises';
+import { readFile, writeFile, readdir, mkdtemp, rm } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -101,13 +101,17 @@ globalThis.chrome = {
   },
 };
 
-const modulePath = join(tmpdir(), `prstudio-sidepanel-${process.pid}-${Date.now()}.mjs`);
+// mkdtemp gives a 0700 directory with a name nobody can predict. A path built
+// from pid and timestamp is guessable, so on a shared temp directory another
+// user can pre-create or symlink it and decide what this test actually loads.
+const scratchDir = await mkdtemp(join(tmpdir(), 'prstudio-sidepanel-'));
+const modulePath = join(scratchDir, 'module.mjs');
 await writeFile(modulePath, source, 'utf8');
 try {
   await import(`${pathToFileURL(modulePath).href}?v=${Date.now()}`);
   await new Promise((resolve) => setTimeout(resolve, 0));
 } finally {
-  await unlink(modulePath).catch(() => {});
+  await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
 }
 
 
@@ -122,16 +126,18 @@ test('every Browser Agent JavaScript file parses as an ES module', async () => {
     }
     return out;
   }
-  for (const file of await walk(ROOT)) {
-    const body = await readFile(file, 'utf8');
-    const tmp = join(tmpdir(), `prstudio-module-${process.pid}-${Math.random().toString(16).slice(2)}.mjs`);
-    await writeFile(tmp, body, 'utf8');
-    try {
+  // One private directory for the whole sweep; see the note above on mkdtemp.
+  const checkDir = await mkdtemp(join(tmpdir(), 'prstudio-module-'));
+  try {
+    for (const file of await walk(ROOT)) {
+      const body = await readFile(file, 'utf8');
+      const tmp = join(checkDir, 'candidate.mjs');
+      await writeFile(tmp, body, 'utf8');
       const run = spawnSync(process.execPath, ['--check', tmp], { encoding: 'utf8' });
       assert.equal(run.status, 0, `${file} failed ES-module parse: ${run.stderr || run.stdout}`);
-    } finally {
-      await unlink(tmp).catch(() => {});
     }
+  } finally {
+    await rm(checkDir, { recursive: true, force: true }).catch(() => {});
   }
 });
 

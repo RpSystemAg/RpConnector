@@ -508,3 +508,24 @@ test("controlled tab close is a technical error, not an approval/review state", 
   assert.match(block, /CONTROLLED_TAB_CLOSED/);
   assert.doesNotMatch(block, /discard_takeover|pendingTakeover|resumeActive|manual_resume/);
 });
+
+test("xmlDecode resolves entities in one pass and never re-decodes its own output", async () => {
+  const worker = await readFile(new URL("../service-worker.js", import.meta.url), "utf8");
+  // xmlDecode is pure, so lift it out of the source and exercise it directly
+  // rather than booting the whole worker for one string function.
+  const source = worker.match(/function xmlDecode\(value\)\s*\{[\s\S]*?\n\}/);
+  assert.ok(source, "xmlDecode must remain a top-level function");
+  const xmlDecode = new Function(`${source[0]}; return xmlDecode;`)();
+
+  assert.equal(xmlDecode("a &amp; b"), "a & b");
+  assert.equal(xmlDecode("&lt;loc&gt;"), "<loc>");
+  assert.equal(xmlDecode("&quot;x&quot; &apos;y&apos; &#39;z&#39;"), "\"x\" 'y' 'z'");
+
+  // The regression: decoding &amp; first re-introduced an ampersand that the
+  // later passes read as a fresh entity, so double-escaped text came back as
+  // live markup. A sitemap <loc> is attacker-influenced input, so this has to
+  // decode exactly one level and stop.
+  assert.equal(xmlDecode("&amp;lt;script&amp;gt;"), "&lt;script&gt;");
+  assert.notEqual(xmlDecode("&amp;lt;script&amp;gt;"), "<script>");
+  assert.equal(xmlDecode("&amp;amp;"), "&amp;");
+});
