@@ -24,6 +24,73 @@ final class PRSTUDIO_UC_MCP_Auth_V5 {
     private static function admin_capability(): string { return is_multisite() ? 'manage_network_options' : 'manage_options'; }
     private static function can_administer(): bool { return current_user_can( self::admin_capability() ) || current_user_can( 'manage_options' ); }
 
+    /**
+     * Serialize shared OAuth state across PHP workers with a connection-scoped
+     * MySQL/MariaDB advisory lock. No mutation proceeds if the lock cannot be
+     * acquired, so a transient infrastructure problem cannot become a lost update.
+     */
+    private static function with_db_lock( string $scope, callable $callback, int $timeout = 5 ) {
+        global $wpdb;
+        if ( ! is_object( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) || ! method_exists( $wpdb, 'prepare' ) ) {
+            return new WP_Error( 'oauth_state_lock_unavailable', 'Database lock OAuth non disponibile.', array( 'status' => 503, 'retryable' => true ) );
+        }
+        $lock_name = 'prstudio_mcp_v5_' . substr( hash( 'sha256', $scope ), 0, 40 );
+        $timeout = max( 0, min( 10, $timeout ) );
+        $acquired = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', $lock_name, $timeout ) );
+        if ( 1 !== $acquired ) {
+            return new WP_Error( 'oauth_state_busy', 'Stato OAuth occupato; riprova.', array( 'status' => 409, 'retryable' => true ) );
+        }
+        try {
+            return $callback();
+        } finally {
+            $wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock_name ) );
+        }
+    }
+
+    /** Atomic client registry mutation under one cross-request lock. */
+    private static function atomic_client_registry( callable $mutator ) {
+        return self::with_db_lock( 'client-registry', static function () use ( $mutator ) {
+            $clients = get_option( self::CLIENTS_OPTION, array() );
+            $clients = is_array( $clients ) ? $clients : array();
+            $mutation = $mutator( $clients );
+            if ( is_wp_error( $mutation ) ) { return $mutation; }
+            if ( ! is_array( $mutation ) || ! array_key_exists( 'registry', $mutation ) || ! array_key_exists( 'result', $mutation ) || ! is_array( $mutation['registry'] ) ) {
+                return new WP_Error( 'oauth_state_invalid_mutation', 'Mutazione registro client non valida.', array( 'status' => 500 ) );
+            }
+            if ( $mutation['registry'] !== $clients ) {
+                update_option( self::CLIENTS_OPTION, $mutation['registry'], false );
+            }
+            return $mutation['result'];
+        } );
+    }
+
+    /** Atomic token registry mutation under one cross-request lock. */
+    private static function atomic_token_registry( callable $mutator ) {
+        return self::with_db_lock( 'token-registry', static function () use ( $mutator ) {
+            $tokens = get_option( self::TOKENS_OPTION, array() );
+            $tokens = is_array( $tokens ) ? $tokens : array();
+            $mutation = $mutator( $tokens );
+            if ( is_wp_error( $mutation ) ) { return $mutation; }
+            if ( ! is_array( $mutation ) || ! array_key_exists( 'registry', $mutation ) || ! array_key_exists( 'result', $mutation ) || ! is_array( $mutation['registry'] ) ) {
+                return new WP_Error( 'oauth_state_invalid_mutation', 'Mutazione registro token non valida.', array( 'status' => 500 ) );
+            }
+            if ( $mutation['registry'] !== $tokens ) {
+                update_option( self::TOKENS_OPTION, $mutation['registry'], false );
+            }
+            return $mutation['result'];
+        } );
+    }
+
+    /** Atomic transient counter used by OAuth and DCR rate limits. */
+    private static function atomic_rate_limit( string $key, int $limit, int $ttl ) {
+        return self::with_db_lock( 'counter:' . $key, static function () use ( $key, $limit, $ttl ) {
+            $count = (int) get_transient( $key );
+            if ( $count >= $limit ) { return false; }
+            set_transient( $key, $count + 1, $ttl );
+            return true;
+        }, 2 );
+    }
+
     public static function mcp_url(): string { return rest_url( 'prstudio-unified/v1/mcp' ); }
     public static function issuer(): string { return untrailingslashit( home_url() ); }
     public static function protected_resource_metadata_url(): string { return home_url( '/.well-known/oauth-protected-resource' ); }
@@ -99,9 +166,9 @@ final class PRSTUDIO_UC_MCP_Auth_V5 {
     public static function register_client( array $payload ) {
         $ip = sanitize_text_field( (string) ( $_SERVER['REMOTE_ADDR'] ?? 'unknown' ) );
         $bucket = 'prstudio_mcp_v5_dcr_' . substr( hash( 'sha256', $ip . '|' . wp_salt( 'auth' ) ), 0, 32 );
-        $count = (int) get_transient( $bucket );
-        if ( $count >= 20 ) { return new WP_Error( 'too_many_requests', 'Troppe registrazioni client.', array( 'status' => 429 ) ); }
-        set_transient( $bucket, $count + 1, HOUR_IN_SECONDS );
+        $rate = self::atomic_rate_limit( $bucket, 20, HOUR_IN_SECONDS );
+        if ( is_wp_error( $rate ) ) { return $rate; }
+        if ( ! $rate ) { return new WP_Error( 'too_many_requests', 'Troppe registrazioni client.', array( 'status' => 429 ) ); }
         $redirects = isset( $payload['redirect_uris'] ) && is_array( $payload['redirect_uris'] ) ? array_slice( $payload['redirect_uris'], 0, 10 ) : array();
         if ( ! $redirects ) { return new WP_Error( 'invalid_client_metadata', 'redirect_uris è obbligatorio.', array( 'status' => 400 ) ); }
         $clean = array();
@@ -110,10 +177,6 @@ final class PRSTUDIO_UC_MCP_Auth_V5 {
             if ( ! self::valid_redirect_uri( $uri ) ) { return new WP_Error( 'invalid_redirect_uri', 'Redirect URI non consentito.', array( 'status' => 400 ) ); }
             $clean[] = $uri;
         }
-        $clients = get_option( self::CLIENTS_OPTION, array() );
-        $clients = is_array( $clients ) ? $clients : array();
-        if ( count( $clients ) >= self::MAX_CLIENTS ) { $clients = array_slice( $clients, -80, null, true ); }
-        $id = 'prstudio_client_' . self::random_id( 18 );
         $application_type = sanitize_key( (string) ( $payload['application_type'] ?? '' ) );
         if ( ! in_array( $application_type, array( 'native', 'web' ), true ) ) {
             $application_type = 'web';
@@ -122,22 +185,28 @@ final class PRSTUDIO_UC_MCP_Auth_V5 {
                 if ( in_array( $host, array( 'localhost', '127.0.0.1', '::1' ), true ) ) { $application_type = 'native'; break; }
             }
         }
-        $record = array(
-            'client_id' => $id,
-            'client_name' => sanitize_text_field( (string) ( $payload['client_name'] ?? 'RP Studio Connector' ) ),
-            'redirect_uris' => array_values( array_unique( $clean ) ),
-            'grant_types' => array( 'authorization_code', 'refresh_token' ),
-            'response_types' => array( 'code' ),
-            'token_endpoint_auth_method' => 'none',
-            'application_type' => $application_type,
-            /* OAuth authorization is protocol-required access control, not a mutation approval gate. */
-            'scope' => self::normalize_scope( sanitize_text_field( (string) ( $payload['scope'] ?? 'prstudio.read prstudio.write offline_access' ) ) ),
-            'client_id_issued_at' => time(),
-        );
-        $clients[ $id ] = $record;
-        update_option( self::CLIENTS_OPTION, $clients, false );
-        self::audit( 'oauth.client_register', array( 'client_id' => $id ) );
-        return $record;
+        $client_name = sanitize_text_field( (string) ( $payload['client_name'] ?? 'RP Studio Connector' ) );
+        $scope = self::normalize_scope( sanitize_text_field( (string) ( $payload['scope'] ?? 'prstudio.read prstudio.write offline_access' ) ) );
+        $result = self::atomic_client_registry( static function ( array $clients ) use ( $clean, $application_type, $client_name, $scope ) {
+            if ( count( $clients ) >= self::MAX_CLIENTS ) { $clients = array_slice( $clients, -80, null, true ); }
+            $id = 'prstudio_client_' . self::random_id( 18 );
+            $record = array(
+                'client_id' => $id,
+                'client_name' => $client_name,
+                'redirect_uris' => array_values( array_unique( $clean ) ),
+                'grant_types' => array( 'authorization_code', 'refresh_token' ),
+                'response_types' => array( 'code' ),
+                'token_endpoint_auth_method' => 'none',
+                'application_type' => $application_type,
+                /* OAuth authorization is protocol-required access control, not a mutation approval gate. */
+                'scope' => $scope,
+                'client_id_issued_at' => time(),
+            );
+            $clients[ $id ] = $record;
+            return array( 'registry' => $clients, 'result' => $record );
+        } );
+        if ( ! is_wp_error( $result ) ) { self::audit( 'oauth.client_register', array( 'client_id' => (string) $result['client_id'] ) ); }
+        return $result;
     }
 
     private static function client( string $id ): ?array {
@@ -268,42 +337,73 @@ final class PRSTUDIO_UC_MCP_Auth_V5 {
 
     private static function exchange_refresh( WP_REST_Request $request, string $client_id ) {
         $token = (string) $request->get_param( 'refresh_token' );
-        $record = self::verify_refresh_token( $token );
-        if ( is_wp_error( $record ) ) { return $record; }
-        if ( $client_id !== (string) $record['client_id'] ) { return new WP_Error( 'invalid_grant', 'Client non corrispondente.', array( 'status' => 400 ) ); }
         $resource = esc_url_raw( (string) $request->get_param( 'resource' ) );
-        if ( '' !== $resource && untrailingslashit( $resource ) !== untrailingslashit( (string) $record['resource'] ) ) { return new WP_Error( 'invalid_target', 'Resource OAuth non corrispondente.', array( 'status' => 400 ) ); }
-        self::delete_token_record( (string) $record['id'] );
-        return self::issue_tokens( $client_id, (string) $record['scope'], (string) $record['resource'] );
+        return self::rotate_refresh_token_atomic( $token, $client_id, $resource );
     }
 
-    private static function issue_tokens( string $client_id, string $scope, string $resource ): array {
-        $id = self::random_id( 10 );
+    private static function token_material( string $client_id, string $scope, string $resource, ?string $forced_id = null ): array {
+        $id = $forced_id ?: self::random_id( 10 );
         $access = 'prstudio_at_' . $id . '_' . self::b64url( random_bytes( 32 ) );
         $scope = self::normalize_scope( $scope );
         $offline = in_array( 'offline_access', preg_split( '/\s+/', $scope ) ?: array(), true );
         $refresh = $offline ? 'prstudio_rt_' . $id . '_' . self::b64url( random_bytes( 40 ) ) : '';
         $now = time();
-        $tokens = get_option( self::TOKENS_OPTION, array() );
-        $tokens = is_array( $tokens ) ? $tokens : array();
-        foreach ( $tokens as $token_id => $record ) {
-            if ( ! is_array( $record ) || (int) ( $record['refresh_exp'] ?? 0 ) < $now ) { unset( $tokens[ $token_id ] ); }
-        }
-        if ( count( $tokens ) > 200 ) { $tokens = array_slice( $tokens, -150, null, true ); }
-        $tokens[ $id ] = array(
+        $record = array(
             'id' => $id, 'access_hash' => self::secret_hash( $access ), 'refresh_hash' => $offline ? self::secret_hash( $refresh ) : '',
             'access_exp' => $now + self::ACCESS_TTL, 'refresh_exp' => $offline ? $now + self::REFRESH_TTL : $now + self::ACCESS_TTL,
             'client_id' => $client_id, 'scope' => $scope, 'resource' => $resource,
             'generation' => self::generation(), 'created_at' => $now, 'last_used' => 0,
         );
-        update_option( self::TOKENS_OPTION, $tokens, false );
-        self::audit( 'oauth.token_issue', array( 'client_id' => $client_id, 'scope' => $scope ) );
         $response = array(
             'access_token' => $access, 'token_type' => 'Bearer', 'expires_in' => self::ACCESS_TTL,
             'scope' => $scope, 'resource' => $resource,
         );
         if ( $offline ) { $response['refresh_token'] = $refresh; }
-        return $response;
+        return array( 'id' => $id, 'record' => $record, 'response' => $response );
+    }
+
+    private static function issue_tokens( string $client_id, string $scope, string $resource ) {
+        $material = self::token_material( $client_id, $scope, $resource );
+        $now = time();
+        $result = self::atomic_token_registry( static function ( array $tokens ) use ( $material, $now ) {
+            foreach ( $tokens as $token_id => $record ) {
+                if ( ! is_array( $record ) || (int) ( $record['refresh_exp'] ?? 0 ) < $now ) { unset( $tokens[ $token_id ] ); }
+            }
+            if ( count( $tokens ) > 200 ) { $tokens = array_slice( $tokens, -150, null, true ); }
+            $tokens[ $material['id'] ] = $material['record'];
+            return array( 'registry' => $tokens, 'result' => $material['response'] );
+        } );
+        if ( ! is_wp_error( $result ) ) { self::audit( 'oauth.token_issue', array( 'client_id' => $client_id, 'scope' => $scope ) ); }
+        return $result;
+    }
+
+    /** Consume the old refresh token and publish the replacement in one registry mutation. */
+    private static function rotate_refresh_token_atomic( string $token, string $client_id, string $resource ) {
+        $parsed = self::parse_token( $token, 'prstudio_rt' );
+        if ( ! $parsed ) { return new WP_Error( 'invalid_grant', 'Refresh token non valido.', array( 'status' => 400 ) ); }
+        $now = time();
+        $result = self::atomic_token_registry( static function ( array $tokens ) use ( $parsed, $token, $client_id, $resource, $now ) {
+            $record = isset( $tokens[ $parsed['id'] ] ) && is_array( $tokens[ $parsed['id'] ] ) ? $tokens[ $parsed['id'] ] : null;
+            if ( ! is_array( $record ) || ! hash_equals( (string) ( $record['refresh_hash'] ?? '' ), self::secret_hash( $token ) ) ) {
+                return new WP_Error( 'invalid_grant', 'Refresh token revocato.', array( 'status' => 400 ) );
+            }
+            if ( $now >= (int) ( $record['refresh_exp'] ?? 0 ) ) { return new WP_Error( 'invalid_grant', 'Refresh token scaduto.', array( 'status' => 400 ) ); }
+            if ( (int) $record['generation'] !== self::generation() ) { return new WP_Error( 'invalid_grant', 'Autorizzazione revocata.', array( 'status' => 400 ) ); }
+            if ( $client_id !== (string) $record['client_id'] ) { return new WP_Error( 'invalid_grant', 'Client non corrispondente.', array( 'status' => 400 ) ); }
+            if ( '' !== $resource && untrailingslashit( $resource ) !== untrailingslashit( (string) $record['resource'] ) ) {
+                return new WP_Error( 'invalid_target', 'Resource OAuth non corrispondente.', array( 'status' => 400 ) );
+            }
+            $material = self::token_material( $client_id, (string) $record['scope'], (string) $record['resource'] );
+            unset( $tokens[ $parsed['id'] ] );
+            foreach ( $tokens as $token_id => $candidate ) {
+                if ( ! is_array( $candidate ) || (int) ( $candidate['refresh_exp'] ?? 0 ) < $now ) { unset( $tokens[ $token_id ] ); }
+            }
+            if ( count( $tokens ) > 200 ) { $tokens = array_slice( $tokens, -150, null, true ); }
+            $tokens[ $material['id'] ] = $material['record'];
+            return array( 'registry' => $tokens, 'result' => $material['response'] );
+        } );
+        if ( ! is_wp_error( $result ) ) { self::audit( 'oauth.refresh_rotate', array( 'client_id' => $client_id ) ); }
+        return $result;
     }
 
     private static function parse_token( string $token, string $prefix ): ?array {
@@ -323,8 +423,25 @@ final class PRSTUDIO_UC_MCP_Auth_V5 {
     }
 
     private static function delete_token_record( string $id ): void {
-        $tokens = get_option( self::TOKENS_OPTION, array() );
-        if ( is_array( $tokens ) && isset( $tokens[ $id ] ) ) { unset( $tokens[ $id ] ); update_option( self::TOKENS_OPTION, $tokens, false ); }
+        self::atomic_token_registry( static function ( array $tokens ) use ( $id ) {
+            unset( $tokens[ $id ] );
+            return array( 'registry' => $tokens, 'result' => true );
+        } );
+    }
+
+    private static function atomic_touch_token_last_used( string $id, string $access_hash, int $now ): void {
+        self::atomic_token_registry( static function ( array $tokens ) use ( $id, $access_hash, $now ) {
+            $record = isset( $tokens[ $id ] ) && is_array( $tokens[ $id ] ) ? $tokens[ $id ] : null;
+            if ( ! is_array( $record ) || ! hash_equals( (string) ( $record['access_hash'] ?? '' ), $access_hash ) ) {
+                return array( 'registry' => $tokens, 'result' => false );
+            }
+            if ( $now - (int) ( $record['last_used'] ?? 0 ) < self::LAST_USED_TOUCH_INTERVAL ) {
+                return array( 'registry' => $tokens, 'result' => true );
+            }
+            $record['last_used'] = $now;
+            $tokens[ $id ] = $record;
+            return array( 'registry' => $tokens, 'result' => true );
+        } );
     }
 
     public static function bearer_token_from_request(): string {
@@ -356,13 +473,9 @@ final class PRSTUDIO_UC_MCP_Auth_V5 {
         if ( $write && ! in_array( 'prstudio.write', is_array( $scopes ) ? $scopes : array(), true ) ) { return new WP_Error( 'insufficient_scope', 'Scope prstudio.write richiesto.', array( 'status' => 403 ) ); }
         if ( ! self::rate_limit( (string) $record['id'] ) ) { return new WP_Error( 'rate_limited', 'Troppe richieste.', array( 'status' => 429 ) ); }
         self::$current_token_id = (string) $record['id'];
-        // Avoid serializing/writing the complete token registry on every MCP call.
-        // Persist a durable last-used touch at most once per five-minute window.
         $now = time();
         if ( $now - (int) ( $record['last_used'] ?? 0 ) >= self::LAST_USED_TOUCH_INTERVAL ) {
-            $record['last_used'] = $now;
-            $tokens[ $record['id'] ] = $record;
-            update_option( self::TOKENS_OPTION, $tokens, false );
+            self::atomic_touch_token_last_used( (string) $record['id'], (string) $record['access_hash'], $now );
         }
         return $record;
     }
@@ -377,15 +490,16 @@ final class PRSTUDIO_UC_MCP_Auth_V5 {
         $limit = (int) apply_filters( 'prstudio_mcp_v5_rate_limit_per_minute', 240 );
         $limit = max( 30, min( 2000, $limit ) );
         $key = 'prstudio_mcp_v5_rl_' . md5( $id . '|' . gmdate( 'YmdHi' ) );
-        $count = (int) get_transient( $key );
-        if ( $count >= $limit ) { return false; }
-        set_transient( $key, $count + 1, 90 );
-        return true;
+        $result = self::atomic_rate_limit( $key, $limit, 90 );
+        return ! is_wp_error( $result ) && true === $result;
     }
 
     public static function revoke_all(): void {
-        update_option( self::GENERATION_OPTION, self::generation() + 1, false );
-        delete_option( self::TOKENS_OPTION );
+        self::with_db_lock( 'token-registry', static function () {
+            update_option( self::GENERATION_OPTION, self::generation() + 1, false );
+            delete_option( self::TOKENS_OPTION );
+            return true;
+        } );
         self::audit( 'oauth.revoke_all', array() );
     }
 
