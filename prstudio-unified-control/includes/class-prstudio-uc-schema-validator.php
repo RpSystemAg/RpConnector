@@ -86,9 +86,13 @@ final class PRSTUDIO_UC_Schema_Validator {
                 if ( ! array_key_exists( (string) $required, $value ) ) { $errors[] = $path . '.' . $required . ' is required'; }
             }
             $properties = (array) ( $schema['properties'] ?? array() );
-            if ( array_key_exists( 'additionalProperties', $schema ) && false === $schema['additionalProperties'] ) {
-                foreach ( array_keys( $value ) as $key ) {
-                    if ( ! array_key_exists( $key, $properties ) ) { $errors[] = $path . '.' . $key . ' is not allowed'; }
+            $additional = $schema['additionalProperties'] ?? true;
+            foreach ( $value as $key => $child_value ) {
+                if ( array_key_exists( $key, $properties ) ) { continue; }
+                if ( false === $additional ) {
+                    $errors[] = $path . '.' . $key . ' is not allowed';
+                } elseif ( is_array( $additional ) ) {
+                    foreach ( self::validate( $child_value, $additional, $path . '.' . $key ) as $e ) { $errors[] = $e; }
                 }
             }
             foreach ( $properties as $key => $child ) {
