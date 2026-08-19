@@ -1,0 +1,168 @@
+{
+  "schema_version": 1,
+  "normative_date": "2026-08-19",
+  "policy_file": "quality/production-readiness-policy.json",
+  "rule": "Every mandatory production gate and every required check must map to at least one concrete executable provider. A model/mock provider cannot satisfy a real-environment check.",
+  "providers": {
+    "source_integrity": {
+      "status": "implemented_ci",
+      "environment_class": "source",
+      "receipt_generator": "tests/production-source-integrity.py",
+      "tests": [
+        "tests/regenerate-contract-artifacts.py",
+        ".github/scripts/check-mcp-tool-drift.mjs",
+        ".github/scripts/check-build-info-counts.mjs"
+      ]
+    },
+    "atomic_capability_coverage": {
+      "status": "framework_implemented_cases_missing",
+      "environment_class": "mixed",
+      "receipt_generator": "tests/atomic-capability-assurance.py",
+      "tests": ["quality/atomic-cases.json"],
+      "blocking_gap": "Exact atomic cases must be populated for every operational inventory item. Empty/wildcard coverage is forbidden."
+    },
+    "static_security": {
+      "status": "implemented_ci_receipt_adapter_missing",
+      "environment_class": "source",
+      "workflows": [
+        ".github/workflows/codeql.yml",
+        ".github/workflows/static-analysis.yml",
+        ".github/workflows/security-supply-chain.yml",
+        ".github/workflows/enterprise-verification.yml"
+      ],
+      "tests": ["tests/validate-security-contract.mjs", "tests/enterprise-static-audit.py"],
+      "blocking_gap": "CI results must be normalized into static-security.json bound to the exact release SHA."
+    },
+    "auth_security": {
+      "status": "mock_and_source_implemented_real_harness_missing",
+      "environment_class": "mixed",
+      "workflows": [".github/workflows/oauth-security-invariants.yml"],
+      "tests": ["tests/php-mcp-oauth-2026-smoke.php", "tests/oauth-concurrency-invariants.py"],
+      "blocking_gap": "Real HTTPS OAuth client flow must prove PKCE, redirect/resource binding, scope denial, replay, expiry and refresh rotation."
+    },
+    "browser_isolation": {
+      "status": "partial_real_harness",
+      "environment_class": "browser",
+      "workflows": [".github/workflows/enterprise-verification.yml", ".github/workflows/nightly-soak.yml"],
+      "tests": [
+        "tests/chrome-extension-live-smoke.mjs",
+        "tests/validate-browser-enterprise-hardening.mjs",
+        "prstudio-unified-browser-agent/tests"
+      ],
+      "blocking_gap": "One exact real-Chrome receipt must exercise wrong tab/origin/document/session and all forbidden RAW-CDP/JS/cookie paths."
+    },
+    "real_environment_matrix": {
+      "status": "partial_real_harness",
+      "environment_class": "real_matrix",
+      "workflows": [".github/workflows/enterprise-verification.yml", ".github/workflows/woocommerce-live-acceptance.yml"],
+      "tests": ["tests/php-runtime-db-liveness-integration.php", "tests/php-task-queue-integration.php", "tests/chrome-extension-live-smoke.mjs"],
+      "blocking_gap": "Produce a single exact-SHA matrix receipt covering the declared supported WordPress, WooCommerce, PHP, Chrome, MariaDB and MySQL envelope."
+    },
+    "upgrade_migration": {
+      "status": "real_harness_missing",
+      "environment_class": "wordpress",
+      "blocking_gap": "Need fresh install, previous-release upgrade, interrupted migration resume, idempotency and persistence proof for settings/jobs/memory/evidence/OAuth/pairing."
+    },
+    "transaction_integrity": {
+      "status": "partial_real_harness",
+      "environment_class": "wordpress_woocommerce",
+      "workflows": [".github/workflows/woocommerce-live-acceptance.yml"],
+      "tests": [
+        "tests/php-publish-transaction-smoke.php",
+        "tests/php-reliability-hotfix-smoke.php",
+        "tests/php-agency-verification-monotonicity-smoke.php"
+      ],
+      "blocking_gap": "Generalize the strong WooCommerce mutation/readback/rollback pattern to every mutating operational capability and emit an exact-SHA receipt."
+    },
+    "concurrency_recovery": {
+      "status": "partial_real_harness",
+      "environment_class": "database",
+      "workflows": [".github/workflows/enterprise-verification.yml"],
+      "tests": [
+        "tests/php-execution-lane-concurrency-smoke.php",
+        "tests/php-runtime-db-liveness-integration.php",
+        "tests/php-task-queue-integration.php",
+        "tests/oauth-concurrency-invariants.py",
+        "tests/validate-m11-portable-concurrency.py"
+      ],
+      "blocking_gap": "Unify real DB collision, lease expiry, fencing, CAS, advisory-lock, crash-window and retry/dead-letter evidence in one receipt."
+    },
+    "fault_injection": {
+      "status": "model_only_real_harness_missing",
+      "environment_class": "mixed",
+      "tests": ["tests/runtime-chaos-model.py", "tests/runtime-state-model-check.py"],
+      "blocking_gap": "Model checking is not live fault injection. Need real DB restart/disconnect, network interruption, remote 429/5xx/timeout, Chrome kill, MV3 suspension and process-kill crash windows."
+    },
+    "load_backpressure": {
+      "status": "partial_harness",
+      "environment_class": "mixed",
+      "tests": [
+        "tests/php-critical-performance.php",
+        "tests/php-suite-latency-runtime-smoke.php",
+        "tests/php-tools-list-budget.php",
+        "tests/performance-budget-single-file.php",
+        "bench/prstudio-bench.py"
+      ],
+      "blocking_gap": "Need a declared real concurrent MCP workload with p50/p95/p99, bounded queue/memory, backpressure and release SLO receipt."
+    },
+    "h24_soak": {
+      "status": "harness_added_not_yet_executed",
+      "environment_class": "production_soak",
+      "tests": ["tests/production-h24-soak.py"],
+      "blocking_gap": "A real exact-SHA run of at least 86400 seconds is required. The existing nightly-soak workflow is intentionally insufficient."
+    },
+    "remote_live_integration": {
+      "status": "legacy_receipts_partial",
+      "environment_class": "remote",
+      "legacy_receipts": [
+        "evidence/live/wordpress-live.json",
+        "evidence/live/browser-live.json",
+        "evidence/live/remote-mcp-oauth.json"
+      ],
+      "blocking_gap": "Need one normalized exact-SHA receipt proving remote HTTPS MCP, real OAuth client, real Chrome pairing, one read and one reversible write."
+    },
+    "observability_operability": {
+      "status": "partial_harness",
+      "environment_class": "mixed",
+      "tests": [
+        "tests/validate-correlation-chain.mjs",
+        "tests/php-health-integrity-smoke.php",
+        "tests/evidence-engine-single-file.php"
+      ],
+      "blocking_gap": "Need real alert trigger plus exercised runbook recovery and redaction/audit evidence in one exact-SHA receipt."
+    },
+    "backup_restore": {
+      "status": "real_harness_missing",
+      "environment_class": "wordpress_database",
+      "blocking_gap": "No complete backup/clean-restore production harness was found. Need restore integrity plus measured RPO/RTO."
+    },
+    "supply_chain_release": {
+      "status": "partial_ci_harness",
+      "environment_class": "source",
+      "workflows": [
+        ".github/workflows/security-supply-chain.yml",
+        ".github/workflows/build-attest.yml"
+      ],
+      "tests": ["tests/php-sidecar-supply-chain-v17-smoke.php", "tests/build-release.py"],
+      "blocking_gap": "Normalize pinned actions, dependency locks, SBOM, checksums, attestation and critical-vulnerability result into exact-SHA receipt."
+    },
+    "compatibility_degradation": {
+      "status": "partial_harness",
+      "environment_class": "mixed",
+      "workflows": [".github/workflows/enterprise-verification.yml"],
+      "tests": ["tests/php-mcp-legacy-protocol-surface-smoke.php", "tests/validate-runtime-regressions.mjs"],
+      "blocking_gap": "Need explicit negative environment tests proving unsupported WP/PHP and unavailable browser/provider degrade without synthetic success."
+    },
+    "documentation_claims": {
+      "status": "framework_implemented_atomic_trace_missing",
+      "environment_class": "source",
+      "tests": [
+        "quality/official-source-map.json",
+        "tests/atomic-capability-assurance.py",
+        ".github/scripts/check-mcp-tool-drift.mjs",
+        ".github/scripts/check-build-info-counts.mjs"
+      ],
+      "blocking_gap": "Cannot pass until every operational atomic case has internal contract + official source refs and generated release claims derive from the same manifest."
+    }
+  }
+}
