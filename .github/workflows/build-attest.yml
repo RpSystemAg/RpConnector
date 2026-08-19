@@ -33,6 +33,9 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
 
       - name: Mark exact build evidence start
         run: echo "RP_BUILD_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
@@ -58,6 +61,31 @@ jobs:
 
       - name: Generated artifacts must be reproducible
         run: git diff --exit-code
+
+      - name: Stamp exact Browser Agent source identity
+        run: python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA"
+
+      - name: Exact identity stamp may mutate only identity carriers
+        run: |
+          set -euo pipefail
+          git diff --name-only | sort > /tmp/browser-stamp-actual.txt
+          printf '%s\n' \
+            prstudio-unified-browser-agent/BUILD-INFO.json \
+            prstudio-unified-browser-agent/lib/executor-meta.js \
+            prstudio-unified-browser-agent/service-worker.js \
+            | sort > /tmp/browser-stamp-expected.txt
+          diff -u /tmp/browser-stamp-expected.txt /tmp/browser-stamp-actual.txt
+
+      - name: Rebuild exact-SHA component artifacts
+        run: python tests/build-release.py --build
+
+      - name: Verify exact Browser Agent identity and deterministic build
+        run: |
+          python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA" --verify
+          python tests/build-release.py --check
+
+      - name: Browser Agent tests on the attested exact-SHA source
+        run: node --test prstudio-unified-browser-agent/tests/*.test.mjs
 
       - name: Generate deterministic exact-SHA CycloneDX SBOM
         run: |
