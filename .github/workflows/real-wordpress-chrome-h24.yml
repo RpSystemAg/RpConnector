@@ -2,6 +2,8 @@ name: Real WordPress + Chrome H24 E2E
 
 on:
   push:
+    branches:
+      - master
   pull_request:
   workflow_dispatch:
   schedule:
@@ -25,6 +27,7 @@ jobs:
       WP_ADMIN_USER: rpadmin
       WP_ADMIN_PASSWORD: H24-Real-Browser-Only-2026!
       RP_WP_PATH: /tmp/rpconnector-h24-wp
+      CHROME_BIN: /usr/bin/chromium
       PRSTUDIO_TEST_DB_HOST: 127.0.0.1
       PRSTUDIO_TEST_DB_PORT: '3306'
       PRSTUDIO_TEST_DB_USER: root
@@ -59,7 +62,8 @@ jobs:
           wp --info
           node --version
           python --version
-          google-chrome --version
+          test -x "$CHROME_BIN"
+          "$CHROME_BIN" --version
 
       - name: Start fresh MariaDB
         run: |
