@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "normative_date": "2026-08-19",
+  "standard": "OpenTelemetry semantic correlation",
+  "mandatory_span_fields": [
+    "trace_id",
+    "span_id",
+    "parent_span_id",
+    "name",
+    "started_at",
+    "finished_at",
+    "status"
+  ],
+  "mandatory_runtime_attributes": [
+    "job_uuid",
+    "mission_id",
+    "step_id",
+    "state_from",
+    "state_to",
+    "progress_signature"
+  ],
+  "effect_attributes": [
+    "effect_id",
+    "idempotency_key"
+  ],
+  "browser_attributes": [
+    "task_uuid",
+    "lane_id",
+    "session_id"
+  ],
+  "evidence_attributes": [
+    "evidence_id",
+    "verification_ok",
+    "verification_strength"
+  ],
+  "invariants": {
+    "trace_id_stable_for_one_mission": true,
+    "span_id_unique": true,
+    "child_span_has_parent": true,
+    "state_transition_emits_event": true,
+    "progress_signature_changes_only_on_logical_progress": true,
+    "waiting_state_has_deadline": true,
+    "no_progress_timeout_is_finite": true,
+    "terminal_job_has_terminal_span": true,
+    "effect_is_correlated_before_final_success": true,
+    "evidence_is_correlated_before_verified_success": true,
+    "secrets_must_be_redacted": true
+  },
+  "max_no_progress_seconds": 120,
+  "forbid_best_effort_loss_for_state_transition_events": true
+}
