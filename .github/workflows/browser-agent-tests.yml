@@ -116,6 +116,13 @@ jobs:
           php -d auto_prepend_file=tests/strict-php-errors.php tests/php-browser-parent-reconciliation-smoke.php
       - name: tools/list must stay within the host tool-schema budget
         run: php -d auto_prepend_file=tests/strict-php-errors.php tests/php-tools-list-budget.php
+      - name: Required status checks must name jobs that exist
+        # Branch protection matches by rendered name, with no link back to the
+        # workflow. A renamed job makes the requirement stop matching -- it does
+        # not error, it just never fails again, and the branch is then guarded
+        # by a permanently green rule. Two agents are renaming jobs in here on
+        # the same day, so this has to exist before protections go on.
+        run: python3 tests/validate-required-checks.py
       - name: Every test in tests/ must be executed by some workflow
         # A suite nothing runs is not a suite: it passes review, counts in the
         # total, and goes stale silently. 66 were unexecuted when this landed.

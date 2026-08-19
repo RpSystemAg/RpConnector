@@ -1,0 +1,4 @@
+{
+  "_comment": "Checks that must be required on master. Every entry must name a real job with a static name. See validate-required-checks.py.",
+  "required": []
+}
