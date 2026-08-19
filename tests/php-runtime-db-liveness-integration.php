@@ -7,7 +7,8 @@
  * - a running lease fences a second worker;
  * - stale browser leases really recover through executable SQL;
  * - stale job leases consume a failure/recovery budget, not a scheduling budget;
- * - retry exhaustion terminates instead of stranding READY work.
+ * - retry exhaustion terminates instead of stranding READY work;
+ * - a lost dead-letter CAS cannot leave a false receipt behind.
  */
 declare(strict_types=1);
 
@@ -34,12 +35,12 @@ $pass = false === $passEnv ? '' : $passEnv;
 $dbname = getenv('PRSTUDIO_TEST_DB_NAME') ?: 'prstudio_runtime_liveness';
 
 if ('' === $host) {
-    echo "SKIP php-runtime-db-liveness-integration: PRSTUDIO_TEST_DB_HOST not set\n";
-    exit(0);
+    fwrite(STDERR, "FAIL php-runtime-db-liveness-integration: PRSTUDIO_TEST_DB_HOST not set for mandatory MariaDB runtime\n");
+    exit(1);
 }
 if (!class_exists('mysqli')) {
-    echo "SKIP php-runtime-db-liveness-integration: mysqli unavailable\n";
-    exit(0);
+    fwrite(STDERR, "FAIL php-runtime-db-liveness-integration: mysqli unavailable for mandatory MariaDB runtime\n");
+    exit(1);
 }
 
 mysqli_report(MYSQLI_REPORT_OFF);
@@ -284,6 +285,39 @@ try {
         'SELECT COUNT(*) FROM ' . PRSTUDIO_UC_Store::jobs_table() . " WHERE status='READY' AND attempts >= max_attempts"
     );
     check_runtime(0 === $strandedAfterRetry, 'retry exhaustion leaves no READY job at failure ceiling', "stranded={$strandedAfterRetry}");
+
+    // The general dead-letter path must never create a receipt before winning
+    // the fenced state transition. A wrong lease deterministically reproduces
+    // the CAS-loss condition that used to leave a false dead-letter row behind.
+    $receiptHash = hash('sha256', 'dead-letter-receipt-race');
+    $receiptJob = PRSTUDIO_UC_Store::create_job('dead-letter receipt race', 'agency', [], ['steps' => [], 'hash' => $receiptHash], '', $receiptHash, ['max_attempts' => 3]);
+    $receiptId = (string)($receiptJob['job_uuid'] ?? '');
+    $receiptClaim = '' !== $receiptId ? PRSTUDIO_UC_Store::claim_job($receiptId, 'receipt-worker') : null;
+    check_runtime(is_array($receiptClaim), 'dead-letter receipt race job is leased');
+    if (is_array($receiptClaim)) {
+        $receiptLease = (string)($receiptClaim['lease_token'] ?? '');
+        $receiptError = ['code' => 'synthetic_terminal', 'class' => 'synthetic_terminal', 'message' => 'deterministic dead-letter fencing test'];
+        $wrongDeadLetter = PRSTUDIO_UC_Store::dead_letter_job($receiptId, $receiptError, 'synthetic_terminal', 'wrong-lease-token');
+        $afterWrongDeadLetter = PRSTUDIO_UC_Store::get_job($receiptId);
+        $falseReceipts = (int)$GLOBALS['wpdb']->get_var("SELECT COUNT(*) FROM " . PRSTUDIO_UC_Store::dead_letters_table() . " WHERE job_uuid='" . $receiptId . "'");
+        check_runtime(false === $wrongDeadLetter, 'dead-letter transition rejects a lost lease');
+        check_runtime('RUNNING' === (string)($afterWrongDeadLetter['status'] ?? ''), 'lost dead-letter CAS leaves job RUNNING', 'status=' . (string)($afterWrongDeadLetter['status'] ?? ''));
+        check_runtime(hash_equals($receiptLease, (string)($afterWrongDeadLetter['lease_token'] ?? '')), 'lost dead-letter CAS preserves winning lease');
+        check_runtime(0 === $falseReceipts, 'lost dead-letter CAS creates no false receipt', "rows={$falseReceipts}");
+
+        $wonDeadLetter = PRSTUDIO_UC_Store::dead_letter_job($receiptId, $receiptError, 'synthetic_terminal', $receiptLease);
+        $afterWonDeadLetter = PRSTUDIO_UC_Store::get_job($receiptId);
+        $wonReceipts = (int)$GLOBALS['wpdb']->get_var("SELECT COUNT(*) FROM " . PRSTUDIO_UC_Store::dead_letters_table() . " WHERE job_uuid='" . $receiptId . "'");
+        check_runtime(true === $wonDeadLetter, 'valid dead-letter lease commits transition and receipt');
+        check_runtime('DEAD_LETTER' === (string)($afterWonDeadLetter['status'] ?? ''), 'valid dead-letter transition reaches DEAD_LETTER');
+        check_runtime(empty($afterWonDeadLetter['lease_token']) && empty($afterWonDeadLetter['lease_expires_gmt']), 'dead-letter transition clears lease ownership');
+        check_runtime(1 === $wonReceipts, 'valid dead-letter transition writes exactly one receipt', "rows={$wonReceipts}");
+
+        $staleReplay = PRSTUDIO_UC_Store::dead_letter_job($receiptId, $receiptError, 'synthetic_terminal', $receiptLease);
+        $replayReceipts = (int)$GLOBALS['wpdb']->get_var("SELECT COUNT(*) FROM " . PRSTUDIO_UC_Store::dead_letters_table() . " WHERE job_uuid='" . $receiptId . "'");
+        check_runtime(false === $staleReplay, 'stale lease cannot replay a terminal dead-letter transition');
+        check_runtime(1 === $replayReceipts, 'stale dead-letter replay cannot duplicate receipt', "rows={$replayReceipts}");
+    }
 
     // Browser stale-lease recovery must execute against the real engine.
     $task = PRSTUDIO_UC_Store::create_task('playwright_observation_bundle', ['url' => 'https://localhost.invalid/'], null, '', hash('sha256', 'browser-recovery'), '');
