@@ -4,7 +4,7 @@
 Scans deployable runtime and generated execution contracts. Legacy vocabulary is
 allowed only inside the two one-way migration files that delete/migrate old state.
 Also proves that the mandatory no-exclusion/no-deferral law is present in every
-agent entry point, including Claude's project constitution.
+agent and Claude entry point across the suite.
 """
 from __future__ import annotations
 import json,re,sys
@@ -136,12 +136,13 @@ for p in agent_constitutions:
     for law in required_agent_laws:
         if law not in text: fail.append(f'{p.relative_to(ROOT)}: missing law {law}')
 
-claude=ROOT/'CLAUDE.md'
-claude_text=claude.read_text(errors='replace') if claude.exists() else ''
-if 'NO EXCLUSIONS, NO DEFERRAL, NO PARTIAL ACCEPTANCE' not in claude_text:
-    fail.append('CLAUDE.md: missing no-exclusion/no-deferral law')
-if 'must read and obey the repository-root `AGENTS.md`' not in claude_text:
-    fail.append('CLAUDE.md: missing mandatory AGENTS.md handoff')
+claude_constitutions=[ROOT/'CLAUDE.md',CONTROL/'CLAUDE.md',BROWSER/'CLAUDE.md']
+for p in claude_constitutions:
+    text=p.read_text(errors='replace') if p.exists() else ''
+    if 'NO EXCLUSIONS, NO DEFERRAL, NO PARTIAL ACCEPTANCE' not in text:
+        fail.append(f'{p.relative_to(ROOT)}: missing no-exclusion/no-deferral law')
+    if 'must read and obey' not in text or '`AGENTS.md`' not in text:
+        fail.append(f'{p.relative_to(ROOT)}: missing mandatory AGENTS.md handoff')
 
 law10_clauses=[
  'An explicit rationale does not legalize an exclusion or a deferral.',
@@ -149,7 +150,7 @@ law10_clauses=[
  'The only acceptable stopping condition is verified closure',
  'No alternative path to completion exists.',
 ]
-for p in [ROOT/'AGENTS.md',CONTROL/'AGENTS.md',BROWSER/'AGENTS.md',claude]:
+for p in agent_constitutions + claude_constitutions:
     text=p.read_text(errors='replace') if p.exists() else ''
     for clause in law10_clauses:
         if clause not in text: fail.append(f'{p.relative_to(ROOT)}: missing Law 10 clause {clause}')
@@ -176,3 +177,4 @@ print('no_exclusions=true')
 print('no_deferral=true')
 print('no_partial_acceptance=true')
 print('claude_constitution_enforced=true')
+print('claude_subtree_constitutions_enforced=true')
