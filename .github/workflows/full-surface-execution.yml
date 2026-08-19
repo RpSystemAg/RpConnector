@@ -88,6 +88,7 @@ jobs:
             .requirements.no_helper_classification == true and
             .requirements.no_baseline == true and
             .requirements.parse_does_not_count_as_execution == true and
+            .requirements.direct_execution_requires_syscall_evidence == true and
             .requirements.required_execution_percent == 100 and
             .counts.syntax_targets == .counts.syntax_passed and
             .counts.total_test_surface_files == .counts.real_executed_files and
