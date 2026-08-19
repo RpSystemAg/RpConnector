@@ -1,0 +1,67 @@
+name: WordPress forward canary
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '19 4 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wordpress-forward-canary-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  playground:
+    name: Playground ${{ matrix.wp }} / PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        wp: [latest, beta, nightly]
+        php: ['8.4', '8.5']
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+
+      - name: Verify exact Playground package identity before execution
+        env:
+          PLAYGROUND_VERSION: '3.1.48'
+        run: |
+          set -euo pipefail
+          version=$(npm view "@wp-playground/cli@${PLAYGROUND_VERSION}" version)
+          integrity=$(npm view "@wp-playground/cli@${PLAYGROUND_VERSION}" dist.integrity)
+          test "$version" = "$PLAYGROUND_VERSION"
+          test -n "$integrity"
+          printf 'version=%s\nintegrity=%s\n' "$version" "$integrity" | tee /tmp/playground-package.txt
+
+      - name: Execute exact plugin commit inside WordPress Playground
+        run: |
+          npx --yes @wp-playground/cli@3.1.48 php \
+            --wp=${{ matrix.wp }} \
+            --php=${{ matrix.php }} \
+            --mount=prstudio-unified-control:/wordpress/wp-content/plugins/prstudio-unified-control \
+            --mount=tests:/workspace/tests \
+            -- \
+            /workspace/tests/playground-forward-canary.php \
+            | tee "/tmp/playground-${{ matrix.wp }}-php-${{ matrix.php }}.json"
+          grep -F '"ok": true' "/tmp/playground-${{ matrix.wp }}-php-${{ matrix.php }}.json"
+
+      - name: Preserve exact resolved WordPress/PHP evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playground-${{ matrix.wp }}-php-${{ matrix.php }}-${{ github.sha }}
+          path: |
+            /tmp/playground-package.txt
+            /tmp/playground-${{ matrix.wp }}-php-${{ matrix.php }}.json
+          if-no-files-found: warn
+          retention-days: 30
