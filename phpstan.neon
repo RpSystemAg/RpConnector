@@ -1,65 +1,42 @@
-# PHPStan configuration.
+# PHPStan configuration for the production plugin surface.
 #
-# Why this file exists
-# --------------------
-# The first full-codebase sweep reported 812 findings. Every one of them was an
-# artefact of running PHPStan without telling it what WordPress is and without
-# telling it to leave the test shims alone. Read that number as "the analyser
-# was not configured", not "the plugin has 812 defects".
+# The first whole-repository pass produced hundreds of false positives because
+# PHPStan had no WordPress model and was reading deliberately incomplete test
+# shims. That setup problem is now removed with a reproducible dev-only toolchain
+# pinned by composer.json/composer.lock:
+#   - phpstan/phpstan 2.2.7
+#   - php-stubs/wordpress-stubs 7.0.1
+#   - szepeviktor/phpstan-wordpress 2.0.3
 #
-# The 812 broke down into two families, and both came from the same root:
-#
-#   574  "Function esc_attr not found." and friends.
-#        PHPStan has no WordPress. Every call into core looked undefined.
-#
-#   ~89  "Function wp_mail invoked with 4 parameters, 3 required."
-#        Worse than noise -- confidently wrong. The analyser was reading the
-#        deliberately minimal shims the test suites define to run without a
-#        WordPress install (tests/php-operational-completeness-smoke.php
-#        declares wp_mail($to,$subject,$message); real wp_mail takes five).
-#        So it measured production calls against a stub signature and called
-#        the correct ones broken.
-#
-# A report where everything is wrong is worse than no report: nobody reads the
-# 813th line to find the one that matters.
-#
-# This config fixes the second family and only the second family. Scoping the
-# analysis to the plugin and excluding the shims removes the ~89 confidently
-# wrong findings, which were the actively harmful ones -- they accused correct
-# code. The 574 "not found" remain: silencing them needs real WordPress
-# signatures from php-stubs, and that means a composer.json plus a committed
-# lock file, which the supply-chain gate requires and which cannot be generated
-# here. Left as the next step rather than faked, and PHPStan stays advisory
-# until it is done.
-#
-# What this is expected to surface once configured
-# ------------------------------------------------
-# Genuine argument-count mistakes. That family is not hypothetical here:
-# recover_stale_tasks() built an UPDATE with six placeholders and passed five
-# arguments, so wpdb::prepare() returned '' and stale leases were never
-# recovered -- silently, for the life of the function. tests/validate-prepare-
-# arity.py now catches that specific shape inside SQL strings; PHPStan is the
-# general case for PHP calls.
+# There is deliberately no PHPStan baseline. Findings that remain after loading
+# the official WordPress stubs and extension are defects or modelling gaps that
+# must be resolved rather than frozen into an ignore file.
+
+includes:
+  - vendor/szepeviktor/phpstan-wordpress/extension.neon
 
 parameters:
-  level: 1
+  # Level 5 is the production floor for this repository. It is high enough to
+  # catch meaningful type/argument/control-flow defects without pretending this
+  # dynamic WordPress codebase already has max-level annotations everywhere.
+  # Raising the level is a future ratchet; lowering it to clear CI is forbidden.
+  level: 5
 
   paths:
     - prstudio-unified-control
 
-  # The test suites define stand-ins for WordPress functions so they can run
-  # without a WordPress install. Those signatures are intentionally partial.
-  # Analysing them alongside the plugin is what produced the confidently wrong
-  # findings described above.
+  # Test suites contain deliberately partial WordPress stand-ins and therefore
+  # cannot be authoritative signatures for production static analysis.
   excludePaths:
     - tests
     - vendor
     - '*/node_modules/*'
 
-  # The plugin is loaded by WordPress, which defines these before any plugin
-  # file runs. PHPStan sees only the plugin, so they have to be declared.
+  # WordPress defines environment constants before plugin boot. Functions,
+  # classes and dynamic WordPress return types are supplied by the versioned
+  # upstream stubs/extension above.
   bootstrapFiles:
     - tests/phpstan-bootstrap.php
 
   treatPhpDocTypesAsCertain: false
-  reportUnmatchedIgnoredErrors: false
+  reportUnmatchedIgnoredErrors: true
