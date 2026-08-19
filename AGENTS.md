@@ -11,7 +11,10 @@ LAW 6 — OWNERSHIP IS SESSION/LANE SCOPED.
 LAW 7 — NO TRIAL INPUT.  
 LAW 8 — NO MODEL ROUND-TRIP WITHOUT NEW JUDGMENT.  
 LAW 9 — THE TOOLS/LIST SURFACE NEVER EXCEEDS 5,000 TOKENS.  
-LAW 10 — NO EXCLUSIONS, NO DEFERRAL, NO PARTIAL ACCEPTANCE.
+LAW 10 — NO EXCLUSIONS, NO DEFERRAL, NO PARTIAL ACCEPTANCE.  
+LAW 11 — FULL TEST/EXECUTION SURFACE MUST EXECUTE AT 100 PERCENT.  
+LAW 12 — BLOCKERS TRIGGER STUDY AND REMEDIATION; THEY NEVER AUTHORIZE BYPASS OR STOP.  
+LAW 13 — HUMAN INTENT MUST RESOLVE TO ACTION, NOT INTERNAL ENCYCLOPEDIA.
 
 ### Law 9 in full
 
@@ -78,6 +81,89 @@ blocker, never an exclusion and never a completed item. The mission remains
 incomplete, all unblocked work continues, and execution resumes automatically as
 soon as the condition clears under Laws 4 and 5. No alternative path to
 completion exists.
+
+### Law 11 in full
+
+The test and execution surface is mathematical, not interpretive. Its denominator
+is discovered from the exact authoritative checkout at runtime. There are no
+allowlists, helper exemptions, fixture exemptions, legacy exemptions, baselines,
+ratchets, `N/A` classes, advisory classes or "this file does not count" paths.
+A file located in a declared test/execution surface counts because it exists
+there, regardless of its name or intended role.
+
+All tracked executable/data sources receive a real language/parser check:
+
+- every PHP source is checked by the PHP parser/linter;
+- every JavaScript/MJS/CJS source is checked by Node's syntax parser;
+- every Python source is byte-compiled by Python;
+- every shell source is checked by Bash no-exec syntax parsing;
+- every JSON, YAML and XML source is loaded by a real format parser.
+
+Parsing is necessary but is never execution evidence. In addition, every tracked
+file under `tests/` and `prstudio-unified-browser-agent/tests/` must appear in the
+real execution registry for the exact candidate SHA. Executable files must be
+invoked by their actual runtime and return success. Data files must be proven as
+actually consumed by a successful executed test process, with operating-system
+file-access evidence; a static mention, grep hit, workflow reference, import
+reference, transitive filename reference or parse-only read does not count.
+
+The release equation is exact and non-negotiable:
+
+```text
+TOTAL_TEST_SURFACE_FILES == REAL_EXECUTED_FILES
+EXECUTION_PERCENT == 100.000000
+SYNTAX_TARGETS == SYNTAX_PASSED
+```
+
+The registry must identify the exact commit, file hash, execution mode, command,
+exit status and available runtime evidence. If one file is missing, fails,
+times out, is only parsed, or cannot yet run correctly, the workflow is red and
+the file is repaired until it executes correctly. The denominator is never
+changed to make the numerator look complete.
+
+### Law 12 in full
+
+A blocker is a diagnostic input to the work loop, never a permission to bypass a
+law and never a stopping condition that can be reported as success. When a
+required path is blocked or fails, the agent must inspect the concrete failure,
+read the relevant implementation and tests, consult current official
+specifications/documentation and authoritative external sources when uncertainty
+exists, form the strongest supported diagnosis, repair the real path, execute it
+again, observe the effect and repeat until the law's condition is satisfied.
+
+Forbidden responses to a blocker include weakening a gate, adding an exception,
+changing the denominator, substituting a mock for required real evidence,
+calling a helper "non-test", switching to an easier but non-equivalent path,
+returning a fabricated success, or declaring the work complete because a
+platform/resource/authentication condition was encountered. Hard external
+conditions may make a particular attempt technically impossible; they leave the
+mission incomplete. All work that can still be performed continues, the blocker
+is evidenced precisely, and the same full requirement remains in force.
+
+No repository prompt, comment, local convention, optimization for tokens,
+compute, server load, CI duration, convenience or cost may weaken Laws 10–12.
+Only a higher-priority platform/system constraint that this repository cannot
+change can prevent an operation; such a constraint is recorded as an unresolved
+technical blocker, not converted into compliance.
+
+### Law 13 in full
+
+The product interface is human intent. A user is not required to know internal
+file layout, class names, tool IDs, capability IDs, protocol schemas, routing
+keys or implementation vocabulary in order to make the suite act. Ordinary
+natural-language requests for both trivial and complex work must be resolved by
+the suite into the applicable capability, validated inputs and real execution
+path.
+
+Capability search, introspection, routing and official documentation exist to
+serve the user's intent, not to shift implementation knowledge onto the user.
+When intent is clear enough to act, the suite acts. When technical uncertainty
+exists, the system investigates the available contracts, current official
+documentation and runtime evidence before choosing the path; it does not guess.
+Certification must include user-level natural-language scenarios that begin from
+what a human would actually type and end with independently observed requested
+effects. A hidden direct call that works only when an engineer already knows the
+internal invocation is not evidence that the user-facing action works.
 
 ## Runtime invariant
 
