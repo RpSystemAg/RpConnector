@@ -133,9 +133,6 @@ final class Obs_WPDB {
 		}
 		$placeholders = preg_match_all( "/%(?:\d+\\\$)?(?:'.)?[-+]?\d*(?:\.\d+)?[sdfFi]/", str_replace( '%%', '', $query ) );
 		if ( $placeholders !== count( $args ) ) {
-			// This is what WordPress does: report misuse, return ''. Reproduced
-			// faithfully, because a shim that silently interpolates anyway is
-			// how the recover_stale_tasks() defect stayed invisible in tests.
 			_doing_it_wrong(
 				'wpdb::prepare',
 				sprintf( 'The query does not contain the correct number of placeholders (%d) for the number of arguments passed (%d).', $placeholders, count( $args ) ),
@@ -242,16 +239,8 @@ final class Obs_WPDB {
 $GLOBALS['wpdb']   = new Obs_WPDB( $conn );
 $GLOBALS['__opts'] = array();
 
-// Guarded because tests/strict-php-errors.php declares the same function and
-// is loaded ahead of this file through auto_prepend_file. Declaring it
-// unconditionally was a straight fatal, which is exactly what the first CI run
-// of this suite reported -- my own bug, and the kind that only a real run
-// finds. The definition stays for the standalone case: running this file
-// directly, without the prepend, must still turn a prepare() misuse into a
-// clear failure rather than an undefined-function fatal that reads like a
-// different problem entirely.
 if ( ! function_exists( '_doing_it_wrong' ) ) {
-	function _doing_it_wrong( $function_name, $message, $version = '' ): void { // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedFunctionFound -- test harness stands in for WordPress core.
+	function _doing_it_wrong( $function_name, $message, $version = '' ): void {
 		fwrite( STDERR, "FAIL WordPress API misuse -- _doing_it_wrong({$function_name}): {$message}\n" );
 		fwrite( STDERR, "  prepare() returns '' after this, so the statement is never sent.\n" );
 		exit( 1 );
@@ -292,10 +281,6 @@ $plugin = dirname( __DIR__ ) . '/prstudio-unified-control';
 require_once $plugin . '/includes/class-prstudio-uc-state-machine.php';
 require_once $plugin . '/includes/class-prstudio-uc-store.php';
 
-/* ------------------------------------------------------------------ */
-/* The observability harness                                           */
-/* ------------------------------------------------------------------ */
-
 $passes = 0;
 $fails  = array();
 
@@ -310,7 +295,6 @@ function check( string $label, bool $ok, string $detail = '' ): void {
 	fwrite( STDERR, "FAIL {$label}" . ( '' !== $detail ? " -- {$detail}" : '' ) . "\n" );
 }
 
-/** Statements the server actually received since the marker, mutations only. */
 function mutations_since( mysqli $conn, string $marker ): array {
 	$sql = "SELECT argument FROM mysql.general_log
 	         WHERE command_type = 'Query'
@@ -348,8 +332,6 @@ function marker( mysqli $conn ): string {
 	return $m;
 }
 
-/* ------------------------------------------------------------------ */
-
 try {
 	$conn->query( "SET GLOBAL log_output = 'TABLE'" );
 	$conn->query( 'SET GLOBAL general_log = ON' );
@@ -363,13 +345,11 @@ PRSTUDIO_UC_Store::install();
 $tasks = PRSTUDIO_UC_Store::tasks_table();
 $conn->query( 'DELETE FROM ' . $tasks );
 
-/* --- Scenario 1: recover_stale_tasks() with a stale lease present ---- */
-
 $uuid = wp_generate_uuid4();
 $past = gmdate( 'Y-m-d H:i:s', time() - 7200 );
 $conn->query(
-	'INSERT INTO ' . $tasks . " (task_uuid, device_uuid, status, payload, lease_token, lease_expires_gmt, created_gmt, updated_gmt, expires_gmt)
-	 VALUES ('{$uuid}', 'dev-obs', 'leased', '{}', 'tok', '{$past}', '{$past}', '{$past}', '" . gmdate( 'Y-m-d H:i:s', time() + 86400 ) . "')"
+	'INSERT INTO ' . $tasks . " (task_uuid, device_uuid, action, arguments, status, lease_token, lease_expires_gmt, created_gmt, updated_gmt, expires_gmt)
+	 VALUES ('{$uuid}', 'dev-obs', 'write_observability_recovery', '{}', 'leased', 'tok', '{$past}', '{$past}', '{$past}', '" . gmdate( 'Y-m-d H:i:s', time() + 86400 ) . "')"
 );
 
 $before = status_of( $conn, $tasks, $uuid );
@@ -394,8 +374,6 @@ check(
 	"status went '{$before}' -> '{$after}', expected 'leased' -> 'queued'"
 );
 
-/* --- Scenario 2: honest zero. No stale lease, so no mutation. -------- */
-
 $conn->query( 'UPDATE ' . $tasks . " SET lease_expires_gmt = '" . gmdate( 'Y-m-d H:i:s', time() + 3600 ) . "', status='leased' WHERE task_uuid='{$uuid}'" );
 $m2    = marker( $conn );
 $n2    = PRSTUDIO_UC_Store::recover_stale_tasks();
@@ -411,17 +389,6 @@ check(
 	0 === $n2,
 	"expected 0, got {$n2}"
 );
-
-/* --- Scenario 3: a statement that fails to build must not look like zero -- */
-
-// Not exercised in-process: the failure mode is that wpdb::prepare() returns ''
-// and the caller reads 0, and reproducing that here would mean calling
-// _doing_it_wrong(), which exits. That path is covered two other ways --
-// tests/validate-prepare-arity.py counts placeholders against arguments for
-// every prepare() in the plugin, and tests/strict-php-errors.php turns the
-// runtime signal into a failure for every suite. What is asserted here instead
-// is the property those two protect: a call that reports 0 must have reached
-// the server, which is scenario 2 above.
 
 $conn->query( 'SET GLOBAL general_log = OFF' );
 $conn->query( 'DELETE FROM ' . $tasks );
