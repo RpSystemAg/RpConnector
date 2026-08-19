@@ -56,7 +56,21 @@
 declare( strict_types = 1 );
 
 define( 'PRSTUDIO_UC_TESTING', true );
-define( 'ABSPATH', __DIR__ . '/' );
+// PRSTUDIO_UC_Store::install() does `require_once ABSPATH . 'wp-admin/includes/
+// upgrade.php'`, which real WordPress always provides. Pointing ABSPATH at
+// tests/ meant that require_once emitted a warning and carried on -- harmless
+// looking, and invisible until tests/strict-php-errors.php started promoting
+// diagnostics to failures. It found this on its first real run, in the suite
+// written alongside it, which is a fair demonstration of why it exists.
+//
+// php-task-queue-integration.php already solved this the same way; this file
+// simply had not copied it.
+$wp_root = sys_get_temp_dir() . '/prstudio-writeobs-root/';
+@mkdir( $wp_root . 'wp-admin/includes', 0777, true );
+if ( ! file_exists( $wp_root . 'wp-admin/includes/upgrade.php' ) ) {
+	file_put_contents( $wp_root . 'wp-admin/includes/upgrade.php', '<?php' . PHP_EOL . '// test stub: dbDelta() is defined by this harness.' . PHP_EOL );
+}
+define( 'ABSPATH', $wp_root );
 define( 'ARRAY_A', 'ARRAY_A' );
 define( 'OBJECT', 'OBJECT' );
 define( 'HOUR_IN_SECONDS', 3600 );
