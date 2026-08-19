@@ -37,6 +37,21 @@
       "gates": ["h24_soak"]
     },
     {
+      "id": "network_chaos",
+      "workflow": "network-chaos.yml",
+      "artifact_name_prefix": "network-chaos-",
+      "required_files": [
+        "network-chaos.json",
+        "network-chaos-details.json",
+        "db-latency-evidence.json",
+        "db-timeout-evidence.json",
+        "db-mid-operation-evidence.json",
+        "http-bandwidth-evidence.json",
+        "http-reset-evidence.json"
+      ],
+      "gates": ["network_chaos"]
+    },
+    {
       "id": "attested_build",
       "workflow": "build-attest.yml",
       "artifact_name_prefix": "prstudio-build-",
