@@ -26,6 +26,8 @@ jobs:
       PRSTUDIO_TEST_DB_NAME: prstudio_full_surface
       RP_WP_PATH: /tmp/rpconnector-full-surface-wp
       WP_URL: http://127.0.0.1:8080
+      WP_ADMIN_USER: rpadmin
+      WP_ADMIN_PASSWORD: Full-Surface-Only-2026!
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
