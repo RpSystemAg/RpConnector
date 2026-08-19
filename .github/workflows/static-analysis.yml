@@ -13,19 +13,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Run the suite on the PHP version the plugin actually claims to support.
-  #
-  # This is the surviving half of a merge. The other side proposed a
-  # PHPCompatibility gate against `testVersion 8.0-`, which is the more obvious
-  # way to check a declared minimum and is what most projects do. It was tried
-  # here and it does not work: the stable PHPCompatibility release predates PHP
-  # 8.0 and carries no data for 8.1 functions, so a fixture calling a known 8.1
-  # function came back unflagged. It reported clean for precisely the calls it
-  # existed to catch.
-  #
-  # Executing the code on 8.0 has no such blind spot. Calling a function that
-  # does not exist there is a fatal, and the suites surface it. `php -l` cannot:
-  # calling an undefined function is valid syntax.
   php-matrix:
     name: PHP ${{ matrix.php }} (declared floor is 8.0)
     runs-on: ubuntu-latest
@@ -33,9 +20,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        php: ['8.0', '8.1', '8.3']
+        php: ['8.0', '8.1', '8.3', '8.4', '8.5']
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
       - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
         with:
           php-version: ${{ matrix.php }}
@@ -45,13 +34,10 @@ jobs:
         run: |
           declared=$(grep -oP 'Requires PHP:\s*\K[0-9.]+' prstudio-unified-control/prstudio-unified-control.php)
           echo "plugin header declares PHP $declared"
-          if [ "$declared" != "8.0" ]; then
-            echo "::error::Header declares PHP $declared but the matrix floor is 8.0. Change both together."
-            exit 1
-          fi
-      - name: Syntax check every file
+          test "$declared" = "8.0"
+      - name: Syntax check every production PHP file
         run: find prstudio-unified-control -name '*.php' -print0 | xargs -0 -n1 -P4 php -l
-      - name: Execute the suites on this PHP version
+      - name: Execute runtime-facing suites on this PHP version
         run: |
           php tests/php-agent-model-constitution.php
           php tests/php-mcp-catalog-runtime-smoke.php
@@ -59,44 +45,62 @@ jobs:
           php tests/php-new-capabilities-smoke.php
           php tests/php-intelligence-smoke.php
 
-  # Broad multi-language linting, run as a ratchet.
-  #
-  # Two runs, two postures, because the repo predates the linter:
-  #   master push     -> whole codebase, advisory. Measures the standing backlog.
-  #   everything else -> changed files only, BLOCKING. New code has to be clean.
-  #
-  # The other side of this merge set VALIDATE_ALL_CODEBASE: true with errors
-  # blocking on every event. That posture is only reachable once the backlog is
-  # clear, and it is not: the first full sweep reported 812 phpstan findings.
-  # Turning it on now would leave master permanently red, which teaches people
-  # to ignore the colour. The ratchet reaches the same end state -- backlog can
-  # only shrink -- without a wall in front of unrelated work.
-  megalinter:
-    name: MegaLinter (${{ github.event_name == 'push' && github.ref == 'refs/heads/master' && 'full sweep, advisory' || 'changed files, blocking' }})
+  phpstan-wordpress:
+    name: PHPStan 2.2.7 + WordPress 7.0.1 stubs (blocking)
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, json
+          tools: composer
+          coverage: none
+      - name: Validate immutable Composer toolchain
+        run: composer validate --strict --no-check-publish
+      - name: Install exact static-analysis dependencies from composer.lock
+        run: composer install --no-interaction --no-progress --no-scripts --no-plugins --prefer-dist
+      - name: Verify exact tool versions
+        run: |
+          test "$(composer show phpstan/phpstan --format=json | jq -r .versions[0])" = "2.2.7"
+          test "$(composer show php-stubs/wordpress-stubs --format=json | jq -r .versions[0])" = "v7.0.1"
+          test "$(composer show szepeviktor/phpstan-wordpress --format=json | jq -r .versions[0])" = "v2.0.3"
+          vendor/bin/phpstan --version
+      - name: Analyze the entire production PHP surface
+        run: vendor/bin/phpstan analyse --configuration=phpstan.neon --no-progress --memory-limit=1G
+
+  megalinter:
+    name: MegaLinter whole repository (blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          # MegaLinter diffs against the base ref to decide what changed.
           fetch-depth: 0
+          persist-credentials: false
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: '8.4'
+          tools: composer
+          coverage: none
+      - name: Materialize locked WordPress model for MegaLinter PHPStan
+        run: composer install --no-interaction --no-progress --no-scripts --no-plugins --prefer-dist
       - name: MegaLinter
         uses: oxsecurity/megalinter/flavors/php@ef3e84b8b836d76db562d0f3ed7da61e8fd538bc # v9.6.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # These two move together on purpose: the full sweep is the only run
-          # allowed to be advisory. Split them and you get either a gate that
-          # blocks on pre-existing debt or one that lets new findings through.
-          VALIDATE_ALL_CODEBASE: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
-          DISABLE_ERRORS: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+          VALIDATE_ALL_CODEBASE: true
+          DISABLE_ERRORS: false
       - name: Upload the report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: megalinter-report-${{ github.sha }}
-          path: |
-            megalinter-reports
+          path: megalinter-reports
           if-no-files-found: warn
           retention-days: 14
