@@ -131,12 +131,23 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts/real-e2e
-          PHP_CLI_SERVER_WORKERS=8 php -S 127.0.0.1:8080 -t "$RP_WP_PATH" "$RP_WP_PATH/index.php" \
+          cat > /tmp/rpconnector-h24-router.php <<'PHP'
+          <?php
+          $root = rtrim((string) $_SERVER['DOCUMENT_ROOT'], '/');
+          $path = parse_url((string) $_SERVER['REQUEST_URI'], PHP_URL_PATH);
+          $path = is_string($path) ? $path : '/';
+          $candidate = $root . $path;
+          if ($path !== '/' && (is_file($candidate) || is_dir($candidate))) {
+              return false;
+          }
+          require $root . '/index.php';
+          PHP
+          PHP_CLI_SERVER_WORKERS=8 php -S 127.0.0.1:8080 -t "$RP_WP_PATH" /tmp/rpconnector-h24-router.php \
             > artifacts/real-e2e/wordpress-server.log 2>&1 &
           echo $! > /tmp/rpconnector-h24-wp.pid
 
           for i in $(seq 1 100); do
-            if curl --fail --silent "$WP_URL/wp-login.php" >/dev/null; then
+            if curl --fail --silent "$WP_URL/wp-login.php" | grep -q 'id="user_login"'; then
               exit 0
             fi
             sleep 0.2
