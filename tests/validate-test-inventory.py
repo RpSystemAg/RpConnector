@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Prove that test inventory is fail-closed and runtime-derived.
-
-This test intentionally contains no exception table and no count ratchet. It
-asserts that the repository-wide execution gate discovers the exact tracked
-surface, executes it, emits syscall-backed evidence, and requires 100 percent.
-"""
+"""Prove that test inventory is fail-closed and runtime-derived."""
 from __future__ import annotations
 
 import subprocess
@@ -46,13 +41,18 @@ def main() -> int:
     required_gate_fragments = (
         'git", "ls-files", "-z"',
         'TEST_ROOTS = (Path("tests"), Path("prstudio-unified-browser-agent/tests"))',
+        "def source_kind",
+        'first.startswith("#!")',
         '"strace"',
         '"php", "-d", "auto_prepend_file=tests/strict-php-errors.php"',
         'sys.executable, rel.as_posix()',
         '"node", "--test"',
         '"bash", rel.as_posix()',
+        "def successful_runtime_evidence",
+        'result["trace_evidence"] = evidence',
         '"runtime-consumed-data"',
         '"parse_does_not_count_as_execution": True',
+        '"direct_execution_requires_syscall_evidence": True',
         '"required_execution_percent": 100.0',
         'exact_100 = executed_ok == total_surface',
     )
@@ -74,6 +74,8 @@ def main() -> int:
 
     required_workflow_fragments = (
         "python .github/scripts/full-surface-execution.py",
+        ".requirements.direct_execution_requires_syscall_evidence == true",
+        ".counts.syntax_targets == .counts.syntax_passed",
         ".counts.total_test_surface_files == .counts.real_executed_files",
         ".counts.execution_percent == 100",
         ".ok == true",
@@ -83,6 +85,8 @@ def main() -> int:
             fail(f"workflow missing fail-closed assertion: {fragment}")
 
     print(f"TEST_INVENTORY_CONTRACT: PASS tracked_surface={len(surface)} required_execution=100%")
+    print("shebang_scripts_included=true")
+    print("direct_runtime_requires_syscall_evidence=true")
     return 0
 
 
