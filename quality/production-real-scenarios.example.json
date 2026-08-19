@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "real": false,
+  "environment_id": "REPLACE-WITH-ISOLATED-STAGING-ID",
+  "instructions": "Copy outside the repository and set real=true only for a real isolated environment. Replace every argv. exercise must verify the expected product behavior; oracle must independently inspect final state/evidence; cleanup must restore the environment and returns nonzero on incomplete cleanup.",
+  "gates": {
+    "auth_security": {
+      "environment_class": "real-https-oauth-staging",
+      "timeout_seconds": 300,
+      "checks": {
+        "pkce_s256": {"exercise": ["REPLACE", "AUTH-WITH-S256"], "oracle": ["REPLACE", "VERIFY-PKCE-BOUND-GRANT"], "cleanup": ["REPLACE", "REVOKE-TEST-GRANTS"]},
+        "redirect_uri_exact_match": {"exercise": ["REPLACE", "ATTEMPT-MISMATCHED-REDIRECT-AND-EXPECT-REJECTION"], "oracle": ["REPLACE", "VERIFY-NO-CODE-OR-GRANT-CREATED"], "cleanup": ["REPLACE", "CLEAN-AUTH-STATE"]},
+        "resource_binding": {"exercise": ["REPLACE", "USE-TOKEN-AGAINST-WRONG-RESOURCE-EXPECT-REJECTION"], "oracle": ["REPLACE", "VERIFY-WRONG-RESOURCE-HAD-ZERO-EFFECT"], "cleanup": ["REPLACE", "REVOKE-TEST-GRANTS"]},
+        "scope_enforcement": {"exercise": ["REPLACE", "READ-SCOPE-TOKEN-ATTEMPTS-WRITE-EXPECT-DENIAL"], "oracle": ["REPLACE", "VERIFY-TARGET-UNCHANGED"], "cleanup": ["REPLACE", "RESTORE-TARGET-AND-REVOKE"]},
+        "refresh_rotation": {"exercise": ["REPLACE", "ROTATE-REFRESH-TOKEN"], "oracle": ["REPLACE", "VERIFY-OLD-REFRESH-REJECTED-NEW-VALID"], "cleanup": ["REPLACE", "REVOKE-TEST-GRANTS"]},
+        "replay_rejected": {"exercise": ["REPLACE", "REPLAY-AUTH-CODE-OR-REFRESH-EXPECT-REJECTION"], "oracle": ["REPLACE", "VERIFY-NO-SECOND-GRANT-OR-TOKEN"], "cleanup": ["REPLACE", "REVOKE-TEST-GRANTS"]},
+        "expired_token_rejected": {"exercise": ["REPLACE", "USE-EXPIRED-TOKEN-EXPECT-401"], "oracle": ["REPLACE", "VERIFY-ZERO-AUTHORIZED-EFFECT"], "cleanup": ["REPLACE", "CLEAN-EXPIRED-TEST-TOKEN"]},
+        "permission_denial_has_zero_side_effects": {"setup": ["REPLACE", "CAPTURE-MUTATION-BASELINE"], "exercise": ["REPLACE", "DENIED-WRITE-REQUEST"], "oracle": ["REPLACE", "COMPARE-BASELINE-BYTE-OR-LOGICAL-EQUALITY"], "cleanup": ["REPLACE", "RESTORE-AUTH-FIXTURE"]}
+      }
+    },
+    "browser_isolation": {
+      "environment_class": "real-owned-chrome-staging",
+      "timeout_seconds": 300,
+      "checks": {
+        "owned_tab_enforced": {"exercise": ["REPLACE", "EXECUTE-IN-OWNED-TAB"], "oracle": ["REPLACE", "VERIFY-ONLY-OWNED-TAB-CHANGED"], "cleanup": ["REPLACE", "RESTORE-BROWSER-FIXTURE"]},
+        "wrong_tab_rejected": {"exercise": ["REPLACE", "ATTEMPT-WRONG-TAB"], "oracle": ["REPLACE", "VERIFY-WRONG-TAB-UNCHANGED"], "cleanup": ["REPLACE", "RESTORE-BROWSER-FIXTURE"]},
+        "wrong_origin_rejected": {"exercise": ["REPLACE", "ATTEMPT-WRONG-ORIGIN"], "oracle": ["REPLACE", "VERIFY-WRONG-ORIGIN-UNCHANGED"], "cleanup": ["REPLACE", "RESTORE-BROWSER-FIXTURE"]},
+        "stale_session_rejected": {"exercise": ["REPLACE", "ATTEMPT-STALE-SESSION"], "oracle": ["REPLACE", "VERIFY-NO-BROWSER-EFFECT"], "cleanup": ["REPLACE", "REPAIR-SESSION"]},
+        "stale_document_rejected": {"exercise": ["REPLACE", "NAVIGATE-THEN-USE-STALE-DOCUMENT-BINDING"], "oracle": ["REPLACE", "VERIFY-NEW-DOCUMENT-UNCHANGED"], "cleanup": ["REPLACE", "RESTORE-BROWSER-FIXTURE"]},
+        "raw_cdp_policy_enforced": {"exercise": ["REPLACE", "ATTEMPT-BLOCKED-CDP-COMMANDS"], "oracle": ["REPLACE", "VERIFY-CDP-BLOCK-EVIDENCE-AND-ZERO-EFFECT"], "cleanup": ["REPLACE", "RESET-DEBUGGER-SESSION"]},
+        "arbitrary_javascript_rejected": {"exercise": ["REPLACE", "ATTEMPT-RUNTIME-EVALUATE"], "oracle": ["REPLACE", "VERIFY-SCRIPT-DID-NOT-RUN"], "cleanup": ["REPLACE", "RESET-BROWSER"]},
+        "cookie_export_rejected": {"exercise": ["REPLACE", "ATTEMPT-COOKIE-EXPORT"], "oracle": ["REPLACE", "VERIFY-NO-COOKIE-PAYLOAD-EXPOSED"], "cleanup": ["REPLACE", "RESET-BROWSER"]},
+        "mv3_worker_restart_recovery": {"exercise": ["REPLACE", "TERMINATE-MV3-WORKER-AND-QUEUE-WORK"], "oracle": ["REPLACE", "VERIFY-WORK-RECOVERED-ONCE-WITH-OWNERSHIP"], "cleanup": ["REPLACE", "RESTORE-BROWSER-FIXTURE"]}
+      }
+    },
+    "transaction_integrity": {
+      "environment_class": "real-wordpress-woocommerce-transaction-staging",
+      "timeout_seconds": 300,
+      "checks": {
+        "mutation_independent_readback": {"setup": ["REPLACE", "CAPTURE-BASELINE"], "exercise": ["REPLACE", "EXECUTE-REAL-MUTATION"], "oracle": ["REPLACE", "READ-BACK-VIA-INDEPENDENT-API-OR-DB"], "cleanup": ["REPLACE", "RESTORE-BASELINE"]},
+        "invalid_input_zero_side_effects": {"setup": ["REPLACE", "CAPTURE-BASELINE"], "exercise": ["REPLACE", "SUBMIT-INVALID-PAYLOAD-EXPECT-TYPED-ERROR"], "oracle": ["REPLACE", "VERIFY-BASELINE-UNCHANGED"], "cleanup": ["REPLACE", "RESTORE-BASELINE"]},
+        "rollback_restores_baseline": {"setup": ["REPLACE", "CAPTURE-BASELINE"], "exercise": ["REPLACE", "MUTATE-THEN-ROLLBACK"], "oracle": ["REPLACE", "VERIFY-FULL-BASELINE-EQUALITY"], "cleanup": ["REPLACE", "ENSURE-BASELINE"]},
+        "idempotent_replay_semantics": {"setup": ["REPLACE", "CAPTURE-BASELINE"], "exercise": ["REPLACE", "REPLAY-SAME-IDEMPOTENCY-KEY"], "oracle": ["REPLACE", "VERIFY-ONE-LOGICAL-EFFECT"], "cleanup": ["REPLACE", "RESTORE-BASELINE"]},
+        "partial_failure_never_reports_success": {"setup": ["REPLACE", "ARM-PARTIAL-FAILURE"], "exercise": ["REPLACE", "EXECUTE-MUTATION-EXPECT-NON-SUCCESS"], "oracle": ["REPLACE", "VERIFY-FINAL-STATE-AND-ERROR-EVIDENCE"], "cleanup": ["REPLACE", "DISARM-FAULT-AND-RESTORE"]},
+        "post_effect_verification_required": {"setup": ["REPLACE", "ARM-VERIFY-FAILURE-AFTER-EFFECT"], "exercise": ["REPLACE", "EXECUTE-MUTATION-EXPECT-DEGRADED-NOT-SUCCESS"], "oracle": ["REPLACE", "VERIFY-EFFECT-EXISTS-BUT-VERIFIED-FALSE"], "cleanup": ["REPLACE", "RESTORE-BASELINE"]}
+      }
+    },
+    "concurrency_recovery": {
+      "environment_class": "real-multi-worker-database-staging",
+      "timeout_seconds": 600,
+      "checks": {
+        "multi_worker_claim_exclusion": {"exercise": ["REPLACE", "START-MULTIPLE-WORKERS-ON-SAME-JOB"], "oracle": ["REPLACE", "VERIFY-EXACTLY-ONE-CLAIM"], "cleanup": ["REPLACE", "CLEAR-CONCURRENCY-FIXTURE"]},
+        "lease_expiry_recovery": {"exercise": ["REPLACE", "ABANDON-LEASE-AND-WAIT-EXPIRY"], "oracle": ["REPLACE", "VERIFY-NEW-WORKER-RECOVERS-ONCE"], "cleanup": ["REPLACE", "CLEAR-CONCURRENCY-FIXTURE"]},
+        "stale_owner_fencing": {"exercise": ["REPLACE", "STALE-OWNER-ATTEMPTS-COMMIT"], "oracle": ["REPLACE", "VERIFY-STALE-OWNER-CANNOT-DELETE-OR-OVERWRITE-NEW-OWNER"], "cleanup": ["REPLACE", "CLEAR-CONCURRENCY-FIXTURE"]},
+        "cas_conflict_preserves_updates": {"exercise": ["REPLACE", "CONCURRENT-CAS-UPDATES"], "oracle": ["REPLACE", "VERIFY-NO-LOST-UPDATE"], "cleanup": ["REPLACE", "CLEAR-CONCURRENCY-FIXTURE"]},
+        "advisory_lock_contention": {"exercise": ["REPLACE", "CONTEND-ON-SAME-CONTENT-LOCK"], "oracle": ["REPLACE", "VERIFY-SERIALIZED-NON-OVERLAPPING-WRITES"], "cleanup": ["REPLACE", "CLEAR-CONCURRENCY-FIXTURE"]},
+        "crash_window_resume": {"exercise": ["REPLACE", "KILL-WORKER-IN-CRASH-WINDOW"], "oracle": ["REPLACE", "VERIFY-RESUME-WITHOUT-DUPLICATE-EFFECT"], "cleanup": ["REPLACE", "CLEAR-CONCURRENCY-FIXTURE"]},
+        "dead_letter_and_retry_semantics": {"exercise": ["REPLACE", "FORCE-TRANSIENT-THEN-PERMANENT-FAILURES"], "oracle": ["REPLACE", "VERIFY-RETRY-BOUNDS-AND-DEAD-LETTER"], "cleanup": ["REPLACE", "CLEAR-CONCURRENCY-FIXTURE"]}
+      }
+    },
+    "load_backpressure": {
+      "environment_class": "real-load-staging",
+      "timeout_seconds": 1800,
+      "checks": {
+        "concurrent_mcp_requests": {"exercise": ["REPLACE", "RUN-DECLARED-CONCURRENT-MCP-WORKLOAD"], "oracle": ["REPLACE", "VERIFY-REQUEST-COUNT-ERROR-RATE-AND-CORRELATION"], "cleanup": ["REPLACE", "CLEAR-LOAD-FIXTURE"]},
+        "queue_saturation_is_bounded": {"exercise": ["REPLACE", "SATURATE-QUEUE"], "oracle": ["REPLACE", "VERIFY-QUEUE-DEPTH-BOUND"], "cleanup": ["REPLACE", "DRAIN-QUEUE"]},
+        "backpressure_is_explicit": {"exercise": ["REPLACE", "EXCEED-ADMISSION-CAPACITY"], "oracle": ["REPLACE", "VERIFY-EXPLICIT-429-503-OR-TYPED-BACKPRESSURE"], "cleanup": ["REPLACE", "DRAIN-QUEUE"]},
+        "tools_list_budget": {"exercise": ["REPLACE", "REQUEST-TOOLS-LIST-UNDER-LOAD"], "oracle": ["REPLACE", "VERIFY-SERIALIZED-TOKEN-OR-BYTE-BUDGET"], "cleanup": ["REPLACE", "CLEAR-LOAD-FIXTURE"]},
+        "result_size_limits": {"exercise": ["REPLACE", "REQUEST-OVERSIZED-RESULT"], "oracle": ["REPLACE", "VERIFY-BOUND-OR-TYPED-REJECTION"], "cleanup": ["REPLACE", "CLEAR-LOAD-FIXTURE"]},
+        "memory_growth_bounded": {"exercise": ["REPLACE", "RUN-SUSTAINED-WORKLOAD"], "oracle": ["REPLACE", "VERIFY-MEMORY-SLO-FROM-TIME-SERIES"], "cleanup": ["REPLACE", "CLEAR-LOAD-FIXTURE"]},
+        "latency_slo_met": {"exercise": ["REPLACE", "RUN-LATENCY-WORKLOAD"], "oracle": ["REPLACE", "VERIFY-P50-P95-P99-AGAINST-DECLARED-SLO"], "cleanup": ["REPLACE", "CLEAR-LOAD-FIXTURE"]}
+      }
+    },
+    "remote_live_integration": {
+      "environment_class": "public-https-real-client-real-chrome",
+      "timeout_seconds": 600,
+      "checks": {
+        "https_remote_mcp": {"exercise": ["REPLACE", "CONNECT-TO-PUBLIC-HTTPS-MCP"], "oracle": ["REPLACE", "VERIFY-TLS-MCP-VERSION-AND-SERVER-IDENTITY"], "cleanup": ["REPLACE", "CLOSE-REMOTE-SESSION"]},
+        "oauth_real_client": {"exercise": ["REPLACE", "AUTHORIZE-REAL-MCP-CLIENT"], "oracle": ["REPLACE", "VERIFY-REAL-CLIENT-GRANT-AND-BOUND-TOKEN"], "cleanup": ["REPLACE", "REVOKE-TEST-GRANT"]},
+        "browser_pairing_real_chrome": {"exercise": ["REPLACE", "PAIR-REAL-CHROME"], "oracle": ["REPLACE", "VERIFY-DEVICE-ROW-AND-CHROME-ACK"], "cleanup": ["REPLACE", "UNPAIR-TEST-DEVICE"]},
+        "live_read_operation": {"exercise": ["REPLACE", "RUN-REMOTE-LIVE-READ"], "oracle": ["REPLACE", "VERIFY-READ-AGAINST-INDEPENDENT-SOURCE"], "cleanup": ["REPLACE", "CLOSE-REMOTE-SESSION"]},
+        "live_mutating_operation_with_rollback": {"setup": ["REPLACE", "CAPTURE-LIVE-BASELINE"], "exercise": ["REPLACE", "RUN-REMOTE-REVERSIBLE-MUTATION"], "oracle": ["REPLACE", "VERIFY-MUTATION-THEN-ROLLBACK-INDEPENDENTLY"], "cleanup": ["REPLACE", "ENSURE-LIVE-BASELINE"]},
+        "evidence_correlated_to_exact_commit": {"exercise": ["REPLACE", "RUN-CORRELATED-REMOTE-OPERATION"], "oracle": ["REPLACE", "VERIFY-MCP-JOB-BROWSER-EVIDENCE-CONTAIN-EXACT-SHA-AND-CORRELATION"], "cleanup": ["REPLACE", "CLOSE-REMOTE-SESSION"]}
+      }
+    },
+    "observability_operability": {
+      "environment_class": "real-operations-staging",
+      "timeout_seconds": 600,
+      "checks": {
+        "health_signal": {"exercise": ["REPLACE", "QUERY-HEALTH"], "oracle": ["REPLACE", "VERIFY-HEALTH-AGAINST-INDEPENDENT-COMPONENT-STATE"], "cleanup": ["REPLACE", "RESET-OPS-FIXTURE"]},
+        "correlation_ids": {"exercise": ["REPLACE", "RUN-END-TO-END-OPERATION"], "oracle": ["REPLACE", "VERIFY-SAME-CORRELATION-ACROSS-MCP-QUEUE-BROWSER-EVIDENCE"], "cleanup": ["REPLACE", "RESET-OPS-FIXTURE"]},
+        "audit_evidence_chain": {"exercise": ["REPLACE", "RUN-AUDITED-MUTATION"], "oracle": ["REPLACE", "VERIFY-HASH-OR-LINKED-EVIDENCE-CHAIN"], "cleanup": ["REPLACE", "RESTORE-BASELINE"]},
+        "secret_redaction": {"exercise": ["REPLACE", "RUN-OPERATION-WITH-SYNTHETIC-SECRET"], "oracle": ["REPLACE", "SEARCH-LOGS-EVIDENCE-RESPONSES-FOR-SECRET-ABSENCE"], "cleanup": ["REPLACE", "DELETE-SYNTHETIC-SECRET"]},
+        "failure_classification": {"exercise": ["REPLACE", "INJECT-KNOWN-FAILURE-CLASS"], "oracle": ["REPLACE", "VERIFY-TYPED-CLASSIFICATION-AND-NO-SUCCESS"], "cleanup": ["REPLACE", "REMOVE-FAULT"]},
+        "alert_condition_exercised": {"exercise": ["REPLACE", "TRIGGER-REAL-ALERT-CONDITION"], "oracle": ["REPLACE", "VERIFY-ALERT-DELIVERY-OR-RECEIPT"], "cleanup": ["REPLACE", "CLEAR-ALERT"]},
+        "runbook_recovery_exercised": {"exercise": ["REPLACE", "EXECUTE-RECOVERY-RUNBOOK"], "oracle": ["REPLACE", "VERIFY-SERVICE-AND-DURABLE-STATE-RECOVERED"], "cleanup": ["REPLACE", "NORMALIZE-ENVIRONMENT"]}
+      }
+    },
+    "compatibility_degradation": {
+      "environment_class": "real-negative-compatibility-staging",
+      "timeout_seconds": 600,
+      "checks": {
+        "unsupported_wordpress_fails_explicitly": {"exercise": ["REPLACE", "RUN-ON-UNSUPPORTED-WORDPRESS-EXPECT-EXPLICIT-FAIL"], "oracle": ["REPLACE", "VERIFY-NO-PARTIAL-INSTALL-OR-MUTATION"], "cleanup": ["REPLACE", "DESTROY-NEGATIVE-WP-FIXTURE"]},
+        "unsupported_php_fails_explicitly": {"exercise": ["REPLACE", "RUN-ON-UNSUPPORTED-PHP-EXPECT-EXPLICIT-FAIL"], "oracle": ["REPLACE", "VERIFY-NO-PARTIAL-STATE"], "cleanup": ["REPLACE", "DESTROY-NEGATIVE-PHP-FIXTURE"]},
+        "browser_unavailable_degrades_without_false_success": {"exercise": ["REPLACE", "DISABLE-BROWSER-AND-RUN-BROWSER-REQUIRED-OP"], "oracle": ["REPLACE", "VERIFY-DEGRADED-BLOCKED-NOT-SUCCESS"], "cleanup": ["REPLACE", "RESTORE-BROWSER"]},
+        "provider_unavailable_degrades_without_false_success": {"exercise": ["REPLACE", "DISABLE-PROVIDER-AND-RUN-PROVIDER-OP"], "oracle": ["REPLACE", "VERIFY-NOT-CONFIGURED-OR-DEGRADED-NOT-SYNTHETIC-DATA"], "cleanup": ["REPLACE", "RESTORE-PROVIDER"]},
+        "read_only_fallback_preserves_safety": {"setup": ["REPLACE", "CAPTURE-BASELINE"], "exercise": ["REPLACE", "FORCE-READ-ONLY-FALLBACK-AND-ATTEMPT-WRITE"], "oracle": ["REPLACE", "VERIFY-ZERO-WRITE-AND-READ-STILL-WORKS"], "cleanup": ["REPLACE", "RESTORE-NORMAL-MODE"]}
+      }
+    }
+  }
+}
