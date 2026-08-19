@@ -69,7 +69,7 @@ final class PRSTUDIO_UC_Job_Engine {
 			return self::reconcile_browser_parent( $task, false, array( 'code'=>'browser_task_cancelled', 'message'=>'Browser task cancelled.', 'retryable'=>false ) );
 		}
 		if ( PRSTUDIO_UC_State_Machine::EXPIRED === $status ) {
-			return self::reconcile_browser_parent( $task, false, array( 'code'=>'browser_task_expired', 'message'=>'Browser task expired.', 'retryable'=>true ) );
+			return self::reconcile_browser_parent( $task, false, array( 'code'=>'browser_task_expired', 'message'=>'Browser task expired before completion.', 'retryable'=>true ) );
 		}
 		return false;
 	}
