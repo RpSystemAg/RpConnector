@@ -19,7 +19,8 @@ jobs:
     timeout-minutes: 35
     services:
       db:
-        image: mariadb:11.4
+        # mariadb:11.4 — multi-platform index pinned for reproducible acceptance.
+        image: mariadb:11.4@sha256:a794d9eb009e20de605858a11f32f63b4075cbd197c650436f0e3b457e4caed7
         env:
           MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: 'yes'
           MARIADB_DATABASE: wordpress_woo_test
