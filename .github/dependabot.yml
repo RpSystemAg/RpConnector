@@ -1,0 +1,33 @@
+# Dependabot configuration.
+#
+# The only third-party code this repository pulls in is the GitHub Actions used
+# by its workflows. There is no package.json and no requirements.txt: the plugin
+# is dependency-free PHP, the Browser Agent is dependency-free JavaScript, and
+# the one Python package the pipeline needs (sqlglot) is installed ad hoc in the
+# job that uses it.
+#
+# That makes the actions ecosystem the whole supply chain, and worth watching.
+# A workflow action runs with access to the repository and its secrets, so an
+# unmaintained or compromised one is the most direct path into this repo --
+# more direct than anything in the application code, which cannot reach CI.
+#
+# Grouped into a single weekly pull request. Separate PRs per action would
+# produce a stream of near-identical reviews for a set that changes together
+# anyway, and a review nobody reads is not a review.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "ci"
+    labels:
+      - "dependencies"
+      - "github-actions"
