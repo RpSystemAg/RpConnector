@@ -13,7 +13,7 @@ concurrency:
 jobs:
   promote:
     name: Validate and publish 24-hour exact-SHA soak
-    runs-on: [self-hosted, rpconnector-production-staging]
+    runs-on: [self-hosted, rpconnector-production-staging] # zizmor: ignore[self-hosted-runner] manual-dispatch, environment-gated production runner
     environment: rpconnector-production-staging
     timeout-minutes: 30
     env:
