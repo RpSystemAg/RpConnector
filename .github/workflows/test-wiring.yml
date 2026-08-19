@@ -1,0 +1,35 @@
+name: Test wiring completeness
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '31 0 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-wiring-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reachability:
+    name: Every test/audit/conformance file must be reachable from CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Audit test execution graph
+        run: python3 tests/test-wiring-audit.py | tee /tmp/test-wiring.txt
+      - name: Preserve wiring inventory
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: test-wiring-${{ github.sha }}
+          path: /tmp/test-wiring.txt
+          if-no-files-found: warn
+          retention-days: 30
