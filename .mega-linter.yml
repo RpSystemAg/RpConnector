@@ -21,6 +21,16 @@
 # 8.0/8.1/8.3 matrix, the one-guard constitution, the tools/list token budget,
 # the SQL syntax validator and the task-queue integration test.
 
+# PHPStan needs WordPress to say anything useful about a WordPress plugin.
+# Without it, every call into core reads as undefined -- 574 of the first
+# sweep's 812 findings were exactly that. Installed at run time rather than
+# vendored, because committing the stubs would put a megabyte of generated
+# code in a repository that otherwise has no dependencies at all.
+PRE_COMMANDS:
+  - command: composer install --no-interaction --no-progress --quiet
+    cwd: workspace
+    continue_if_failed: false
+
 APPLY_FIXES: none
 SHOW_ELAPSED_TIME: true
 FILEIO_REPORTER: false
@@ -71,15 +81,25 @@ FILTER_REGEX_EXCLUDE: |
 # and tests/build-release.py. Linting it reports on machine output nobody edits
 # by hand, and the drift checks already assert it matches its source.
 
+# The memory limit is not decoration. On the full-codebase sweep phpcs died
+# with "Allowed memory size of 134217728 bytes exhausted" inside its tokenizer,
+# and MegaLinter reported that crash as "1 non blocking error" -- which reads
+# exactly like a single style finding. The full sweep had produced no PHP style
+# signal at all for as long as it has existed, while appearing to have run.
 PHP_PHPCS_ARGUMENTS:
   - "--standard=PSR12"
   - "--extensions=php"
+  - "-d"
+  - "memory_limit=1G"
 
 # PHPStan at a low level to start: it finds undefined methods, wrong argument
 # counts and impossible conditions -- the classes of defect that reach runtime --
 # without demanding full type coverage on a codebase that has none yet.
+# Configuration lives in phpstan.neon so the analysis has the same shape here
+# and on a developer machine. Read that file for why the first full sweep's 812
+# findings were all artefacts.
 PHP_PHPSTAN_ARGUMENTS:
-  - "--level=1"
   - "--no-progress"
+PHP_PHPSTAN_CONFIG_FILE: "phpstan.neon"
 
 MARKDOWN_MARKDOWNLINT_DISABLE_ERRORS: true

@@ -1,0 +1,14 @@
+{
+    "name": "rpsystemag/rpconnector-analysis",
+    "description": "Development-only dependencies for static analysis. The shipped plugin and the browser extension have no runtime dependencies, and this file is not part of either: the plugin ZIP is built from prstudio-unified-control/ and the extension from prstudio-unified-browser-agent/, so nothing here reaches a user's site or browser.",
+    "type": "project",
+    "license": "proprietary",
+    "require-dev": {
+        "szepeviktor/phpstan-wordpress": "^2.0"
+    },
+    "config": {
+        "allow-plugins": {
+            "phpstan/extension-installer": true
+        }
+    }
+}

@@ -34,3 +34,8 @@ __pycache__/
 /artifacts/
 /prstudio-unified-private/
 node_modules/
+
+# Static-analysis dependencies. Installed by CI at run time from the root
+# composer.json; never committed and never part of the plugin ZIP or the
+# extension, both of which ship with no dependencies.
+/vendor/

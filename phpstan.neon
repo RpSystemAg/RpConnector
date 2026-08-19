@@ -1,0 +1,60 @@
+# PHPStan configuration.
+#
+# Why this file exists
+# --------------------
+# The first full-codebase sweep reported 812 findings. Every one of them was an
+# artefact of running PHPStan without telling it what WordPress is and without
+# telling it to leave the test shims alone. Read that number as "the analyser
+# was not configured", not "the plugin has 812 defects".
+#
+# The 812 broke down into two families, and both came from the same root:
+#
+#   574  "Function esc_attr not found." and friends.
+#        PHPStan has no WordPress. Every call into core looked undefined.
+#
+#   ~89  "Function wp_mail invoked with 4 parameters, 3 required."
+#        Worse than noise -- confidently wrong. The analyser was reading the
+#        deliberately minimal shims the test suites define to run without a
+#        WordPress install (tests/php-operational-completeness-smoke.php
+#        declares wp_mail($to,$subject,$message); real wp_mail takes five).
+#        So it measured production calls against a stub signature and called
+#        the correct ones broken.
+#
+# A report where everything is wrong is worse than no report: nobody reads the
+# 813th line to find the one that matters. Two changes fix it -- analyse only
+# the plugin, and give PHPStan the real WordPress signatures.
+#
+# What this is expected to surface once configured
+# ------------------------------------------------
+# Genuine argument-count mistakes. That family is not hypothetical here:
+# recover_stale_tasks() built an UPDATE with six placeholders and passed five
+# arguments, so wpdb::prepare() returned '' and stale leases were never
+# recovered -- silently, for the life of the function. tests/validate-prepare-
+# arity.py now catches that specific shape inside SQL strings; PHPStan is the
+# general case for PHP calls.
+
+includes:
+  - vendor/szepeviktor/phpstan-wordpress/extension.neon
+
+parameters:
+  level: 1
+
+  paths:
+    - prstudio-unified-control
+
+  # The test suites define stand-ins for WordPress functions so they can run
+  # without a WordPress install. Those signatures are intentionally partial.
+  # Analysing them alongside the plugin is what produced the confidently wrong
+  # findings described above.
+  excludePaths:
+    - tests
+    - vendor
+    - '*/node_modules/*'
+
+  # The plugin is loaded by WordPress, which defines these before any plugin
+  # file runs. PHPStan sees only the plugin, so they have to be declared.
+  bootstrapFiles:
+    - tests/phpstan-bootstrap.php
+
+  treatPhpDocTypesAsCertain: false
+  reportUnmatchedIgnoredErrors: false
