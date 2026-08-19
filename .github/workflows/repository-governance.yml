@@ -1,0 +1,39 @@
+name: Repository governance
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '3 0 * * *'
+
+permissions:
+  contents: read
+  security-events: read
+
+concurrency:
+  group: repository-governance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  governance:
+    name: Master protection / required checks / secret push protection
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: GitHub repository controls must be independently provable
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 tests/repository-governance.py | tee /tmp/repository-governance.json
+      - name: Preserve governance evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: repository-governance-${{ github.sha }}
+          path: /tmp/repository-governance.json
+          if-no-files-found: warn
+          retention-days: 30
