@@ -185,9 +185,68 @@ final class PRSTUDIO_UC_Agency_Runtime {
 				}
 				$checkpoint['results'][$step_id]=class_exists('PRSTUDIO_UC_Memory')?PRSTUDIO_UC_Memory::redact($result):$result;$checkpoint['next_step']=$index+1;$progress=(int)floor((($index+1)/max(1,count($steps)))*90);$saved=PRSTUDIO_UC_Store::checkpoint_leased_job((string)$job['job_uuid'],$lease,$index,$checkpoint,$progress);if(!$saved)return array('ok'=>false,'claimed'=>true,'conflict'=>true,'job_id'=>$job['job_uuid']);$job=$saved;$index++;$processed++;
 			}
-			if($index>=count($steps)){$verification=array('ok'=>true,'verifier'=>'agency_playbook_v10','plan_hash'=>(string)($plan['hash']??''),'verified_gmt'=>gmdate('c'));$done=PRSTUDIO_UC_Store::complete_leased_job((string)$job['job_uuid'],$lease,array('playbook'=>$checkpoint['playbook']??'','results'=>$checkpoint['results']??array()),$verification);return array('ok'=>true,'claimed'=>true,'completed'=>(bool)$done,'job'=>$done);}
+			if($index>=count($steps)){$verification=self::mission_verification($checkpoint,$plan);$done=PRSTUDIO_UC_Store::complete_leased_job((string)$job['job_uuid'],$lease,array('playbook'=>$checkpoint['playbook']??'','results'=>$checkpoint['results']??array()),$verification);return array('ok'=>true,'claimed'=>true,'completed'=>(bool)$done,'job'=>$done);}
 			$released=PRSTUDIO_UC_Store::release_leased_job((string)$job['job_uuid'],$lease,$checkpoint,$index,(int)($job['progress']??0),0);return array('ok'=>true,'claimed'=>true,'bounded_yield'=>true,'processed_steps'=>$processed,'job'=>$released);
 		}catch(Throwable $e){$error=array('code'=>'agency_worker_exception','message'=>'Agency worker failed safely.','exception_class'=>get_class($e),'retryable'=>true,'class'=>'worker_exception');$updated=PRSTUDIO_UC_Store::retry_leased_job((string)$job['job_uuid'],$lease,$error);return array('ok'=>false,'claimed'=>true,'job'=>$updated,'error'=>$error);}
+	}
+
+	/**
+	 * Build the mission verification from what the steps actually reported.
+	 *
+	 * This used to be array('ok'=>true,...) written literally, so a mission was
+	 * verified whenever the step index reached the end of the plan. It never
+	 * looked at a single step result. A browser step could return
+	 * verification.ok=false with 'browser_result_missing_verified_evidence' and
+	 * the mission still completed as verified -- the agent reporting a job done
+	 * on evidence it had itself just called insufficient.
+	 *
+	 * That is the same failure as a query that never reaches the database: a
+	 * plausible answer produced without doing the work. It is worse here,
+	 * because this one is the answer the operator reads.
+	 *
+	 * Rules:
+	 *   - any step whose verification says something other than ok makes the
+	 *     mission not ok, and is named in unverified_steps
+	 *   - any degraded step result marks the mission degraded, even when every
+	 *     verification passed
+	 *   - a step with no verification block is not treated as a failure. Most
+	 *     steps do not produce one, and inventing failures from silence would
+	 *     make the flag useless. It is counted in steps_without_evidence
+	 *     instead, so "verified" and "nothing checked it" stay distinguishable.
+	 *
+	 * Per the constitution this is evidence, not authorization: nothing here
+	 * blocks a mutation. It decides what the mission tells you afterwards.
+	 *
+	 * @param array $checkpoint Accumulated step results.
+	 * @param array $plan       The plan being executed.
+	 * @return array
+	 */
+	private static function mission_verification( array $checkpoint, array $plan ): array {
+		$ok=true;$degraded=false;$unverified=array();$without_evidence=0;
+		foreach((array)($checkpoint['results']??array()) as $step_id=>$step_result){
+			if(!is_array($step_result)){$without_evidence++;continue;}
+			$inner=is_array($step_result['result']??null)?$step_result['result']:array();
+			if(!empty($step_result['degraded'])||!empty($inner['degraded'])){$degraded=true;}
+			$evidence=is_array($step_result['verification']??null)?$step_result['verification']:null;
+			if(null===$evidence){$without_evidence++;continue;}
+			if(true!==($evidence['ok']??null)){
+				$ok=false;
+				$unverified[]=array(
+					'step'=>(string)$step_id,
+					'reason'=>(string)($evidence['reason']??'unverified'),
+					'evidence_hash'=>(string)($evidence['evidence_hash']??''),
+				);
+			}
+		}
+		return array(
+			'ok'=>$ok,
+			'verifier'=>'agency_playbook_v10',
+			'plan_hash'=>(string)($plan['hash']??''),
+			'verified_gmt'=>gmdate('c'),
+			'degraded'=>$degraded,
+			'unverified_steps'=>$unverified,
+			'steps_without_evidence'=>$without_evidence,
+		);
 	}
 
 	private static function process_schedules( int $limit = 10 ): int {

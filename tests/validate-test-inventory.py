@@ -20,7 +20,14 @@ A ratchet, for the same reason the MegaLinter posture is one: blocking on a
 backlog nobody in the current change created just teaches people to bypass the
 job. So:
 
-  * A file that is referenced by a workflow is executed. Fine.
+  * A file referenced by a workflow is executed. Fine.
+  * A file referenced by a repo-root config that CI consumes (psalm.xml,
+    phpstan.neon, .mega-linter.yml) is loaded by the tool that reads it. Fine.
+  * A file referenced by an already-executed file is executed too, transitively.
+    A suite that spawns a worker process, or a Python runner that drives a PHP
+    child, does execute it -- reporting those as dead would be crying wolf, and
+    the first version of this gate did exactly that against two files that had
+    landed an hour earlier.
   * A file listed in HELPERS is not a test -- a fixture, a generator, a
     reporting script. Each entry carries the reason. Fine.
   * Anything else is unexecuted, and is compared against the committed baseline
@@ -96,11 +103,44 @@ def referenced() -> set[str]:
         for m in re.finditer(r"\b([\w-]+\.(?:php|py|mjs))\b", text):
             seen.add(m.group(1))
 
-    resolved = set()
-    for name in suites():
+    # Every configuration file at the repository root, rather than a hardcoded
+    # list of them. A stub named in a tool's config is loaded by that tool as
+    # surely as a suite named in a run: step.
+    #
+    # The list used to be spelled out and it missed psalm-taint.xml within an
+    # hour of that file appearing. Guessing what the next tool will call its
+    # config is a losing game, and the failure mode is this gate calling a live
+    # file dead -- the exact false alarm it exists to avoid.
+    CONFIG_SUFFIXES = {".xml", ".neon", ".yml", ".yaml", ".json", ".toml", ".ini", ".dist"}
+    for path in sorted(ROOT.glob("*")):
+        if not path.is_file() or path.suffix.lower() not in CONFIG_SUFFIXES:
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for m in re.finditer(r"([\w.-]+\.(?:php|py|mjs))", text):
+            seen.add(m.group(1))
+
+    all_suites = suites()
+
+    def matches(name: str) -> bool:
         base = name.rsplit("/", 1)[-1]
-        if name in seen or base in seen or any(g.match(name) or g.match(base) for g in globs):
-            resolved.add(name)
+        return name in seen or base in seen or any(g.match(name) or g.match(base) for g in globs)
+
+    resolved = {name for name in all_suites if matches(name)}
+
+    # Transitive closure: a file executed by an executed file is executed. A
+    # suite that forks a worker, or a generator that drives a PHP child, runs it
+    # just as truly as a workflow step does.
+    changed = True
+    while changed:
+        changed = False
+        for name in list(resolved):
+            body = (TESTS / name).read_text(encoding="utf-8", errors="replace")
+            for other in all_suites:
+                if other in resolved:
+                    continue
+                if other.rsplit("/", 1)[-1] in body:
+                    resolved.add(other)
+                    changed = True
     return resolved
 
 
