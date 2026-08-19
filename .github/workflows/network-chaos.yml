@@ -16,9 +16,9 @@ concurrency:
 
 jobs:
   toxiproxy:
-    name: Toxiproxy 2.12.0 / DB + HTTP latency reset recovery
+    name: Toxiproxy 2.12.0 / latency bandwidth reset recovery
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 50
     services:
       db:
         image: mariadb:11.4@sha256:a794d9eb009e20de605858a11f32f63b4075cbd197c650436f0e3b457e4caed7
@@ -107,12 +107,29 @@ jobs:
 
       - name: Put WordPress HTTP itself behind Toxiproxy
         run: |
+          dd if=/dev/zero of="$WP_PATH/bandwidth.bin" bs=1024 count=256 status=none
           PHP_CLI_SERVER_WORKERS=8 php -S 127.0.0.1:8080 -t "$WP_PATH" "$WP_PATH/index.php" >/tmp/chaos-wp.log 2>&1 &
           for i in $(seq 1 100); do curl --fail --silent http://127.0.0.1:8080/ >/dev/null && break; sleep 0.1; done
           curl --fail --silent --show-error -X POST http://127.0.0.1:8474/proxies \
             -H 'Content-Type: application/json' \
             --data '{"name":"http","listen":"127.0.0.1:18080","upstream":"127.0.0.1:8080"}' >/tmp/toxi-http.json
           curl --fail --silent http://127.0.0.1:18080/ >/dev/null
+
+      - name: Bandwidth backpressure is real, measurable and bounded
+        run: |
+          curl --fail --silent --show-error -X POST http://127.0.0.1:8474/proxies/http/toxics \
+            -H 'Content-Type: application/json' \
+            --data '{"name":"http-bandwidth","type":"bandwidth","stream":"downstream","toxicity":1.0,"attributes":{"rate":32}}' >/tmp/toxi-bandwidth.json
+          start=$(date +%s%3N)
+          curl --fail --silent --max-time 15 http://127.0.0.1:18080/bandwidth.bin -o /tmp/bandwidth-received.bin
+          end=$(date +%s%3N)
+          elapsed=$((end-start))
+          bytes=$(wc -c </tmp/bandwidth-received.bin)
+          echo "bandwidth transfer bytes=$bytes elapsed=${elapsed}ms"
+          test "$bytes" -eq 262144
+          test "$elapsed" -ge 5000
+          test "$elapsed" -lt 15000
+          curl --fail --silent -X DELETE http://127.0.0.1:8474/proxies/http/toxics/http-bandwidth >/dev/null
 
       - name: HTTP latency/reset is bounded and target recovers
         run: |
@@ -149,6 +166,7 @@ jobs:
             /tmp/db-cut.*
             /tmp/http-reset.*
             /tmp/post-db-recovery.json
+            /tmp/bandwidth-received.bin
             /tmp/chaos-wp.log
           if-no-files-found: warn
           retention-days: 30
