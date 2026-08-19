@@ -13,6 +13,7 @@ import argparse
 import hashlib
 import json
 import re
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +28,15 @@ def sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def source_commit() -> str:
+    value = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True, stderr=subprocess.DEVNULL
+    ).strip()
+    if len(value) != 40 or any(ch not in "0123456789abcdefABCDEF" for ch in value):
+        raise RuntimeError("cannot resolve exact 40-hex source commit")
+    return value.lower()
 
 
 def plugin_version() -> str:
@@ -66,6 +76,7 @@ def shipped_files(base: Path, component_ref: str) -> list[dict[str, Any]]:
 
 
 def build() -> dict[str, Any]:
+    commit = source_commit()
     pv = plugin_version()
     bv = browser_version()
     plugin_ref = f"pkg:wordpress/prstudio-unified-control@{pv}"
@@ -108,6 +119,7 @@ def build() -> dict[str, Any]:
             "properties": [
                 {"name": "rpstudio:deterministic", "value": "true"},
                 {"name": "rpstudio:file_hash_algorithm", "value": "SHA-256"},
+                {"name": "rpstudio:source_commit", "value": commit},
             ],
         },
         "components": components,
@@ -123,6 +135,10 @@ def validate(value: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     if value.get("bomFormat") != "CycloneDX" or value.get("specVersion") != "1.6":
         errors.append("unexpected CycloneDX identity")
+    properties = value.get("metadata", {}).get("properties", []) if isinstance(value.get("metadata"), dict) else []
+    source_values = [p.get("value") for p in properties if isinstance(p, dict) and p.get("name") == "rpstudio:source_commit"]
+    if source_values != [source_commit()]:
+        errors.append("SBOM source commit is absent, duplicated or stale")
     components = value.get("components")
     if not isinstance(components, list) or len(components) < 3:
         errors.append("components missing")
@@ -168,7 +184,7 @@ def main() -> int:
     else:
         output.write_text(serialized, encoding="utf-8")
     print("PRODUCTION SBOM")
-    print(f"components={len(value['components'])} output={output.relative_to(ROOT)}")
+    print(f"commit={source_commit()} components={len(value['components'])} output={output.relative_to(ROOT)}")
     for error in errors:
         print("FAIL", error)
     return 1 if errors else 0
