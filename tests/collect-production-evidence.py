@@ -4,6 +4,10 @@
 The collector rejects cross-SHA evidence, unsuccessful/in-progress runs, duplicate
 receipt filenames, unsafe ZIP paths and artifact name mismatches. It is intended
 to run immediately before production-readiness-certifier.py in release CI.
+
+A bare invocation runs a deterministic self-test of the collector using real ZIP
+and filesystem operations. It does not claim or manufacture production evidence.
+Production collection is requested by passing CLI arguments, as release CI does.
 """
 from __future__ import annotations
 
@@ -13,6 +17,7 @@ import json
 import os
 import shutil
 import sys
+import tempfile
 import urllib.parse
 import urllib.request
 import zipfile
@@ -108,6 +113,80 @@ def receipt_commit(path: Path) -> str:
     return str(value.get("commit_sha", "")) if isinstance(value, dict) else ""
 
 
+def make_zip(entries: dict[str, bytes]) -> bytes:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for name, payload in entries.items():
+            archive.writestr(name, payload)
+    return buffer.getvalue()
+
+
+def self_test() -> int:
+    failures: list[str] = []
+    commit = "a" * 40
+
+    try:
+        config = json.loads(DEFAULT_SOURCES.read_text(encoding="utf-8"))
+        sources = config.get("sources", [])
+        if not isinstance(sources, list) or not sources:
+            failures.append("production evidence sources are empty")
+        claimed: set[str] = set()
+        for source in sources:
+            required = source.get("required_files", []) if isinstance(source, dict) else []
+            if not source.get("id") or not source.get("workflow") or not source.get("artifact_name_prefix") or not required:
+                failures.append(f"invalid production evidence source: {source!r}")
+                continue
+            duplicate = claimed.intersection(str(item) for item in required)
+            if duplicate:
+                failures.append(f"duplicate required evidence names: {sorted(duplicate)}")
+            claimed.update(str(item) for item in required)
+    except Exception as exc:
+        failures.append(f"sources configuration could not be validated: {type(exc).__name__}: {exc}")
+
+    with tempfile.TemporaryDirectory(prefix="rp-evidence-collector-self-test-") as tmp_name:
+        temp = Path(tmp_name)
+        valid = make_zip({"nested/receipt.json": json.dumps({"commit_sha": commit}).encode("utf-8")})
+        try:
+            extracted = safe_extract(valid, temp / "valid")
+            if len(extracted) != 1 or receipt_commit(extracted[0]) != commit:
+                failures.append("valid ZIP/receipt extraction did not preserve commit binding")
+        except Exception as exc:
+            failures.append(f"valid ZIP extraction failed: {type(exc).__name__}: {exc}")
+
+        unsafe = make_zip({"../escape.json": b"{}"})
+        try:
+            safe_extract(unsafe, temp / "unsafe")
+            failures.append("path-traversal ZIP was accepted")
+        except RuntimeError as exc:
+            if "unsafe artifact path" not in str(exc):
+                failures.append(f"unexpected traversal rejection: {exc}")
+
+        invalid_receipt = temp / "invalid.json"
+        invalid_receipt.write_text("{not-json", encoding="utf-8")
+        try:
+            receipt_commit(invalid_receipt)
+            failures.append("invalid JSON receipt was accepted")
+        except RuntimeError:
+            pass
+
+    query = urllib.parse.urlencode({"head_sha": commit, "status": "completed", "per_page": 100})
+    if f"head_sha={commit}" not in query or "status=completed" not in query:
+        failures.append(f"workflow query encoding is invalid: {query}")
+
+    print("PRODUCTION EVIDENCE COLLECTOR SELF-TEST")
+    if failures:
+        for failure in failures:
+            print(f"FAIL {failure}")
+        return 1
+    print("PASS sources_configuration")
+    print("PASS safe_zip_extraction")
+    print("PASS traversal_rejection")
+    print("PASS receipt_commit_binding")
+    print("PASS exact_sha_query_encoding")
+    print("SELF_TEST production_evidence_claimed=false")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repository", default=os.environ.get("GITHUB_REPOSITORY", ""))
@@ -117,6 +196,9 @@ def main() -> int:
     parser.add_argument("--output", default=str(DEFAULT_OUT))
     parser.add_argument("--strict", action="store_true")
     args = parser.parse_args()
+
+    if len(sys.argv) == 1:
+        return self_test()
 
     repository = args.repository.strip()
     commit = args.commit.strip()
@@ -223,7 +305,7 @@ def main() -> int:
     for failure in failures:
         print(f"FAIL {failure}")
     print(f"manifest={manifest_path}")
-    return 1 if args.strict and failures else 0
+    return 1 if failures else 0
 
 
 if __name__ == "__main__":
