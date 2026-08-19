@@ -255,7 +255,7 @@ final class PRSTUDIO_UC_MCP_Auth_V5 {
         $client_name = sanitize_text_field( (string) ( $payload['client_name'] ?? 'RP Studio Connector' ) );
         $scope = self::normalize_scope( sanitize_text_field( (string) ( $payload['scope'] ?? 'prstudio.read prstudio.write offline_access' ) ) );
         $result = self::atomic_client_registry( static function ( array $clients ) use ( $clean, $application_type, $client_name, $scope ) {
-            if ( count( $clients ) >= self::MAX_CLIENTS ) { $clients = array_slice( $clients, -80, null, true ); }
+            if ( count( $clients ) >= self::MAX_CLIENTS ) { return new WP_Error( 'client_registry_full', 'Capacità registrazione OAuth esaurita.', array( 'status' => 503, 'retryable' => true ) ); }
             $id = 'prstudio_client_' . self::random_id( 18 );
             $record = array(
                 'client_id' => $id,
