@@ -4,7 +4,7 @@
     "It is intentionally small: PHPStan is distributed as a self-contained package; the WordPress extension depends only on PHPStan and wordpress-stubs.",
     "Generated for RpConnector assurance on 2026-08-19; update composer.json and this lock together."
   ],
-  "content-hash": "69672e47a74eb13e107e398ae95c0cf0",
+  "content-hash": "4c197e7856ab3c04a06e2fd60e8c3b89",
   "packages": [],
   "packages-dev": [
     {
