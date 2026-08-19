@@ -2,182 +2,205 @@
   "schema_version": 1,
   "normative_date": "2026-08-19",
   "policy_file": "quality/production-readiness-policy.json",
-  "rule": "Every mandatory production gate and every required check must map to at least one concrete executable provider. A model/mock provider cannot satisfy a real-environment check.",
+  "rule": "Every mandatory production gate and every required check maps 1:1 to at least one concrete executable provider. Model/mock evidence cannot satisfy a real-environment gate.",
   "providers": {
     "source_integrity": {
-      "status": "implemented_ci",
-      "environment_class": "source",
-      "receipt_generator": "tests/production-source-integrity.py",
-      "tests": ["tests/regenerate-contract-artifacts.py", ".github/scripts/check-mcp-tool-drift.mjs", ".github/scripts/check-build-info-counts.mjs"]
+      "status": "implemented_ci", "environment_class": "source", "receipt_generator": "tests/production-source-integrity.py",
+      "tests": ["tests/production-source-integrity.py", "tests/regenerate-contract-artifacts.py", ".github/scripts/check-mcp-tool-drift.mjs", ".github/scripts/check-build-info-counts.mjs"],
+      "mapped_checks": {
+        "exact_source_tree": "tests/production-source-integrity.py", "generated_artifacts_reproducible": "tests/regenerate-contract-artifacts.py",
+        "release_manifest_consistent": ".github/scripts/check-build-info-counts.mjs", "no_release_placeholders": "tests/production-source-integrity.py",
+        "no_unresolved_stubs": "tests/production-source-integrity.py", "dependency_actions_pinned": "tests/production-source-integrity.py"
+      }
     },
     "atomic_capability_coverage": {
-      "status": "framework_implemented_cases_missing",
-      "environment_class": "mixed",
-      "receipt_generator": "tests/atomic-capability-assurance.py",
-      "tests": ["quality/atomic-cases.json"],
-      "blocking_gap": "Exact atomic cases must be populated for every operational inventory item. Empty/wildcard coverage is forbidden."
+      "status": "framework_implemented_cases_missing", "environment_class": "mixed", "receipt_generator": "tests/atomic-capability-assurance.py",
+      "tests": ["tests/atomic-capability-assurance.py", "quality/atomic-cases.json", "quality/official-source-map.json"],
+      "blocking_gap": "Populate one exact executable atomic case for every operational inventory ID; empty/wildcard coverage is forbidden.",
+      "mapped_checks": {
+        "inventory_complete": "tests/atomic-capability-assurance.py", "implementation_resolved": "tests/atomic-capability-assurance.py",
+        "one_exact_case_per_operational_item": "quality/atomic-cases.json", "independent_oracle_per_item": "tests/atomic-capability-assurance.py",
+        "official_docs_traced": "quality/official-source-map.json", "zero_stub_operational_items": "tests/atomic-capability-assurance.py",
+        "required_environment_evidence_present": "tests/atomic-capability-assurance.py"
+      }
     },
     "static_security": {
-      "status": "implemented_ci",
-      "environment_class": "source",
-      "receipt_generator": "tests/production-workflow-evidence.py",
+      "status": "implemented_ci", "environment_class": "source", "receipt_generator": "tests/production-workflow-evidence.py",
       "tests": ["quality/production-workflow-gates.json", "tests/validate-security-contract.mjs", "tests/enterprise-static-audit.py"],
       "workflows": [".github/workflows/codeql.yml", ".github/workflows/static-analysis.yml", ".github/workflows/security-supply-chain.yml", ".github/workflows/enterprise-verification.yml"],
       "mapped_checks": {
-        "codeql": "quality/production-workflow-gates.json",
-        "wordpress_plugin_check": "quality/production-workflow-gates.json",
-        "php_static_analysis": "quality/production-workflow-gates.json",
-        "javascript_static_analysis": "quality/production-workflow-gates.json",
-        "dependency_vulnerability_scan": "quality/production-workflow-gates.json",
-        "secret_scan": "quality/production-workflow-gates.json"
+        "codeql": "quality/production-workflow-gates.json", "wordpress_plugin_check": "quality/production-workflow-gates.json",
+        "php_static_analysis": "quality/production-workflow-gates.json", "javascript_static_analysis": "quality/production-workflow-gates.json",
+        "dependency_vulnerability_scan": "quality/production-workflow-gates.json", "secret_scan": "quality/production-workflow-gates.json"
       }
     },
     "auth_security": {
-      "status": "mock_and_source_implemented_real_harness_missing",
-      "environment_class": "mixed",
-      "workflows": [".github/workflows/oauth-security-invariants.yml", ".github/workflows/wordpress-live-acceptance.yml"],
-      "tests": ["tests/php-mcp-oauth-2026-smoke.php", "tests/oauth-concurrency-invariants.py"],
-      "blocking_gap": "Real HTTPS OAuth client flow still needs a normalized exact-SHA receipt proving PKCE, redirect/resource binding, scopes, refresh rotation, replay/expiry and zero-side-effect denial."
+      "status": "harness_added_not_yet_executed", "environment_class": "real_https_oauth_staging", "receipt_generator": "tests/production-scenario-gate.py",
+      "tests": ["tests/production-scenario-gate.py", "quality/production-real-scenarios.example.json", "tests/php-mcp-oauth-2026-smoke.php", "tests/oauth-concurrency-invariants.py"],
+      "workflows": [".github/workflows/production-real-staging.yml", ".github/workflows/wordpress-live-acceptance.yml"],
+      "blocking_gap": "Configure the real staging scenario profile and execute the exact-SHA auth gate.",
+      "mapped_checks": {
+        "pkce_s256": "quality/production-real-scenarios.example.json", "redirect_uri_exact_match": "quality/production-real-scenarios.example.json",
+        "resource_binding": "quality/production-real-scenarios.example.json", "scope_enforcement": "quality/production-real-scenarios.example.json",
+        "refresh_rotation": "quality/production-real-scenarios.example.json", "replay_rejected": "quality/production-real-scenarios.example.json",
+        "expired_token_rejected": "quality/production-real-scenarios.example.json", "permission_denial_has_zero_side_effects": "quality/production-real-scenarios.example.json"
+      }
     },
     "browser_isolation": {
-      "status": "partial_real_harness",
-      "environment_class": "browser",
-      "workflows": [".github/workflows/enterprise-verification.yml", ".github/workflows/nightly-soak.yml"],
-      "tests": ["tests/chrome-extension-live-smoke.mjs", "tests/validate-browser-enterprise-hardening.mjs", "prstudio-unified-browser-agent/tests"],
-      "blocking_gap": "One exact real-Chrome receipt must exercise wrong tab/origin/document/session and all forbidden RAW-CDP/JS/cookie paths."
+      "status": "harness_added_not_yet_executed", "environment_class": "real_owned_chrome_staging", "receipt_generator": "tests/production-scenario-gate.py",
+      "tests": ["tests/production-scenario-gate.py", "quality/production-real-scenarios.example.json", "tests/chrome-extension-live-smoke.mjs", "tests/validate-browser-enterprise-hardening.mjs", "prstudio-unified-browser-agent/tests"],
+      "workflows": [".github/workflows/production-real-staging.yml", ".github/workflows/enterprise-verification.yml"],
+      "blocking_gap": "Configure and execute the real owned-Chrome isolation profile for the exact SHA.",
+      "mapped_checks": {
+        "owned_tab_enforced": "quality/production-real-scenarios.example.json", "wrong_tab_rejected": "quality/production-real-scenarios.example.json",
+        "wrong_origin_rejected": "quality/production-real-scenarios.example.json", "stale_session_rejected": "quality/production-real-scenarios.example.json",
+        "stale_document_rejected": "quality/production-real-scenarios.example.json", "raw_cdp_policy_enforced": "quality/production-real-scenarios.example.json",
+        "arbitrary_javascript_rejected": "quality/production-real-scenarios.example.json", "cookie_export_rejected": "quality/production-real-scenarios.example.json",
+        "mv3_worker_restart_recovery": "quality/production-real-scenarios.example.json"
+      }
     },
     "real_environment_matrix": {
-      "status": "implemented_real_harness",
-      "environment_class": "real_matrix",
-      "receipt_generator": "tests/production-workflow-evidence.py",
+      "status": "implemented_real_harness", "environment_class": "real_matrix", "receipt_generator": "tests/production-workflow-evidence.py",
       "tests": ["quality/production-workflow-gates.json", "tests/php-runtime-db-liveness-integration.php", "tests/php-task-queue-integration.php", "tests/chrome-extension-live-smoke.mjs"],
       "workflows": [".github/workflows/enterprise-verification.yml", ".github/workflows/wordpress-live-acceptance.yml", ".github/workflows/woocommerce-live-acceptance.yml"],
       "mapped_checks": {
-        "wordpress_supported_matrix": "quality/production-workflow-gates.json",
-        "woocommerce_supported_matrix": "quality/production-workflow-gates.json",
-        "php_supported_matrix": "quality/production-workflow-gates.json",
-        "mariadb_real_sql": "quality/production-workflow-gates.json",
-        "mysql_real_sql": "quality/production-workflow-gates.json",
-        "chrome_supported_matrix": "quality/production-workflow-gates.json"
+        "wordpress_supported_matrix": "quality/production-workflow-gates.json", "woocommerce_supported_matrix": "quality/production-workflow-gates.json",
+        "php_supported_matrix": "quality/production-workflow-gates.json", "mariadb_real_sql": "quality/production-workflow-gates.json",
+        "mysql_real_sql": "quality/production-workflow-gates.json", "chrome_supported_matrix": "quality/production-workflow-gates.json"
       }
     },
     "upgrade_migration": {
-      "status": "implemented_real_harness",
-      "environment_class": "wordpress_database",
-      "receipt_generator": "tests/production-wordpress-lifecycle-receipt.py",
-      "workflows": [".github/workflows/production-wordpress-lifecycle.yml"],
-      "tests": ["tests/wordpress-production-state.php", "tests/production-wordpress-lifecycle-receipt.py"],
+      "status": "implemented_real_harness", "environment_class": "wordpress_database", "receipt_generator": "tests/production-wordpress-lifecycle-receipt.py",
+      "workflows": [".github/workflows/production-wordpress-lifecycle.yml"], "tests": ["tests/wordpress-production-state.php", "tests/production-wordpress-lifecycle-receipt.py"],
       "mapped_checks": {
-        "fresh_install": ".github/workflows/production-wordpress-lifecycle.yml",
-        "previous_release_upgrade": ".github/workflows/production-wordpress-lifecycle.yml",
-        "interrupted_migration_resume": ".github/workflows/production-wordpress-lifecycle.yml",
-        "migration_idempotency": ".github/workflows/production-wordpress-lifecycle.yml",
-        "settings_preserved": "tests/wordpress-production-state.php",
-        "jobs_memory_evidence_preserved": "tests/wordpress-production-state.php",
-        "oauth_pairing_preserved": "tests/wordpress-production-state.php",
-        "failed_migration_not_marked_complete": "tests/wordpress-production-state.php"
+        "fresh_install": ".github/workflows/production-wordpress-lifecycle.yml", "previous_release_upgrade": ".github/workflows/production-wordpress-lifecycle.yml",
+        "interrupted_migration_resume": ".github/workflows/production-wordpress-lifecycle.yml", "migration_idempotency": ".github/workflows/production-wordpress-lifecycle.yml",
+        "settings_preserved": "tests/wordpress-production-state.php", "jobs_memory_evidence_preserved": "tests/wordpress-production-state.php",
+        "oauth_pairing_preserved": "tests/wordpress-production-state.php", "failed_migration_not_marked_complete": "tests/wordpress-production-state.php"
       }
     },
     "transaction_integrity": {
-      "status": "partial_real_harness",
-      "environment_class": "wordpress_woocommerce",
-      "workflows": [".github/workflows/woocommerce-live-acceptance.yml"],
-      "tests": ["tests/php-publish-transaction-smoke.php", "tests/php-reliability-hotfix-smoke.php", "tests/php-agency-verification-monotonicity-smoke.php"],
-      "blocking_gap": "Generalize the strong WooCommerce mutation/readback/rollback pattern to every mutating operational capability and emit an exact-SHA receipt."
+      "status": "harness_added_not_yet_executed", "environment_class": "real_wordpress_woocommerce_transaction_staging", "receipt_generator": "tests/production-scenario-gate.py",
+      "workflows": [".github/workflows/production-real-staging.yml", ".github/workflows/woocommerce-live-acceptance.yml"],
+      "tests": ["tests/production-scenario-gate.py", "quality/production-real-scenarios.example.json", "tests/php-publish-transaction-smoke.php", "tests/php-reliability-hotfix-smoke.php"],
+      "blocking_gap": "Execute all transaction scenarios against real staging for the exact SHA; the WooCommerce workflow remains supporting evidence.",
+      "mapped_checks": {
+        "mutation_independent_readback": "quality/production-real-scenarios.example.json", "invalid_input_zero_side_effects": "quality/production-real-scenarios.example.json",
+        "rollback_restores_baseline": "quality/production-real-scenarios.example.json", "idempotent_replay_semantics": "quality/production-real-scenarios.example.json",
+        "partial_failure_never_reports_success": "quality/production-real-scenarios.example.json", "post_effect_verification_required": "quality/production-real-scenarios.example.json"
+      }
     },
     "concurrency_recovery": {
-      "status": "partial_real_harness",
-      "environment_class": "database",
-      "workflows": [".github/workflows/enterprise-verification.yml", ".github/workflows/wordpress-live-acceptance.yml"],
-      "tests": ["tests/php-execution-lane-concurrency-smoke.php", "tests/php-runtime-db-liveness-integration.php", "tests/php-task-queue-integration.php", "tests/oauth-concurrency-invariants.py", "tests/validate-m11-portable-concurrency.py"],
-      "blocking_gap": "Unify real DB collision, lease expiry, fencing, CAS, advisory-lock, crash-window and retry/dead-letter evidence in one receipt."
+      "status": "harness_added_not_yet_executed", "environment_class": "real_multi_worker_database_staging", "receipt_generator": "tests/production-scenario-gate.py",
+      "workflows": [".github/workflows/production-real-staging.yml", ".github/workflows/enterprise-verification.yml", ".github/workflows/wordpress-live-acceptance.yml"],
+      "tests": ["tests/production-scenario-gate.py", "quality/production-real-scenarios.example.json", "tests/php-execution-lane-concurrency-smoke.php", "tests/php-runtime-db-liveness-integration.php", "tests/oauth-concurrency-invariants.py"],
+      "blocking_gap": "Execute the multi-worker crash/lease/CAS/lock scenarios on real staging for the exact SHA.",
+      "mapped_checks": {
+        "multi_worker_claim_exclusion": "quality/production-real-scenarios.example.json", "lease_expiry_recovery": "quality/production-real-scenarios.example.json",
+        "stale_owner_fencing": "quality/production-real-scenarios.example.json", "cas_conflict_preserves_updates": "quality/production-real-scenarios.example.json",
+        "advisory_lock_contention": "quality/production-real-scenarios.example.json", "crash_window_resume": "quality/production-real-scenarios.example.json",
+        "dead_letter_and_retry_semantics": "quality/production-real-scenarios.example.json"
+      }
     },
     "fault_injection": {
-      "status": "harness_added_not_yet_executed",
-      "environment_class": "isolated_production_staging",
-      "receipt_generator": "tests/production-fault-injection.py",
+      "status": "harness_added_not_yet_executed", "environment_class": "isolated_production_staging", "receipt_generator": "tests/production-fault-injection.py",
+      "workflows": [".github/workflows/production-real-staging.yml"],
       "tests": ["tests/production-fault-injection.py", "quality/fault-injection-profile.example.json", "tests/runtime-chaos-model.py", "tests/runtime-state-model-check.py"],
-      "blocking_gap": "The destructive harness exists, but a real isolated staging profile must supply argv hooks for DB/network/provider/Chrome/MV3/process-kill faults and then execute all nine scenarios for the exact release SHA.",
+      "blocking_gap": "Configure the destructive staging profile and execute all nine faults for the exact release SHA.",
       "mapped_checks": {
-        "database_disconnect": "tests/production-fault-injection.py",
-        "database_restart": "tests/production-fault-injection.py",
-        "remote_timeout": "tests/production-fault-injection.py",
-        "remote_rate_limit": "tests/production-fault-injection.py",
-        "remote_5xx": "tests/production-fault-injection.py",
-        "chrome_process_kill": "tests/production-fault-injection.py",
-        "extension_worker_suspend": "tests/production-fault-injection.py",
-        "network_interruption": "tests/production-fault-injection.py",
-        "process_kill_between_effect_and_checkpoint": "tests/production-fault-injection.py"
+        "database_disconnect": "quality/fault-injection-profile.example.json", "database_restart": "quality/fault-injection-profile.example.json",
+        "remote_timeout": "quality/fault-injection-profile.example.json", "remote_rate_limit": "quality/fault-injection-profile.example.json",
+        "remote_5xx": "quality/fault-injection-profile.example.json", "chrome_process_kill": "quality/fault-injection-profile.example.json",
+        "extension_worker_suspend": "quality/fault-injection-profile.example.json", "network_interruption": "quality/fault-injection-profile.example.json",
+        "process_kill_between_effect_and_checkpoint": "quality/fault-injection-profile.example.json"
       }
     },
     "load_backpressure": {
-      "status": "partial_harness",
-      "environment_class": "mixed",
-      "tests": ["tests/php-critical-performance.php", "tests/php-suite-latency-runtime-smoke.php", "tests/php-tools-list-budget.php", "tests/performance-budget-single-file.php", "bench/prstudio-bench.py"],
-      "blocking_gap": "Need a declared real concurrent MCP workload with p50/p95/p99, bounded queue/memory, backpressure and release SLO receipt."
+      "status": "harness_added_not_yet_executed", "environment_class": "real_load_staging", "receipt_generator": "tests/production-scenario-gate.py",
+      "workflows": [".github/workflows/production-real-staging.yml"],
+      "tests": ["tests/production-scenario-gate.py", "quality/production-real-scenarios.example.json", "tests/php-critical-performance.php", "tests/php-suite-latency-runtime-smoke.php", "tests/php-tools-list-budget.php", "bench/prstudio-bench.py"],
+      "blocking_gap": "Execute the declared concurrent MCP workload and resource/backpressure oracles for the exact SHA.",
+      "mapped_checks": {
+        "concurrent_mcp_requests": "quality/production-real-scenarios.example.json", "queue_saturation_is_bounded": "quality/production-real-scenarios.example.json",
+        "backpressure_is_explicit": "quality/production-real-scenarios.example.json", "tools_list_budget": "quality/production-real-scenarios.example.json",
+        "result_size_limits": "quality/production-real-scenarios.example.json", "memory_growth_bounded": "quality/production-real-scenarios.example.json",
+        "latency_slo_met": "quality/production-real-scenarios.example.json"
+      }
     },
     "h24_soak": {
-      "status": "harness_added_not_yet_executed",
-      "environment_class": "production_soak",
-      "receipt_generator": "tests/production-h24-soak.py",
+      "status": "harness_added_not_yet_executed", "environment_class": "production_soak", "receipt_generator": "tests/production-h24-soak.py",
+      "workflows": [".github/workflows/production-h24-promote.yml"],
       "tests": ["tests/production-h24-soak.py", "quality/h24-soak-profile.json", "quality/h24-environment-profile.example.json"],
-      "blocking_gap": "A real exact-SHA run of at least 86400 seconds is required with restart, lease, queue and memory oracles. The existing nightly-soak workflow is intentionally insufficient."
+      "blocking_gap": "Run at least 86400 seconds externally on the exact SHA, then promote the independently revalidated receipt/artifact.",
+      "mapped_checks": {
+        "continuous_24h": "tests/production-h24-soak.py", "periodic_jobs_progress": "tests/production-h24-soak.py",
+        "forced_restart_recovery": "quality/h24-environment-profile.example.json", "zero_orphan_leases": "quality/h24-environment-profile.example.json",
+        "zero_unbounded_queue_growth": "quality/h24-environment-profile.example.json", "zero_fatal_errors": "tests/production-h24-soak.py",
+        "memory_growth_bounded": "quality/h24-environment-profile.example.json", "evidence_chain_complete": ".github/workflows/production-h24-promote.yml"
+      }
     },
     "remote_live_integration": {
-      "status": "legacy_receipts_partial",
-      "environment_class": "remote",
-      "legacy_receipts": ["evidence/live/wordpress-live.json", "evidence/live/browser-live.json", "evidence/live/remote-mcp-oauth.json"],
-      "blocking_gap": "Need one normalized exact-SHA receipt proving remote HTTPS MCP, real OAuth client, real Chrome pairing, one read and one reversible write."
+      "status": "harness_added_not_yet_executed", "environment_class": "public_https_real_client_real_chrome", "receipt_generator": "tests/production-scenario-gate.py",
+      "workflows": [".github/workflows/production-real-staging.yml", ".github/workflows/wordpress-live-acceptance.yml"],
+      "tests": ["tests/production-scenario-gate.py", "quality/production-real-scenarios.example.json"],
+      "blocking_gap": "Execute public HTTPS MCP + real OAuth client + real Chrome + reversible write scenarios on the exact SHA.",
+      "mapped_checks": {
+        "https_remote_mcp": "quality/production-real-scenarios.example.json", "oauth_real_client": "quality/production-real-scenarios.example.json",
+        "browser_pairing_real_chrome": "quality/production-real-scenarios.example.json", "live_read_operation": "quality/production-real-scenarios.example.json",
+        "live_mutating_operation_with_rollback": "quality/production-real-scenarios.example.json", "evidence_correlated_to_exact_commit": "quality/production-real-scenarios.example.json"
+      }
     },
     "observability_operability": {
-      "status": "partial_harness",
-      "environment_class": "mixed",
-      "tests": ["tests/validate-correlation-chain.mjs", "tests/php-health-integrity-smoke.php", "tests/evidence-engine-single-file.php"],
-      "blocking_gap": "Need real alert trigger plus exercised runbook recovery and redaction/audit evidence in one exact-SHA receipt."
+      "status": "harness_added_not_yet_executed", "environment_class": "real_operations_staging", "receipt_generator": "tests/production-scenario-gate.py",
+      "workflows": [".github/workflows/production-real-staging.yml"],
+      "tests": ["tests/production-scenario-gate.py", "quality/production-real-scenarios.example.json", "tests/validate-correlation-chain.mjs", "tests/php-health-integrity-smoke.php", "tests/evidence-engine-single-file.php"],
+      "blocking_gap": "Execute real alert/runbook/redaction/audit-chain scenarios for the exact SHA.",
+      "mapped_checks": {
+        "health_signal": "quality/production-real-scenarios.example.json", "correlation_ids": "quality/production-real-scenarios.example.json",
+        "audit_evidence_chain": "quality/production-real-scenarios.example.json", "secret_redaction": "quality/production-real-scenarios.example.json",
+        "failure_classification": "quality/production-real-scenarios.example.json", "alert_condition_exercised": "quality/production-real-scenarios.example.json",
+        "runbook_recovery_exercised": "quality/production-real-scenarios.example.json"
+      }
     },
     "backup_restore": {
-      "status": "implemented_real_harness",
-      "environment_class": "wordpress_database",
-      "receipt_generator": "tests/production-wordpress-lifecycle-receipt.py",
-      "workflows": [".github/workflows/production-wordpress-lifecycle.yml"],
-      "tests": ["tests/wordpress-production-state.php", "tests/production-wordpress-lifecycle-receipt.py"],
+      "status": "implemented_real_harness", "environment_class": "wordpress_database", "receipt_generator": "tests/production-wordpress-lifecycle-receipt.py",
+      "workflows": [".github/workflows/production-wordpress-lifecycle.yml"], "tests": ["tests/wordpress-production-state.php", "tests/production-wordpress-lifecycle-receipt.py"],
       "mapped_checks": {
-        "backup_created": ".github/workflows/production-wordpress-lifecycle.yml",
-        "clean_environment_restore": ".github/workflows/production-wordpress-lifecycle.yml",
-        "configuration_preserved": "tests/wordpress-production-state.php",
-        "runtime_state_integrity": "tests/wordpress-production-state.php",
-        "jobs_memory_evidence_integrity": "tests/wordpress-production-state.php",
-        "restore_verification": "tests/wordpress-production-state.php",
+        "backup_created": ".github/workflows/production-wordpress-lifecycle.yml", "clean_environment_restore": ".github/workflows/production-wordpress-lifecycle.yml",
+        "configuration_preserved": "tests/wordpress-production-state.php", "runtime_state_integrity": "tests/wordpress-production-state.php",
+        "jobs_memory_evidence_integrity": "tests/wordpress-production-state.php", "restore_verification": "tests/wordpress-production-state.php",
         "rpo_rto_recorded": "tests/production-wordpress-lifecycle-receipt.py"
       }
     },
     "supply_chain_release": {
-      "status": "implemented_ci",
-      "environment_class": "source",
-      "receipt_generator": "tests/production-workflow-evidence.py",
+      "status": "implemented_ci", "environment_class": "source", "receipt_generator": "tests/production-workflow-evidence.py",
       "workflows": [".github/workflows/workflow-security.yml", ".github/workflows/security-supply-chain.yml", ".github/workflows/build-attest.yml"],
-      "tests": ["tests/production-supply-chain-source.py", "tests/generate-production-sbom.py", "quality/production-workflow-gates.json", "tests/build-release.py"],
+      "tests": ["tests/production-supply-chain-source.py", "tests/generate-production-sbom.py", "quality/production-workflow-gates.json", "quality/production-evidence-sources.json"],
       "mapped_checks": {
-        "github_actions_commit_pinned": "tests/production-supply-chain-source.py",
-        "dependencies_locked": "tests/production-supply-chain-source.py",
-        "sbom_generated": "tests/generate-production-sbom.py",
-        "artifact_checksums": ".github/workflows/build-attest.yml",
-        "build_attestation": ".github/workflows/build-attest.yml",
-        "known_critical_vulnerabilities_zero": ".github/workflows/security-supply-chain.yml"
+        "github_actions_commit_pinned": "tests/production-supply-chain-source.py", "dependencies_locked": "tests/production-supply-chain-source.py",
+        "sbom_generated": "tests/generate-production-sbom.py", "artifact_checksums": ".github/workflows/build-attest.yml",
+        "build_attestation": ".github/workflows/build-attest.yml", "known_critical_vulnerabilities_zero": ".github/workflows/security-supply-chain.yml"
       }
     },
     "compatibility_degradation": {
-      "status": "partial_harness",
-      "environment_class": "mixed",
-      "workflows": [".github/workflows/enterprise-verification.yml"],
-      "tests": ["tests/php-mcp-legacy-protocol-surface-smoke.php", "tests/validate-runtime-regressions.mjs"],
-      "blocking_gap": "Need explicit negative environment tests proving unsupported WP/PHP and unavailable browser/provider degrade without synthetic success."
+      "status": "harness_added_not_yet_executed", "environment_class": "real_negative_compatibility_staging", "receipt_generator": "tests/production-scenario-gate.py",
+      "workflows": [".github/workflows/production-real-staging.yml", ".github/workflows/enterprise-verification.yml"],
+      "tests": ["tests/production-scenario-gate.py", "quality/production-real-scenarios.example.json", "tests/php-mcp-legacy-protocol-surface-smoke.php", "tests/validate-runtime-regressions.mjs"],
+      "blocking_gap": "Execute unsupported WP/PHP and unavailable browser/provider negative scenarios for the exact SHA.",
+      "mapped_checks": {
+        "unsupported_wordpress_fails_explicitly": "quality/production-real-scenarios.example.json", "unsupported_php_fails_explicitly": "quality/production-real-scenarios.example.json",
+        "browser_unavailable_degrades_without_false_success": "quality/production-real-scenarios.example.json", "provider_unavailable_degrades_without_false_success": "quality/production-real-scenarios.example.json",
+        "read_only_fallback_preserves_safety": "quality/production-real-scenarios.example.json"
+      }
     },
     "documentation_claims": {
-      "status": "framework_implemented_atomic_trace_missing",
-      "environment_class": "source",
-      "tests": ["quality/official-source-map.json", "tests/atomic-capability-assurance.py", ".github/scripts/check-mcp-tool-drift.mjs", ".github/scripts/check-build-info-counts.mjs"],
-      "blocking_gap": "Cannot pass until every operational atomic case has internal contract + official source refs and generated release claims derive from the same manifest."
+      "status": "implemented_ci", "environment_class": "source", "receipt_generator": "tests/production-documentation-claims.py",
+      "tests": ["tests/production-documentation-claims.py", "quality/official-source-map.json", "tests/atomic-capability-assurance.py", ".github/scripts/check-mcp-tool-drift.mjs", ".github/scripts/check-build-info-counts.mjs"],
+      "mapped_checks": {
+        "official_source_map_valid": "quality/official-source-map.json", "all_operational_items_document_traced": "tests/atomic-capability-assurance.py",
+        "counts_match_generated_manifest": ".github/scripts/check-build-info-counts.mjs", "versions_match_source": "tests/production-documentation-claims.py",
+        "endpoints_match_source": "tests/production-documentation-claims.py", "production_claim_matches_verdict": "tests/production-documentation-claims.py"
+      }
     }
   }
 }
