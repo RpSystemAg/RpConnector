@@ -9,205 +9,117 @@
     "repository_governance": {
       "mandatory_for_production": true,
       "receipt": "repository-governance.json",
-      "checks": [
-        "default_branch_is_master",
-        "master_is_protected",
-        "required_status_checks_enforced",
-        "force_push_disabled",
-        "branch_deletion_disabled",
-        "secret_scanning_enabled",
-        "push_protection_enabled"
-      ],
-      "official_sources": [
-        "https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets",
-        "https://docs.github.com/en/code-security/secret-scanning/introduction/about-secret-scanning",
-        "https://docs.github.com/en/code-security/secret-scanning/protecting-pushes-with-secret-scanning"
-      ]
+      "real_environment": false,
+      "max_age_hours": 24,
+      "checks": ["default_branch_is_master","master_is_protected","required_status_checks_enforced","force_push_disabled","branch_deletion_disabled","secret_scanning_enabled","push_protection_enabled"],
+      "official_sources": ["https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets","https://docs.github.com/en/code-security/secret-scanning/introduction/about-secret-scanning","https://docs.github.com/en/code-security/secret-scanning/protecting-pushes-with-secret-scanning"]
     },
     "mcp_official_conformance": {
       "mandatory_for_production": true,
       "receipt": "mcp-official-conformance.json",
+      "real_environment": true,
+      "max_age_hours": 72,
       "tool": "@modelcontextprotocol/conformance",
       "track": "2026-07-28",
-      "checks": [
-        "official_referee_executes_against_real_http_server",
-        "suite_all",
-        "spec_version_2026_07_28",
-        "zero_expected_failure_baseline",
-        "wire_schema_validation_present"
-      ],
-      "official_sources": [
-        "https://github.com/modelcontextprotocol/conformance",
-        "https://modelcontextprotocol.io/specification/2026-07-28"
-      ]
+      "checks": ["official_referee_executes_against_real_http_server","suite_all","spec_version_2026_07_28","zero_expected_failure_baseline","wire_schema_validation_present"],
+      "official_sources": ["https://github.com/modelcontextprotocol/conformance","https://modelcontextprotocol.io/specification/2026-07-28"]
     },
     "php_taint_analysis": {
       "mandatory_for_production": true,
       "receipt": "php-taint-analysis.json",
-      "tool": "vimeo/psalm",
-      "tool_version": "6.16.1",
-      "checks": [
-        "wordpress_model_loaded",
-        "mcp_rest_inputs_modelled_as_sources",
-        "sql_filesystem_http_header_process_persistence_modelled_as_sinks",
-        "taint_analysis_executes",
-        "zero_unreviewed_taint_paths"
-      ],
-      "official_sources": [
-        "https://psalm.dev/docs/security_analysis/",
-        "https://psalm.dev/docs/security_analysis/custom_taint_sinks/"
-      ]
+      "real_environment": false,
+      "max_age_hours": 24,
+      "tool": "Psalm + Semgrep taint mode",
+      "tool_version": "Psalm 6.16.1 / Semgrep 1.171.0",
+      "checks": ["wordpress_model_loaded","mcp_rest_inputs_modelled_as_sources","sql_filesystem_http_header_process_persistence_modelled_as_sinks","taint_analysis_executes","zero_unreviewed_taint_paths"],
+      "official_sources": ["https://psalm.dev/docs/security_analysis/","https://psalm.dev/docs/security_analysis/custom_taint_sinks/","https://semgrep.dev/docs/writing-rules/data-flow/taint-mode/overview"]
     },
     "generative_stateful": {
       "mandatory_for_production": true,
       "receipt": "generative-stateful.json",
+      "real_environment": true,
+      "max_age_hours": 72,
       "tool": "hypothesis",
       "tool_version": "6.164.0",
-      "checks": [
-        "schema_boundary_generation",
-        "invalid_input_zero_side_effects",
-        "stateful_claim_wait_retry_recover_sequences",
-        "counterexample_shrinking",
-        "real_runtime_oracle"
-      ],
-      "official_sources": [
-        "https://hypothesis.readthedocs.io/en/latest/",
-        "https://hypothesis.readthedocs.io/en/latest/stateful.html"
-      ]
+      "checks": ["schema_boundary_generation","invalid_input_zero_side_effects","stateful_claim_wait_retry_recover_sequences","counterexample_shrinking","real_runtime_oracle"],
+      "official_sources": ["https://hypothesis.readthedocs.io/en/latest/","https://hypothesis.readthedocs.io/en/latest/stateful.html"]
     },
     "mutation_testing": {
       "mandatory_for_production": true,
       "receipt": "mutation-testing.json",
+      "real_environment": false,
+      "max_age_hours": 24,
       "tool": "infection/infection",
       "tool_version": "0.34.1",
-      "critical_kernel": [
-        "store",
-        "agency_runtime",
-        "browser_queue",
-        "verifier",
-        "oauth",
-        "idempotency",
-        "publish_transaction"
-      ],
+      "critical_kernel": ["store","agency_runtime","browser_queue","verifier","oauth","idempotency","publish_transaction"],
       "minimum_msi_percent": 90,
       "minimum_covered_msi_percent": 95,
-      "checks": [
-        "phpunit_kernel_harness_exists",
-        "all_critical_kernel_components_mutated",
-        "escaped_mutants_below_threshold",
-        "zero_ignored_critical_mutants"
-      ],
-      "official_sources": [
-        "https://infection.github.io/guide/"
-      ]
+      "checks": ["phpunit_kernel_harness_exists","all_critical_kernel_components_mutated","escaped_mutants_below_threshold","zero_ignored_critical_mutants"],
+      "official_sources": ["https://infection.github.io/guide/"]
     },
     "authenticated_dast": {
       "mandatory_for_production": true,
       "receipt": "authenticated-dast.json",
+      "real_environment": true,
+      "max_age_hours": 72,
       "tool": "OWASP ZAP",
       "tool_version": "action-full-scan-v0.13.0",
-      "checks": [
-        "real_http_target",
-        "oauth_authenticated_path",
-        "rest_mcp_attack_surface",
-        "active_scan",
-        "zero_high_risk_unresolved_alerts"
-      ],
-      "official_sources": [
-        "https://www.zaproxy.org/docs/automate/automation-framework/",
-        "https://github.com/zaproxy/action-full-scan"
-      ]
+      "checks": ["real_http_target","oauth_authenticated_path","rest_mcp_attack_surface","active_scan","zero_high_risk_unresolved_alerts"],
+      "official_sources": ["https://www.zaproxy.org/docs/automate/automation-framework/","https://github.com/zaproxy/action-full-scan"]
     },
     "browser_forward_compatibility": {
       "mandatory_for_production": true,
       "receipt": "browser-forward-compatibility.json",
+      "real_environment": true,
+      "max_age_hours": 72,
       "tool": "Chrome for Testing",
       "setup_action": "browser-actions/setup-chrome@2e1d749697dd1612b833dba4a722266286fbefcd",
-      "required_channels": ["stable", "beta", "dev"],
-      "checks": [
-        "extension_loads_each_channel",
-        "mv3_service_worker_observed",
-        "forced_worker_termination",
-        "worker_restarts",
-        "pending_work_resumes_exactly_once"
-      ],
-      "official_sources": [
-        "https://developer.chrome.com/blog/chrome-for-testing/",
-        "https://developer.chrome.com/docs/extensions/how-to/test/test-serviceworker-termination-with-puppeteer"
-      ]
+      "required_channels": ["stable","beta","dev"],
+      "checks": ["extension_loads_each_channel","mv3_service_worker_observed","forced_worker_termination","worker_restarts","pending_work_resumes_exactly_once"],
+      "official_sources": ["https://developer.chrome.com/blog/chrome-for-testing/","https://developer.chrome.com/docs/extensions/how-to/test/test-serviceworker-termination-with-puppeteer"]
     },
     "network_chaos": {
       "mandatory_for_production": true,
       "receipt": "network-chaos.json",
+      "real_environment": true,
+      "max_age_hours": 72,
       "tool": "Shopify Toxiproxy",
       "tool_version": "2.12.0",
-      "checks": [
-        "latency",
-        "jitter",
-        "connection_reset",
-        "timeout",
-        "bandwidth_limit",
-        "database_disconnect_mid_operation",
-        "recovery_is_bounded"
-      ],
-      "official_sources": [
-        "https://github.com/Shopify/toxiproxy"
-      ]
+      "checks": ["latency","jitter","connection_reset","timeout","bandwidth_limit","database_disconnect_mid_operation","recovery_is_bounded"],
+      "official_sources": ["https://github.com/Shopify/toxiproxy"]
     },
     "trace_progress_oracle": {
       "mandatory_for_production": true,
       "receipt": "trace-progress-oracle.json",
+      "real_environment": true,
+      "max_age_hours": 72,
       "standard": "OpenTelemetry",
-      "checks": [
-        "mission_trace_id",
-        "parent_child_span_correlation",
-        "job_task_effect_evidence_correlation",
-        "progress_signature_events",
-        "no_orphan_terminal_spans",
-        "no_unbounded_span_without_progress"
-      ],
-      "official_sources": [
-        "https://opentelemetry.io/docs/concepts/context-propagation/"
-      ]
+      "checks": ["mission_trace_id","parent_child_span_correlation","job_task_effect_evidence_correlation","progress_signature_events","no_orphan_terminal_spans","no_unbounded_span_without_progress"],
+      "official_sources": ["https://opentelemetry.io/docs/concepts/context-propagation/"]
     },
     "wordpress_forward_canary": {
       "mandatory_for_production": true,
       "receipt": "wordpress-forward-canary.json",
-      "tool": "WordPress Playground / WordPress nightly",
-      "checks": [
-        "latest_supported_passes",
-        "beta_boots_and_activates",
-        "nightly_boots_and_activates",
-        "schema_migration_survives",
-        "mcp_surface_survives"
-      ],
-      "official_sources": [
-        "https://wordpress.github.io/wordpress-playground/",
-        "https://wordpress.org/download/beta-nightly/"
-      ]
+      "real_environment": true,
+      "max_age_hours": 72,
+      "tool": "WordPress Playground / WordPress beta-nightly",
+      "tool_version": "@wp-playground/cli 3.1.48",
+      "checks": ["latest_supported_passes","beta_boots_and_activates","nightly_boots_and_activates","schema_migration_survives","mcp_surface_survives"],
+      "official_sources": ["https://wordpress.github.io/wordpress-playground/","https://wordpress.org/download/beta-nightly/"]
     },
     "reproducible_build": {
       "mandatory_for_production": true,
       "receipt": "reproducible-build.json",
-      "checks": [
-        "two_clean_builds_same_commit",
-        "normalized_archive_metadata",
-        "byte_identical_control_zip",
-        "byte_identical_browser_zip",
-        "manifest_and_sbom_identical"
-      ]
+      "real_environment": false,
+      "max_age_hours": 24,
+      "checks": ["two_clean_builds_same_commit","normalized_archive_metadata","byte_identical_control_zip","byte_identical_browser_zip","manifest_and_sbom_identical"]
     },
     "deterministic_replay": {
       "mandatory_for_production": true,
       "receipt": "deterministic-replay.json",
-      "checks": [
-        "durable_event_journal",
-        "replay_uses_recorded_external_observations",
-        "same_transition_sequence",
-        "same_logical_effects",
-        "same_final_verdict",
-        "divergence_is_explained"
-      ]
+      "real_environment": true,
+      "max_age_hours": 72,
+      "checks": ["durable_event_journal","replay_uses_recorded_external_observations","same_transition_sequence","same_logical_effects","same_final_verdict","divergence_is_explained"]
     }
   }
 }
