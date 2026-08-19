@@ -39,7 +39,8 @@ jobs:
     timeout-minutes: 20
     services:
       mysql:
-        image: mariadb:11.4
+        # mariadb:11.4 — multi-platform index pinned for reproducible CI.
+        image: mariadb:11.4@sha256:a794d9eb009e20de605858a11f32f63b4075cbd197c650436f0e3b457e4caed7
         env:
           MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: 'yes'
           MARIADB_DATABASE: prstudio_queue_test
