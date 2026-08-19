@@ -4,8 +4,9 @@
 The repository intentionally stores an UNSTAMPED/unbound identity because a
 commit cannot contain its own Git SHA. Official candidate builds must run this
 script before regenerating component integrity documents, testing and packaging.
-The script fails closed if the requested SHA is not the checkout HEAD or if it
-finds metadata already stamped for a different commit.
+The script fails closed if the requested SHA is not the checkout HEAD, if the
+checkout contains bytes outside that commit, or if metadata is already stamped
+for a different commit.
 """
 from __future__ import annotations
 
@@ -23,6 +24,11 @@ BROWSER = ROOT / "prstudio-unified-browser-agent"
 BUILD_INFO = BROWSER / "BUILD-INFO.json"
 EXECUTOR_META = BROWSER / "lib" / "executor-meta.js"
 SERVICE_WORKER = BROWSER / "service-worker.js"
+IDENTITY_PATHS = {
+    "prstudio-unified-browser-agent/BUILD-INFO.json",
+    "prstudio-unified-browser-agent/lib/executor-meta.js",
+    "prstudio-unified-browser-agent/service-worker.js",
+}
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
@@ -48,6 +54,26 @@ def git(*args: str) -> str:
     except (OSError, subprocess.SubprocessError) as exc:
         raise BuildIdentityError(f"git {' '.join(args)} failed: {exc}") from exc
     return result.stdout.strip()
+
+
+def git_paths(*args: str) -> set[str]:
+    output = git(*args)
+    return {line.strip() for line in output.splitlines() if line.strip()}
+
+
+def assert_workspace_identity_boundary(*, verify_only: bool) -> None:
+    tracked = git_paths("diff", "HEAD", "--name-only", "--")
+    untracked = git_paths("ls-files", "--others", "--exclude-standard")
+    if untracked:
+        fail("checkout contains untracked source bytes: " + ", ".join(sorted(untracked)))
+    expected = IDENTITY_PATHS if verify_only else set()
+    if tracked != expected:
+        fail(
+            "checkout tracked-diff boundary mismatch: expected "
+            + repr(sorted(expected))
+            + " got "
+            + repr(sorted(tracked))
+        )
 
 
 def normalize_source_sha(raw: str) -> str:
@@ -188,6 +214,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     sha = normalize_source_sha(args.source_sha)
+    assert_workspace_identity_boundary(verify_only=args.verify)
     epoch = source_epoch(sha)
     timestamp = iso_timestamp(epoch)
     build_id = f"prstudio-browser-1.0.0+git.{sha[:12]}"
@@ -195,6 +222,7 @@ def main() -> int:
         stamp_build_info(sha, timestamp, build_id)
         stamp_executor_meta(sha, timestamp, build_id)
         stamp_service_worker(sha)
+        assert_workspace_identity_boundary(verify_only=True)
     verify(sha, timestamp, build_id)
     mode = "verify" if args.verify else "stamp"
     print(f"PASS browser build identity {mode}: source_sha={sha} build_id={build_id} built_at={timestamp}")
