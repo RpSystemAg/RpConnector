@@ -5,6 +5,14 @@
 # must be corrected (for example with real WordPress stubs) rather than marking
 # its failures non-blocking.
 
+# PHPStan needs WordPress to say anything useful about a WordPress plugin.
+# Installed from the committed composer.lock, so the analysis is reproducible
+# and the supply-chain gate's "dependencies_locked" check stays satisfied.
+PRE_COMMANDS:
+  - command: composer install --no-interaction --no-progress --quiet
+    cwd: workspace
+    continue_if_failed: false
+
 APPLY_FIXES: none
 SHOW_ELAPSED_TIME: true
 FILEIO_REPORTER: false
@@ -22,7 +30,6 @@ ENABLE_LINTERS:
   - REPOSITORY_SECRETLINT
 
 REPOSITORY_SECRETLINT_DISABLE_ERRORS: false
-PHP_PHPSTAN_DISABLE_ERRORS: false
 MARKDOWN_MARKDOWNLINT_DISABLE_ERRORS: false
 
 EXCLUDED_DIRECTORIES:
