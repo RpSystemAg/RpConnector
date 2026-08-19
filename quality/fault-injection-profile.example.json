@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "real": false,
+  "environment_id": "REPLACE-WITH-REAL-STAGING-ID",
+  "instructions": "Copy outside the repository. Set real=true only for an isolated real staging environment. Every command is argv-only. exercise must exit 0 only when the product observes the injected failure safely; oracle must independently verify final state/no false success; recover must restore health.",
+  "scenarios": {
+    "database_disconnect": {
+      "inject": ["REPLACE", "DB-DISCONNECT", "ARGV"],
+      "exercise": ["REPLACE", "RUN-DURABLE-OPERATION-AND-EXPECT-SAFE-DB-FAILURE", "ARGV"],
+      "oracle": ["REPLACE", "VERIFY-NO-FALSE-SUCCESS-OR-DUPLICATE-EFFECT", "ARGV"],
+      "recover": ["REPLACE", "DB-RECONNECT", "ARGV"],
+      "post_recovery": ["REPLACE", "VERIFY-DURABLE-OPERATION-RECOVERS", "ARGV"]
+    },
+    "database_restart": {
+      "inject": ["REPLACE", "DB-RESTART-DURING-WORK", "ARGV"],
+      "exercise": ["REPLACE", "OBSERVE-LEASE-OR-JOB-RECOVERY", "ARGV"],
+      "oracle": ["REPLACE", "VERIFY-ONE-FINAL-EFFECT", "ARGV"],
+      "recover": ["REPLACE", "ENSURE-DB-HEALTHY", "ARGV"],
+      "post_recovery": ["REPLACE", "VERIFY-QUEUE-PROGRESS", "ARGV"]
+    },
+    "remote_timeout": {
+      "inject": ["REPLACE", "ROUTE-PROVIDER-TO-TIMEOUT-FAULT", "ARGV"],
+      "exercise": ["REPLACE", "RUN-REMOTE-OPERATION-EXPECT-TYPED-TIMEOUT", "ARGV"],
+      "oracle": ["REPLACE", "VERIFY-NO-SYNTHETIC-SUCCESS", "ARGV"],
+      "recover": ["REPLACE", "REMOVE-TIMEOUT-FAULT", "ARGV"],
+      "post_recovery": ["REPLACE", "VERIFY-REMOTE-OPERATION-RECOVERS", "ARGV"]
+    },
+    "remote_rate_limit": {
+      "inject": ["REPLACE", "ROUTE-PROVIDER-TO-429", "ARGV"],
+      "exercise": ["REPLACE", "RUN-REMOTE-OPERATION-EXPECT-RETRYABLE-429", "ARGV"],
+      "oracle": ["REPLACE", "VERIFY-BOUNDED-RETRY-AND-NO-DUPLICATION", "ARGV"],
+      "recover": ["REPLACE", "REMOVE-429-FAULT", "ARGV"],
+      "post_recovery": ["REPLACE", "VERIFY-RECOVERY", "ARGV"]
+    },
+    "remote_5xx": {
+      "inject": ["REPLACE", "ROUTE-PROVIDER-TO-5XX", "ARGV"],
+      "exercise": ["REPLACE", "RUN-REMOTE-OPERATION-EXPECT-RETRYABLE-5XX", "ARGV"],
+      "oracle": ["REPLACE", "VERIFY-NO-FALSE-SUCCESS", "ARGV"],
+      "recover": ["REPLACE", "REMOVE-5XX-FAULT", "ARGV"],
+      "post_recovery": ["REPLACE", "VERIFY-RECOVERY", "ARGV"]
+    },
+    "chrome_process_kill": {
+      "inject": ["REPLACE", "KILL-OWNED-CHROME-PROCESS", "ARGV"],
+      "exercise": ["REPLACE", "RUN-BROWSER-WORK-EXPECT-DISCONNECT-STATE", "ARGV"],
+      "oracle": ["REPLACE", "VERIFY-NO-BROWSER-FALSE-SUCCESS", "ARGV"],
+      "recover": ["REPLACE", "START-AND-REPAIR-OWNED-CHROME", "ARGV"],
+      "post_recovery": ["REPLACE", "VERIFY-BROWSER-WORK-RECOVERS", "ARGV"]
+    },
+    "extension_worker_suspend": {
+      "inject": ["REPLACE", "SUSPEND-OR-TERMINATE-MV3-WORKER", "ARGV"],
+      "exercise": ["REPLACE", "QUEUE-BROWSER-WORK-ACROSS-WORKER-RESTART", "ARGV"],
+      "oracle": ["REPLACE", "VERIFY-OWNERSHIP-AND-EXACTLY-ONCE-OUTCOME", "ARGV"],
+      "recover": ["REPLACE", "WAKE-EXTENSION-WORKER", "ARGV"],
+      "post_recovery": ["REPLACE", "VERIFY-WORKER-RECONCILIATION", "ARGV"]
+    },
+    "network_interruption": {
+      "inject": ["REPLACE", "INTERRUPT-STAGING-NETWORK-PATH", "ARGV"],
+      "exercise": ["REPLACE", "RUN-MCP-OR-REMOTE-WORK-EXPECT-BOUNDED-FAILURE", "ARGV"],
+      "oracle": ["REPLACE", "VERIFY-DURABLE-STATE-AND-NO-FALSE-SUCCESS", "ARGV"],
+      "recover": ["REPLACE", "RESTORE-NETWORK-PATH", "ARGV"],
+      "post_recovery": ["REPLACE", "VERIFY-QUEUED-WORK-RECOVERS", "ARGV"]
+    },
+    "process_kill_between_effect_and_checkpoint": {
+      "inject": ["REPLACE", "ARM-PROCESS-KILL-AT-EFFECT-CHECKPOINT-WINDOW", "ARGV"],
+      "exercise": ["REPLACE", "RUN-MUTATION-UNTIL-INJECTED-KILL", "ARGV"],
+      "oracle": ["REPLACE", "INDEPENDENTLY-READ-BACK-EFFECT-AND-JOB-STATE", "ARGV"],
+      "recover": ["REPLACE", "RESTART-WORKER", "ARGV"],
+      "post_recovery": ["REPLACE", "VERIFY-RECONCILIATION-WITHOUT-DUPLICATE-EFFECT", "ARGV"]
+    }
+  }
+}
