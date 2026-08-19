@@ -39,9 +39,67 @@ final class PRSTUDIO_UC_Procedural_Skills {
     }
 
     /** Learn only from independently verified capability completion. */
+
+    /**
+     * Confidence as a lower bound on the success rate, not a step counter.
+     *
+     * The previous formulas were min(0.99, 0.55 + 0.12 * successes) and
+     * min(0.99, 0.50 + 0.15 * successes). Both put a skill at 0.65-0.67 after a
+     * SINGLE verified success, and best_match() reuses anything at or above
+     * 0.50. So one sample was enough to make a recipe reusable, and observed
+     * failures did not lower the number at all -- they were recorded in
+     * failed_paths and then ignored by the score.
+     *
+     * arXiv:2608.17587 (Write, Execute, Refine, 18 Aug 2026) measured what that
+     * produces: skills authored from experience without repeated scored
+     * confirmation perform 8 to 11 points WORSE than using no skill at all.
+     * Advertising a recipe from n=1 is not neutral, it is negative.
+     *
+     * This is the Wilson score lower bound at 95%, which is the standard answer
+     * to "how much can one success tell you". It is deterministic, needs no new
+     * data, and behaves the way the evidence should:
+     *
+     *     1 success,  0 failures  ->  0.21   (was 0.67, now below the reuse bar)
+     *     5 successes, 0 failures ->  0.57   (reusable, on repeated confirmation)
+     *    10 successes, 0 failures ->  0.72
+     *    10 successes, 5 failures ->  0.42   (failures now actually cost)
+     *
+     * The reuse threshold in best_match() is untouched at 0.50. The bar did not
+     * move; the number being compared against it became honest.
+     *
+     * Caveat worth stating: failed_paths deduplicates by signature, so the
+     * failure term counts distinct failure modes rather than total failed
+     * trials. That makes this bound optimistic, not pessimistic, which is the
+     * direction to be careful about. It is still strictly better than the zero
+     * weight failures carried before.
+     *
+     * Nothing here can stop an execution. best_match() only annotates a
+     * response that has already run, so withholding a low-evidence recipe never
+     * blocks a mutation (LAW 1) and never prevents intent resolving to action
+     * (LAW 13).
+     *
+     * @param int $successes Verified successful observations.
+     * @param int $failures  Distinct observed failure signatures.
+     * @return float Lower bound in [0.0, 0.99].
+     */
+    public static function confidence(int $successes, int $failures): float {
+        $successes = max(0, $successes);
+        $failures  = max(0, $failures);
+        $n         = $successes + $failures;
+        if ($n <= 0) { return 0.0; }
+        $z  = 1.96;
+        $z2 = $z * $z;
+        $p  = $successes / $n;
+        $denominator = 1.0 + ($z2 / $n);
+        $centre      = $p + ($z2 / (2 * $n));
+        $margin      = $z * sqrt((($p * (1 - $p)) / $n) + ($z2 / (4 * $n * $n)));
+        $lower       = ($centre - $margin) / $denominator;
+        return round(max(0.0, min(0.99, $lower)), 4);
+    }
+
     public static function learn_verified_capability(string $capability,array $args,array $result,array $verification,string $job_id=''):array{
         if(empty($verification['ok']))return array('ok'=>false,'learned'=>false,'reason'=>'verification_required');$capability=self::key($capability,120);if(''===$capability)return array('ok'=>false,'learned'=>false,'reason'=>'capability_required');$id=self::skill_id('capability',$capability,$args);$fingerprint=self::fingerprint('capability',$capability,$args);
-        $r=self::mutate(static function(array &$state)use($id,$capability,$args,$result,$verification,$job_id,$fingerprint){$old=is_array($state['skills'][$id]??null)?$state['skills'][$id]:array();$count=(int)($old['success_count']??0)+1;$confidence=min(0.99,0.55+0.12*$count);$skill=array_merge($old,array('id'=>$id,'kind'=>'capability','name'=>$capability,'description'=>'Verified reusable procedure for capability '.$capability.'.','fingerprint'=>$fingerprint,'preconditions'=>array('suite_version'=>defined('PRSTUDIO_UC_VERSION')?PRSTUDIO_UC_VERSION:'','argument_keys'=>array_values(array_keys($args))),'procedure'=>array('steps'=>array(array('capability'=>$capability,'argument_shape'=>array_map(static fn($v)=>is_array($v)?'array':gettype($v),$args))),'verification_required'=>true),'last_result_signature'=>hash('sha256',PRSTUDIO_UC_Idempotency::canonical_json(self::clean($result))),'last_verifier'=>(string)($verification['verifier']??''),'last_job_id'=>$job_id,'success_count'=>$count,'confidence'=>round($confidence,3),'last_verified_gmt'=>gmdate('c'),'expires_gmt'=>gmdate('c',time()+90*86400),'failed_paths'=>array_values((array)($old['failed_paths']??array()))));$state['skills'][$id]=$skill;if(count($state['skills'])>self::MAX_SKILLS){uasort($state['skills'],static fn($a,$b)=>strcmp((string)($b['last_verified_gmt']??''),(string)($a['last_verified_gmt']??'')));$state['skills']=array_slice($state['skills'],0,self::MAX_SKILLS,true);}$state['metrics']['learned']=(int)($state['metrics']['learned']??0)+1;return array('ok'=>true,'learned'=>true,'skill'=>$skill);});if(is_array($r)&&is_array($r['skill']??null)){self::write_skill_md($r['skill']);PRSTUDIO_UC_Memory::movement('skill.learned',array('resource'=>$id,'capability'=>$capability,'outcome'=>'verified_procedure'));}return$r;
+        $r=self::mutate(static function(array &$state)use($id,$capability,$args,$result,$verification,$job_id,$fingerprint){$old=is_array($state['skills'][$id]??null)?$state['skills'][$id]:array();$count=(int)($old['success_count']??0)+1;$confidence=self::confidence($count,count((array)($old['failed_paths']??array())));$skill=array_merge($old,array('id'=>$id,'kind'=>'capability','name'=>$capability,'description'=>'Verified reusable procedure for capability '.$capability.'.','fingerprint'=>$fingerprint,'preconditions'=>array('suite_version'=>defined('PRSTUDIO_UC_VERSION')?PRSTUDIO_UC_VERSION:'','argument_keys'=>array_values(array_keys($args))),'procedure'=>array('steps'=>array(array('capability'=>$capability,'argument_shape'=>array_map(static fn($v)=>is_array($v)?'array':gettype($v),$args))),'verification_required'=>true),'last_result_signature'=>hash('sha256',PRSTUDIO_UC_Idempotency::canonical_json(self::clean($result))),'last_verifier'=>(string)($verification['verifier']??''),'last_job_id'=>$job_id,'success_count'=>$count,'confidence'=>round($confidence,3),'last_verified_gmt'=>gmdate('c'),'expires_gmt'=>gmdate('c',time()+90*86400),'failed_paths'=>array_values((array)($old['failed_paths']??array()))));$state['skills'][$id]=$skill;if(count($state['skills'])>self::MAX_SKILLS){uasort($state['skills'],static fn($a,$b)=>strcmp((string)($b['last_verified_gmt']??''),(string)($a['last_verified_gmt']??'')));$state['skills']=array_slice($state['skills'],0,self::MAX_SKILLS,true);}$state['metrics']['learned']=(int)($state['metrics']['learned']??0)+1;return array('ok'=>true,'learned'=>true,'skill'=>$skill);});if(is_array($r)&&is_array($r['skill']??null)){self::write_skill_md($r['skill']);PRSTUDIO_UC_Memory::movement('skill.learned',array('resource'=>$id,'capability'=>$capability,'outcome'=>'verified_procedure'));}return$r;
     }
 
     /** Record failed paths so the next plan can avoid retrying the same dead end. */
@@ -53,7 +111,7 @@ final class PRSTUDIO_UC_Procedural_Skills {
     /** Learn a complete verified Browser Agent task including its successful step sequence. */
     public static function learn_verified_browser_task(array $task,array $result,array $verification):array{
         if(empty($verification['ok']))return array('ok'=>false,'learned'=>false,'reason'=>'verification_required');$action=self::key((string)($task['action']??'browser-task'),120);$args=is_array($task['arguments']??null)?$task['arguments']:array();$steps=array_values(array_filter((array)($args['steps']??array()),'is_array'));if(!$steps)$steps=array(array('action'=>$action,'arguments'=>array_keys($args)));$id=self::skill_id('browser',$action,$args);$fingerprint=self::fingerprint('browser',$action,$args);
-        $r=self::mutate(static function(array &$state)use($task,$result,$verification,$action,$args,$steps,$id,$fingerprint){$old=is_array($state['skills'][$id]??null)?$state['skills'][$id]:array();$count=(int)($old['success_count']??0)+1;$skill=array_merge($old,array('id'=>$id,'kind'=>'browser','name'=>$action,'description'=>'Verified Browser Agent procedure for '.$action.'.','fingerprint'=>$fingerprint,'preconditions'=>array('suite_version'=>defined('PRSTUDIO_UC_VERSION')?PRSTUDIO_UC_VERSION:'','expected_origin'=>$args['expectedOrigin']??$args['expected_origin']??''),'procedure'=>array('steps'=>self::clean(array_slice($steps,0,250)),'verification_required'=>true,'strict_tab_ownership'=>true),'last_result_signature'=>hash('sha256',PRSTUDIO_UC_Idempotency::canonical_json(self::clean($result))),'last_verifier'=>(string)($verification['verifier']??''),'last_task_id'=>(string)($task['task_uuid']??''),'success_count'=>$count,'confidence'=>round(min(0.99,0.50+0.15*$count),3),'last_verified_gmt'=>gmdate('c'),'expires_gmt'=>gmdate('c',time()+30*86400),'failed_paths'=>array_values((array)($old['failed_paths']??array()))));$state['skills'][$id]=$skill;$state['metrics']['learned']=(int)($state['metrics']['learned']??0)+1;return array('ok'=>true,'learned'=>true,'skill'=>$skill);});if(is_array($r)&&is_array($r['skill']??null)){self::write_skill_md($r['skill']);PRSTUDIO_UC_Memory::movement('skill.browser_learned',array('resource'=>$id,'action'=>$action,'outcome'=>'verified_procedure'));}return$r;
+        $r=self::mutate(static function(array &$state)use($task,$result,$verification,$action,$args,$steps,$id,$fingerprint){$old=is_array($state['skills'][$id]??null)?$state['skills'][$id]:array();$count=(int)($old['success_count']??0)+1;$skill=array_merge($old,array('id'=>$id,'kind'=>'browser','name'=>$action,'description'=>'Verified Browser Agent procedure for '.$action.'.','fingerprint'=>$fingerprint,'preconditions'=>array('suite_version'=>defined('PRSTUDIO_UC_VERSION')?PRSTUDIO_UC_VERSION:'','expected_origin'=>$args['expectedOrigin']??$args['expected_origin']??''),'procedure'=>array('steps'=>self::clean(array_slice($steps,0,250)),'verification_required'=>true,'strict_tab_ownership'=>true),'last_result_signature'=>hash('sha256',PRSTUDIO_UC_Idempotency::canonical_json(self::clean($result))),'last_verifier'=>(string)($verification['verifier']??''),'last_task_id'=>(string)($task['task_uuid']??''),'success_count'=>$count,'confidence'=>round(self::confidence($count,count((array)($old['failed_paths']??array()))),3),'last_verified_gmt'=>gmdate('c'),'expires_gmt'=>gmdate('c',time()+30*86400),'failed_paths'=>array_values((array)($old['failed_paths']??array()))));$state['skills'][$id]=$skill;$state['metrics']['learned']=(int)($state['metrics']['learned']??0)+1;return array('ok'=>true,'learned'=>true,'skill'=>$skill);});if(is_array($r)&&is_array($r['skill']??null)){self::write_skill_md($r['skill']);PRSTUDIO_UC_Memory::movement('skill.browser_learned',array('resource'=>$id,'action'=>$action,'outcome'=>'verified_procedure'));}return$r;
     }
 
     /** Return the best non-stale reusable recipe for this capability/action shape. */

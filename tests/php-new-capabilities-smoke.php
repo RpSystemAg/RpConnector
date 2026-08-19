@@ -95,8 +95,16 @@ try {
     ok(!empty($failure['recorded']),'procedural skill records failed path');
     $search=PRSTUDIO_UC_Procedural_Skills::search(['query'=>'demo.action']);
     ok(1===(int)$search['count'] && 1===(int)$search['items'][0]['failed_path_count'],'progressive skill search includes failed-path count');
+    // One verified success no longer qualifies a recipe for reuse. Confidence is
+    // a Wilson lower bound over successes and observed failure modes, so a
+    // single sample scores ~0.09 against a 0.5 reuse bar. See
+    // tests/php-procedural-skill-confidence-smoke.php and arXiv:2608.17587,
+    // which measured agent-authored skills performing 8-11 points worse than no
+    // skill when they are trusted from n=1.
+    ok(null===PRSTUDIO_UC_Procedural_Skills::best_match('capability','demo.action',['x'=>1]),'planner refuses a recipe backed by one sample');
+    for($i=0;$i<6;$i++){PRSTUDIO_UC_Procedural_Skills::learn_verified_capability('demo.action',['x'=>1],['ok'=>true],['ok'=>true,'verifier'=>'readback'],'job-'.($i+2));}
     $best=PRSTUDIO_UC_Procedural_Skills::best_match('capability','demo.action',['x'=>1]);
-    ok(is_array($best) && !empty($best['procedure']['verification_required']),'planner can reuse only a non-stale verified recipe');
+    ok(is_array($best) && !empty($best['procedure']['verification_required']),'planner can reuse a repeatedly confirmed non-stale verified recipe');
     $inv=PRSTUDIO_UC_Procedural_Skills::invalidate(['id'=>$learned['skill']['id'],'reason'=>'test-change']);
     ok(!is_wp_error($inv) && !empty($inv['invalidated']),'skill invalidation');
     ok(null===PRSTUDIO_UC_Procedural_Skills::best_match('capability','demo.action',['x'=>1]),'stale skill is not reused');
