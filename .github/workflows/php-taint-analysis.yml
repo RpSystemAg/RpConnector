@@ -1,0 +1,116 @@
+name: PHP taint and dataflow security
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '29 2 * * 4'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: php-taint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  psalm-and-semgrep:
+    name: Psalm 6.16.1 + Semgrep 1.171.0 taint mode
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, curl
+          tools: composer
+          coverage: none
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.13'
+
+      - name: Materialize immutable WordPress model
+        run: |
+          composer validate --strict --no-check-publish
+          composer install --no-interaction --no-progress --no-scripts --no-plugins --prefer-dist
+
+      - name: Download Psalm 6.16.1 and verify the GitHub release asset digest
+        env:
+          PSALM_VERSION: '6.16.1'
+        run: |
+          set -euo pipefail
+          release=$(curl --fail --silent --show-error \
+            -H 'Accept: application/vnd.github+json' \
+            "https://api.github.com/repos/vimeo/psalm/releases/tags/${PSALM_VERSION}")
+          url=$(jq -r '.assets[] | select(.name=="psalm.phar") | .browser_download_url' <<<"$release")
+          digest=$(jq -r '.assets[] | select(.name=="psalm.phar") | .digest // empty' <<<"$release")
+          test -n "$url"
+          test -n "$digest"
+          test "${digest%%:*}" = 'sha256'
+          curl --fail --location --silent --show-error "$url" -o /tmp/psalm.phar
+          actual="sha256:$(sha256sum /tmp/psalm.phar | awk '{print $1}')"
+          test "$actual" = "$digest"
+          php /tmp/psalm.phar --version | tee /tmp/psalm-version.txt
+          grep -F "$PSALM_VERSION" /tmp/psalm-version.txt
+
+      - name: Psalm security dataflow over the production PHP surface
+        run: |
+          set +e
+          php /tmp/psalm.phar \
+            --config=psalm-taint.xml \
+            --taint-analysis \
+            --no-cache \
+            --output-format=json \
+            > /tmp/psalm-taint.json 2> /tmp/psalm-taint.stderr
+          code=$?
+          set -e
+          echo "$code" > /tmp/psalm-taint.exit
+          python3 tests/psalm-taint-verdict.py
+
+      - name: Install exact Semgrep dataflow engine
+        run: |
+          python -m pip install --disable-pip-version-check "semgrep==1.171.0"
+          test "$(semgrep --version)" = '1.171.0'
+
+      - name: Prove the custom taint rules can detect an intentionally unsafe flow
+        run: |
+          cat >/tmp/rp-taint-positive.php <<'PHP'
+          <?php
+          function proof($request, $wpdb) {
+              $value = $request->get_param('id');
+              $wpdb->query('SELECT * FROM x WHERE id=' . $value);
+              wp_remote_get($request->get_param('url'));
+          }
+          PHP
+          set +e
+          semgrep --config quality/semgrep-rpconnector-taint.yml --json /tmp/rp-taint-positive.php >/tmp/semgrep-selftest.json
+          set -e
+          count=$(jq '.results | length' /tmp/semgrep-selftest.json)
+          test "$count" -ge 2
+
+      - name: Semgrep WordPress/MCP source-to-sink analysis (blocking)
+        run: |
+          semgrep \
+            --config quality/semgrep-rpconnector-taint.yml \
+            --error \
+            --json-output=/tmp/semgrep-taint.json \
+            prstudio-unified-control
+
+      - name: Preserve taint evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: php-taint-analysis-${{ github.sha }}
+          path: |
+            /tmp/psalm-taint.json
+            /tmp/psalm-taint.stderr
+            /tmp/psalm-taint.exit
+            /tmp/psalm-version.txt
+            /tmp/semgrep-taint.json
+            /tmp/semgrep-selftest.json
+          if-no-files-found: warn
+          retention-days: 30
