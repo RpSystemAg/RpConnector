@@ -15,9 +15,9 @@ concurrency:
 
 jobs:
   build:
-    name: Build, SBOM, checksum and provenance
+    name: Build, SBOM, vulnerability scan, checksum and provenance
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
     permissions:
       contents: read
       id-token: write
@@ -62,21 +62,62 @@ jobs:
           test -s dist/sbom.cdx.json
           jq -e '.bomFormat == "CycloneDX" and .specVersion == "1.6" and (.components | length > 2)' dist/sbom.cdx.json
 
-      - name: Package build artifacts and checksums
+      - name: Package release candidates
         run: |
+          set -euo pipefail
           mkdir -p dist
           sha=$(git rev-parse --short HEAD)
           zip -rq "dist/prstudio-unified-browser-agent-${sha}.zip" prstudio-unified-browser-agent -x '*.claude*'
           zip -rq "dist/prstudio-unified-control-${sha}.zip" prstudio-unified-control
-          sha256sum dist/*.zip dist/sbom.cdx.json dist/supply-chain-source.json > dist/SHA256SUMS
+          test -s "dist/prstudio-unified-browser-agent-${sha}.zip"
+          test -s "dist/prstudio-unified-control-${sha}.zip"
+
+      - name: Exact-build HIGH/CRITICAL vulnerability scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0 / Trivy 0.70.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: false
+          exit-code: '1'
+          format: json
+          output: dist/trivy-vulnerabilities.json
+
+      - name: Freeze checksums after all static build outputs exist
+        run: |
+          set -euo pipefail
+          test -s dist/trivy-vulnerabilities.json
+          sha256sum \
+            dist/*.zip \
+            dist/sbom.cdx.json \
+            dist/supply-chain-source.json \
+            dist/trivy-vulnerabilities.json \
+            > dist/SHA256SUMS
           sha256sum --check --strict dist/SHA256SUMS
 
-      - name: Attest complete build provenance
+      - name: Attest exact immutable build subjects
+        id: provenance
         uses: actions/attest-build-provenance@ef244123eb79f2f7a7e75d99086184180e6d0018 # v1
         with:
-          subject-path: 'dist/*'
+          subject-path: |
+            dist/*.zip
+            dist/sbom.cdx.json
+            dist/supply-chain-source.json
+            dist/trivy-vulnerabilities.json
+            dist/SHA256SUMS
 
-      - name: Upload immutable release candidates
+      - name: Preserve the signed provenance bundle beside the release
+        env:
+          BUNDLE_PATH: ${{ steps.provenance.outputs.bundle-path }}
+        run: |
+          set -euo pipefail
+          test -n "$BUNDLE_PATH"
+          test -s "$BUNDLE_PATH"
+          cp "$BUNDLE_PATH" dist/provenance.bundle.jsonl
+          test -s dist/provenance.bundle.jsonl
+
+      - name: Upload self-verifying release candidate
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: prstudio-build-${{ github.sha }}
@@ -85,5 +126,7 @@ jobs:
             dist/SHA256SUMS
             dist/sbom.cdx.json
             dist/supply-chain-source.json
+            dist/trivy-vulnerabilities.json
+            dist/provenance.bundle.jsonl
           if-no-files-found: error
           retention-days: 30
