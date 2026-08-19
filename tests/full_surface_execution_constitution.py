@@ -53,6 +53,8 @@ def assert_failure_output_contract(gate: str) -> None:
         "worker: FAILED after recovery",
         "receipt FAILURE detected",
         "prefix FAIL token with exit zero",
+        "SKIP dependency unavailable",
+        "worker SKIPPED runtime path",
     ):
         if pattern.search(sample) is None:
             fail(f"failure-output matcher accepts explicit failure marker: {sample!r}")
@@ -124,6 +126,7 @@ def main() -> int:
         '"direct_execution_requires_syscall_evidence": True',
         '"failed_process_trace_cannot_count_data_execution": True',
         '"failure_output_with_zero_exit_is_failure": True',
+        '"skip_output_with_zero_exit_is_failure": True',
         '"required_execution_percent": 100.0',
         "exact_100 = executed_ok == total_surface",
     )
@@ -168,6 +171,7 @@ def main() -> int:
     print("direct_runtime_requires_syscall_evidence=true")
     print("failed_process_trace_counts=false")
     print("zero_exit_failure_output_counts=false")
+    print("zero_exit_skip_output_counts=false")
     print("independent_enterprise_crosscheck=true")
     print("required_execution_percent=100")
     print("blocker_bypass=false")
