@@ -15,6 +15,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  immutable-inputs:
+    name: Production immutable input audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Block floating Actions, containers and package inputs
+        run: python tests/production-supply-chain-source.py --strict
+
   actionlint:
     name: actionlint 1.7.12
     runs-on: ubuntu-latest
