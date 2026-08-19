@@ -1191,18 +1191,48 @@ final class PRSTUDIO_UC_Store {
 
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
 	public static function dead_letter_job( string $job_uuid, array $error, string $failure_class = 'exhausted', string $lease_token = '' ): bool {
-		global $wpdb;$job=self::get_job($job_uuid);if(!$job)return false;$snapshot=$job;unset($snapshot['lease_token']);
-		$wpdb->replace(self::dead_letters_table(),array('job_uuid'=>$job_uuid,'mission_id'=>(string)($job['mission_id']??'')?:null,'capability'=>(string)($job['capability']??'')?:null,'failure_class'=>sanitize_key($failure_class),'error'=>self::encode($error),'job_snapshot'=>self::encode($snapshot),'created_gmt'=>self::now()));
-		$where=array('job_uuid'=>$job_uuid,'status'=>(string)$job['status']);$where_formats=array('%s','%s');if(''!==$lease_token){$where['lease_token']=$lease_token;$where_formats[]='%s';}
-		$updated=$wpdb->update(self::jobs_table(),array('status'=>'DEAD_LETTER','failure_class'=>sanitize_key($failure_class),'error'=>self::encode($error),'lease_token'=>null,'lease_expires_gmt'=>null,'worker_id'=>null,'heartbeat_gmt'=>null,'updated_gmt'=>self::now(),'completed_gmt'=>self::now()),$where,array('%s','%s','%s','%s','%s','%s','%s','%s','%s'),$where_formats);
-		if(1!==(int)$updated)return false;self::event('job:'.$job_uuid,'job.dead_letter',array('failure_class'=>$failure_class));return true;
+		global $wpdb;
+		$wpdb->query( 'START TRANSACTION' );
+		try {
+			$locked = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . self::jobs_table() . ' WHERE job_uuid = %s LIMIT 1 FOR UPDATE', $job_uuid ), ARRAY_A );
+			if ( ! is_array( $locked ) ) { $wpdb->query( 'COMMIT' ); return false; }
+			if ( '' !== $lease_token && ! hash_equals( (string) ( $locked['lease_token'] ?? '' ), $lease_token ) ) { $wpdb->query( 'COMMIT' ); return false; }
+			$job = self::hydrate_job( $locked );
+			$failure_class = sanitize_key( $failure_class );
+			$now = self::now();
+			$where = array( 'id'=>(int)$locked['id'], 'status'=>(string)$locked['status'] );
+			$where_formats = array( '%d','%s' );
+			if ( '' !== $lease_token ) { $where['lease_token']=$lease_token; $where_formats[]='%s'; }
+			$updated = $wpdb->update(
+				self::jobs_table(),
+				array( 'status'=>'DEAD_LETTER', 'failure_class'=>$failure_class, 'error'=>self::encode($error), 'lease_token'=>null, 'lease_expires_gmt'=>null, 'worker_id'=>null, 'heartbeat_gmt'=>null, 'updated_gmt'=>$now, 'completed_gmt'=>$now ),
+				$where,
+				array( '%s','%s','%s','%s','%s','%s','%s','%s','%s' ),
+				$where_formats
+			);
+			if ( 1 !== (int) $updated ) { $wpdb->query( 'ROLLBACK' ); return false; }
+			$terminal = self::get_job( $job_uuid );
+			if ( ! is_array( $terminal ) ) { $wpdb->query( 'ROLLBACK' ); return false; }
+			$snapshot = $terminal; unset( $snapshot['lease_token'] );
+			$written = $wpdb->replace(
+				self::dead_letters_table(),
+				array( 'job_uuid'=>$job_uuid, 'mission_id'=>(string)($terminal['mission_id']??'')?:null, 'capability'=>(string)($terminal['capability']??'')?:null, 'failure_class'=>$failure_class, 'error'=>self::encode($error), 'job_snapshot'=>self::encode($snapshot), 'created_gmt'=>$now )
+			);
+			if ( false === $written ) { $wpdb->query( 'ROLLBACK' ); return false; }
+			if ( false === $wpdb->query( 'COMMIT' ) ) { $wpdb->query( 'ROLLBACK' ); return false; }
+		} catch ( Throwable $e ) {
+			$wpdb->query( 'ROLLBACK' );
+			throw $e;
+		}
+		self::event( 'job:' . $job_uuid, 'job.dead_letter', array( 'failure_class'=>$failure_class ) );
+		return true;
 	}
 
 // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
 
 	public static function upsert_schedule( string $playbook, string $objective, array $context, int $interval_seconds, string $next_run_gmt = '', string $schedule_uuid = '' ): array {
 		global $wpdb;$playbook=sanitize_key($playbook);$schedule_uuid=preg_match('/^[a-f0-9-]{20,64}$/i',$schedule_uuid)?strtolower($schedule_uuid):self::uuid();$interval_seconds=max(300,min(30*DAY_IN_SECONDS,$interval_seconds));$next=strtotime($next_run_gmt.' UTC');if(false===$next){$next=class_exists('PRSTUDIO_UC_Schedule_Clock')?PRSTUDIO_UC_Schedule_Clock::initial_run($context,$interval_seconds)->getTimestamp():time()+60;}$now=self::now();
-		// phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.NotPrepared -- table/column identifier only, from a fixed helper or the identifier() allowlist + SHOW TABLES check -- never external input; values are parameterized via $wpdb->prepare()
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
 		$existing=$wpdb->get_row($wpdb->prepare('SELECT * FROM '.self::schedules_table().' WHERE schedule_uuid=%s LIMIT 1',$schedule_uuid),ARRAY_A);$data=array('playbook'=>$playbook,'objective'=>sanitize_text_field($objective),'context'=>self::encode($context),'interval_seconds'=>$interval_seconds,'next_run_gmt'=>gmdate('Y-m-d H:i:s',$next),'enabled'=>1,'updated_gmt'=>$now);
 		if(is_array($existing)){$wpdb->update(self::schedules_table(),$data,array('schedule_uuid'=>$schedule_uuid));}else{$data['schedule_uuid']=$schedule_uuid;$data['created_gmt']=$now;$wpdb->insert(self::schedules_table(),$data);}
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
