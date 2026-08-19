@@ -18,6 +18,11 @@ final class PRSTUDIO_UC_Evidence_Engine {
         return $default;
     }
 
+    private static function verification_count( $value ): int {
+        if ( is_bool( $value ) ) { return $value ? 1 : 0; }
+        return self::count_value( $value, 0 );
+    }
+
     private static function sources( $value ): array {
         if ( ! is_array( $value ) ) { return array(); }
         $sources = array();
@@ -36,17 +41,18 @@ final class PRSTUDIO_UC_Evidence_Engine {
     }
 
     public static function receipt(array $cap,array $result,array $context=array()):array{
+        $verified = self::verification_count( $context['verified'] ?? 0 );
         $counts=array(
             'requested'=>self::count_value($context['requested']??1,1),
             'processed'=>self::count_value($result['processed']??$result['count']??$result['totals']['products']??1,1),
             'changed'=>self::count_value($result['changed']??$result['affected_rows']??0,0),
-            'verified'=>self::count_value($context['verified']??0,0),
+            'verified'=>$verified,
             'failed'=>self::count_value($result['failed']??$result['error_count']??0,0),
             'skipped'=>self::count_value($result['skipped']??0,0),
             'memory_reused'=>self::count_value($context['memory_reused']??$result['memory']['reused_count']??0,0),
         );
         $safe=class_exists('PRSTUDIO_UC_Memory')?PRSTUDIO_UC_Memory::redact($result):$result;
         $capability = is_string( $cap['id'] ?? null ) && 1 === preg_match( '//u', $cap['id'] ) ? $cap['id'] : '';
-        return array('capability'=>$capability,'counts'=>$counts,'evidence_hash'=>hash('sha256',self::evidence_json($safe)),'sources'=>self::sources($context['sources']??array()),'verified'=>(bool)($context['verified']??false),'created_at'=>gmdate('c'));
+        return array('capability'=>$capability,'counts'=>$counts,'evidence_hash'=>hash('sha256',self::evidence_json($safe)),'sources'=>self::sources($context['sources']??array()),'verified'=>$verified > 0,'created_at'=>gmdate('c'));
     }
 }
