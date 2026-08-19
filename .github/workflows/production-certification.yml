@@ -48,6 +48,8 @@ jobs:
             tests/production-wordpress-lifecycle-receipt.py \
             tests/production-workflow-evidence.py \
             tests/production-supply-chain-source.py \
+            tests/production-supply-chain-release.py \
+            tests/production-supply-chain-selftest.py \
             tests/production-documentation-claims.py \
             tests/generate-production-sbom.py \
             tests/collect-production-evidence.py \
@@ -55,6 +57,9 @@ jobs:
 
       - name: Production certifier must reject manufactured green evidence
         run: python tests/production-readiness-certifier-selftest.py
+
+      - name: Supply-chain verifier must reject manufactured green evidence
+        run: python tests/production-supply-chain-selftest.py
 
       - name: Production test-plan structure must be honest and complete
         run: python tests/production-test-plan-audit.py
@@ -94,7 +99,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: python tests/collect-production-evidence.py --commit "$GITHUB_SHA" --strict
 
-      - name: Convert exact-SHA workflow jobs into static, platform and supply-chain receipts
+      - name: Convert exact-SHA workflow jobs into static and platform receipts
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: python tests/production-workflow-evidence.py --commit "$GITHUB_SHA" --strict
