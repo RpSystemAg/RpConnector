@@ -19,6 +19,7 @@ CONSTITUTIONS = (
 )
 GATE = ROOT / ".github" / "scripts" / "full-surface-execution.py"
 WORKFLOW = ROOT / ".github" / "workflows" / "full-surface-execution.yml"
+ENTERPRISE_WORKFLOW = ROOT / ".github" / "workflows" / "enterprise-verification.yml"
 INVENTORY_TEST = ROOT / "tests" / "validate-test-inventory.py"
 LEGACY_BASELINE = ROOT / "tests" / "test-inventory-baseline.json"
 
@@ -55,12 +56,13 @@ def main() -> int:
 
     if LEGACY_BASELINE.exists():
         fail("legacy test-inventory baseline reintroduced")
-    for path in (GATE, WORKFLOW, INVENTORY_TEST):
+    for path in (GATE, WORKFLOW, ENTERPRISE_WORKFLOW, INVENTORY_TEST):
         if not path.is_file():
             fail(f"missing enforcement file {path.relative_to(ROOT)}")
 
     gate = GATE.read_text(encoding="utf-8", errors="replace")
     workflow = WORKFLOW.read_text(encoding="utf-8", errors="replace")
+    enterprise = ENTERPRISE_WORKFLOW.read_text(encoding="utf-8", errors="replace")
     inventory = INVENTORY_TEST.read_text(encoding="utf-8", errors="replace")
 
     for forbidden in (
@@ -79,6 +81,8 @@ def main() -> int:
     gate_requirements = (
         '["git", "ls-files", "-z"]',
         'TEST_ROOTS = (Path("tests"), Path("prstudio-unified-browser-agent/tests"))',
+        "def source_kind",
+        'first.startswith("#!")',
         '"php", "-l"',
         '"node", "--check"',
         "py_compile.compile",
@@ -87,7 +91,10 @@ def main() -> int:
         "yaml.safe_load_all",
         "ET.parse",
         '"strace"',
+        "def successful_runtime_evidence",
+        'result["trace_evidence"] = evidence',
         '"parse_does_not_count_as_execution": True',
+        '"direct_execution_requires_syscall_evidence": True',
         '"required_execution_percent": 100.0',
         "exact_100 = executed_ok == total_surface",
     )
@@ -99,6 +106,7 @@ def main() -> int:
         "push:",
         "pull_request:",
         "python .github/scripts/full-surface-execution.py",
+        ".requirements.direct_execution_requires_syscall_evidence == true",
         ".counts.syntax_targets == .counts.syntax_passed",
         ".counts.total_test_surface_files == .counts.real_executed_files",
         ".counts.execution_percent == 100",
@@ -108,12 +116,24 @@ def main() -> int:
         if fragment not in workflow:
             fail(f"full-surface workflow missing blocking assertion {fragment!r}")
 
+    enterprise_requirements = (
+        "push:",
+        "pull_request:",
+        "python3 tests/full_surface_execution_constitution.py",
+    )
+    for fragment in enterprise_requirements:
+        if fragment not in enterprise:
+            fail(f"enterprise verification missing independent constitution check {fragment!r}")
+
     print("FULL_SURFACE_EXECUTION_CONSTITUTION: PASS")
     print("laws_11_12_13_present_in_all_entry_points=true")
     print("allowlist=false")
     print("helper_exemption=false")
     print("baseline=false")
     print("parse_only_execution=false")
+    print("shebang_scripts_included=true")
+    print("direct_runtime_requires_syscall_evidence=true")
+    print("independent_enterprise_crosscheck=true")
     print("required_execution_percent=100")
     print("blocker_bypass=false")
     print("human_intent_is_entrypoint=true")
