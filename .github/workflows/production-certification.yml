@@ -37,10 +37,14 @@ jobs:
         run: |
           python -m py_compile \
             tests/production-readiness-certifier.py \
+            tests/production-readiness-certifier-selftest.py \
             tests/production-source-integrity.py \
             tests/production-test-plan-audit.py \
             tests/production-h24-soak.py \
             tests/atomic-capability-assurance.py
+
+      - name: Production certifier must reject manufactured green evidence
+        run: python tests/production-readiness-certifier-selftest.py
 
       - name: Production test-plan structure must be honest and complete
         run: python tests/production-test-plan-audit.py
