@@ -29,6 +29,8 @@ jobs:
         run: python3 tests/runtime-state-model-check.py
       - name: One-guard constitution
         run: python3 tests/one_guard_constitution.py
+      - name: Full-surface execution constitution
+        run: python3 tests/full_surface_execution_constitution.py
 
   php-runtime-matrix:
     name: PHP ${{ matrix.php }} runtime
