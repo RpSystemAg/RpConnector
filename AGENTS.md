@@ -14,7 +14,8 @@ LAW 9 — THE TOOLS/LIST SURFACE NEVER EXCEEDS 5,000 TOKENS.
 LAW 10 — NO EXCLUSIONS, NO DEFERRAL, NO PARTIAL ACCEPTANCE.  
 LAW 11 — FULL TEST/EXECUTION SURFACE MUST EXECUTE AT 100 PERCENT.  
 LAW 12 — BLOCKERS TRIGGER STUDY AND REMEDIATION; THEY NEVER AUTHORIZE BYPASS OR STOP.  
-LAW 13 — HUMAN INTENT MUST RESOLVE TO ACTION, NOT INTERNAL ENCYCLOPEDIA.
+LAW 13 — HUMAN INTENT MUST RESOLVE TO ACTION, NOT INTERNAL ENCYCLOPEDIA.  
+LAW 14 — ENTERPRISE CAPABILITY CONTRACT MIGRATION HAS ZERO BLOCKED COMPLETION STATES.
 
 ### Law 9 in full
 
@@ -164,6 +165,40 @@ Certification must include user-level natural-language scenarios that begin from
 what a human would actually type and end with independently observed requested
 effects. A hidden direct call that works only when an engineer already knows the
 internal invocation is not evidence that the user-facing action works.
+
+### Law 14 in full
+
+This law applies to the `ENTERPRISE CAPABILITY CONTRACT MIGRATION` program and to
+any successor pass whose purpose is to make capability/tool/action contracts
+enterprise-grade.
+
+A capability selected into the current migration batch has exactly one allowed
+completion state: `VERIFIED`. `BLOCKED`, `PARTIAL`, `DEFERRED`, `N/A`,
+`KNOWN LIMITATION`, backlog/follow-up labels, or advancing to the next capability
+because the current one lacks an executor, schema, tests, documentation, clear
+semantics, or an immediately obvious implementation are forbidden completion
+paths.
+
+Missing handlers, generic schemas, schema/runtime mismatches, unclear return
+shapes, legacy behavior, absent tests, stale generated artifacts, incomplete
+error contracts and documentation gaps are defects to investigate and remediate,
+not reasons to move the migration cursor. The required loop is the Laws 10 and
+12 loop: trace the actual runtime, search current authoritative documentation,
+recover intent from canonical code/history/tests where necessary, implement or
+extend the real path, test it, observe it and repeat until the selected
+capability is enterprise-grade and verified.
+
+The migration cursor is pinned to the current batch until every selected
+capability is verified. No next batch may begin, no tracker metric may count a
+selected capability as completed, and no batch may be reported closed while one
+of its selected capabilities is unresolved.
+
+If a higher-priority platform/system constraint that cannot be changed from this
+repository prevents a concrete verification step, the batch remains open and
+the affected capability remains current and incomplete. That condition may be
+described as an unresolved external technical constraint for evidence purposes,
+but it must not be recorded as a `BLOCKED` migration status and must not advance
+the migration cursor. There is no repository-local bypass to this law.
 
 ## Runtime invariant
 
