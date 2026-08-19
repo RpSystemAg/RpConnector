@@ -150,7 +150,17 @@ jobs:
         run: node .github/scripts/check-mcp-tool-drift.mjs
       - name: BUILD-INFO.json capability/tool count drift check
         run: node .github/scripts/check-build-info-counts.mjs
-      - name: WordPress Plugin Check (blocking)
+      - name: WordPress Plugin Check full scan
+        # The upstream action's result processor is all-or-nothing: any ERROR
+        # fails the step, but this repository already had a measured backlog
+        # before the hardening merge accidentally made that processor blocking.
+        # Let the collector finish so the next step can apply the exact ratchet;
+        # a missing/malformed result still fails there.
+        continue-on-error: true
         uses: wordpress/plugin-check-action@10857da14b6c2246d15402b3e69f777edcf8c12e # v1.1.8 line
         with:
           build-dir: './prstudio-unified-control'
+      - name: WordPress Plugin Check ERROR ratchet (blocking)
+        # Baseline is per file + error code. Existing debt may shrink, but any
+        # new code/file key or increased count fails the job.
+        run: python3 tests/validate-plugin-check-ratchet.py "$RUNNER_TEMP/plugin-check-results.txt"
