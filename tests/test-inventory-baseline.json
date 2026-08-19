@@ -1,34 +1,4 @@
 {
   "_comment": "Suites in tests/ that no workflow executes. This list may only shrink. See validate-test-inventory.py for why it exists.",
-  "unexecuted": [
-    "browser-orchestrator-v3-single-file.php",
-    "browser-protocol-single-file.php",
-    "canary-engine-single-file.php",
-    "database-engine-v3-single-file.php",
-    "domain-data-storage-single-file.php",
-    "evidence-engine-single-file.php",
-    "exhaustive-checkpoint.py",
-    "file-engine-single-file.php",
-    "idempotency-single-file.php",
-    "impact-engine-single-file.php",
-    "performance-budget-single-file.php",
-    "php-bootstrap-fastlane-benchmark.php",
-    "php-database-querycount-benchmark.php",
-    "php-mcp-browser-sync-budget-smoke.php",
-    "php-mcp-legacy-protocol-surface-smoke.php",
-    "php-mcp-operator-bootstrap-smoke.php",
-    "php-pre-mutation-routing-smoke.php",
-    "php-prstudio-flow-smoke.php",
-    "php-scheduler-topology-v17-smoke.php",
-    "php-suite-latency-runtime-smoke.php",
-    "php-universal-execution-benchmark.php",
-    "php-wait-channel-lost-wakeup-smoke.php",
-    "policy-engine-single-file.php",
-    "request-guard-single-file.php",
-    "risk-engine-v3-single-file.php",
-    "schema-validator-single-file.php",
-    "site-context-single-file.php",
-    "state-machine-single-file.php",
-    "verifier-single-file.php"
-  ]
+  "unexecuted": []
 }
