@@ -228,10 +228,20 @@ final class Obs_WPDB {
 $GLOBALS['wpdb']   = new Obs_WPDB( $conn );
 $GLOBALS['__opts'] = array();
 
-function _doing_it_wrong( $function_name, $message, $version = '' ): void { // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedFunctionFound -- test harness stands in for WordPress core.
-	fwrite( STDERR, "FAIL WordPress API misuse -- _doing_it_wrong({$function_name}): {$message}\n" );
-	fwrite( STDERR, "  prepare() returns '' after this, so the statement is never sent.\n" );
-	exit( 1 );
+// Guarded because tests/strict-php-errors.php declares the same function and
+// is loaded ahead of this file through auto_prepend_file. Declaring it
+// unconditionally was a straight fatal, which is exactly what the first CI run
+// of this suite reported -- my own bug, and the kind that only a real run
+// finds. The definition stays for the standalone case: running this file
+// directly, without the prepend, must still turn a prepare() misuse into a
+// clear failure rather than an undefined-function fatal that reads like a
+// different problem entirely.
+if ( ! function_exists( '_doing_it_wrong' ) ) {
+	function _doing_it_wrong( $function_name, $message, $version = '' ): void { // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedFunctionFound -- test harness stands in for WordPress core.
+		fwrite( STDERR, "FAIL WordPress API misuse -- _doing_it_wrong({$function_name}): {$message}\n" );
+		fwrite( STDERR, "  prepare() returns '' after this, so the statement is never sent.\n" );
+		exit( 1 );
+	}
 }
 function dbDelta( $sql ) { global $wpdb; foreach ( (array) $sql as $stmt ) { $wpdb->query( $stmt ); } return array(); }
 function get_option( $k, $d = false ) { return $GLOBALS['__opts'][ $k ] ?? $d; }
