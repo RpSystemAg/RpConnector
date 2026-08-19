@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "normative_date": "2026-08-19",
+  "policy": {
+    "official_domains": [
+      "modelcontextprotocol.io",
+      "blog.modelcontextprotocol.io",
+      "developer.wordpress.org",
+      "developer.woocommerce.com",
+      "developer.chrome.com",
+      "rfc-editor.org",
+      "www.rfc-editor.org",
+      "php.net",
+      "www.php.net",
+      "platform.openai.com"
+    ],
+    "require_internal_contract": true,
+    "require_official_upstream_when_applicable": true
+  },
+  "sources": {
+    "mcp_2026_07_28": {
+      "authority": "Model Context Protocol",
+      "type": "normative_protocol",
+      "url": "https://blog.modelcontextprotocol.io/posts/2026-07-28/",
+      "version": "2026-07-28",
+      "covers": ["mcp", "tools/list", "tools/call", "resources/list", "resources/read", "server/discover", "Mcp-Method", "Mcp-Name", "_meta"]
+    },
+    "wordpress_abilities": {
+      "authority": "WordPress",
+      "type": "official_api",
+      "url": "https://developer.wordpress.org/apis/abilities-api/",
+      "minimum_version": "6.9",
+      "covers": ["ability", "abilities", "wp_register_ability", "WP_Ability", "WP_Abilities_Registry"]
+    },
+    "wordpress_abilities_php": {
+      "authority": "WordPress",
+      "type": "official_api_reference",
+      "url": "https://developer.wordpress.org/apis/abilities-api/php-reference/",
+      "covers": ["wp_register_ability", "execute_callback", "permission_callback", "input_schema", "output_schema"]
+    },
+    "wordpress_abilities_rest": {
+      "authority": "WordPress",
+      "type": "official_api_reference",
+      "url": "https://developer.wordpress.org/apis/abilities-api/rest-api-endpoints/",
+      "covers": ["wp-abilities/v1", "show_in_rest", "ability execute", "ability permissions"]
+    },
+    "wordpress_rest": {
+      "authority": "WordPress",
+      "type": "official_api_reference",
+      "url": "https://developer.wordpress.org/rest-api/reference/",
+      "covers": ["wp/v2", "REST", "posts", "pages", "media", "users", "settings", "themes", "search"]
+    },
+    "wordpress_security": {
+      "authority": "WordPress",
+      "type": "official_security_guidance",
+      "url": "https://developer.wordpress.org/apis/security/",
+      "covers": ["permission", "nonce", "sanitize", "escape", "validate", "capability"]
+    },
+    "woocommerce_rest_v3": {
+      "authority": "WooCommerce",
+      "type": "official_api_reference",
+      "url": "https://developer.woocommerce.com/docs/apis/rest-api/v3/",
+      "version": "v3",
+      "covers": ["woocommerce", "wc", "product", "order", "coupon", "customer", "inventory"]
+    },
+    "woocommerce_rest": {
+      "authority": "WooCommerce",
+      "type": "official_api",
+      "url": "https://developer.woocommerce.com/docs/apis/rest-api/",
+      "covers": ["WooCommerce REST API", "wc/v3"]
+    },
+    "chrome_extensions": {
+      "authority": "Google Chrome",
+      "type": "official_api_reference",
+      "url": "https://developer.chrome.com/docs/extensions/reference/",
+      "covers": ["chrome.", "tabs", "scripting", "debugger", "storage", "sidePanel", "offscreen", "alarms", "tabCapture", "runtime"]
+    },
+    "oauth_pkce": {
+      "authority": "IETF RFC Editor",
+      "type": "standards_track",
+      "url": "https://www.rfc-editor.org/rfc/rfc7636.html",
+      "rfc": "7636",
+      "covers": ["PKCE", "S256", "code_verifier", "code_challenge"]
+    },
+    "oauth_issuer": {
+      "authority": "IETF RFC Editor",
+      "type": "standards_track",
+      "url": "https://www.rfc-editor.org/rfc/rfc9207.html",
+      "rfc": "9207",
+      "covers": ["authorization_response_iss_parameter_supported", "iss", "issuer"]
+    },
+    "oauth_protected_resource": {
+      "authority": "IETF RFC Editor",
+      "type": "standards_track",
+      "url": "https://www.rfc-editor.org/rfc/rfc9728.html",
+      "rfc": "9728",
+      "covers": ["oauth-protected-resource", "resource", "authorization_servers"]
+    },
+    "oauth_security_bcp": {
+      "authority": "IETF RFC Editor",
+      "type": "best_current_practice",
+      "url": "https://www.rfc-editor.org/rfc/rfc9700.html",
+      "rfc": "9700",
+      "bcp": "240",
+      "covers": ["OAuth", "authorization server metadata", "TLS", "redirect_uri", "refresh token"]
+    },
+    "openai_remote_mcp": {
+      "authority": "OpenAI",
+      "type": "official_platform_documentation",
+      "url": "https://platform.openai.com/docs/quickstart",
+      "covers": ["OpenAI", "remote MCP", "ChatGPT"]
+    }
+  },
+  "classification_rules": [
+    {"id": "mcp", "match_any": ["mcp", "tools/", "server/discover", "prstudio_execute", "prstudio_capability_search", "prstudio_tool_manual"], "source_ids": ["mcp_2026_07_28"]},
+    {"id": "wordpress-ability", "match_any": ["ability", "abilities", "wp_register_ability", "WP_Ability"], "source_ids": ["wordpress_abilities", "wordpress_abilities_php", "wordpress_abilities_rest"]},
+    {"id": "wordpress", "match_any": ["wordpress", "wp_", "post", "page", "media", "theme", "plugin", "user", "option", "taxonomy"], "source_ids": ["wordpress_rest"]},
+    {"id": "wordpress-security", "match_any": ["permission", "nonce", "sanitize", "capability", "auth"], "source_ids": ["wordpress_security"]},
+    {"id": "woocommerce", "match_any": ["woocommerce", "woo", "wc_", "product", "order", "coupon", "inventory", "customer"], "source_ids": ["woocommerce_rest", "woocommerce_rest_v3"]},
+    {"id": "browser", "match_any": ["browser", "chrome", "tab", "dom", "cdp", "screenshot", "webrtc"], "source_ids": ["chrome_extensions"]},
+    {"id": "oauth", "match_any": ["oauth", "pkce", "token", "client_id", "authorization", "refresh"], "source_ids": ["oauth_pkce", "oauth_issuer", "oauth_protected_resource", "oauth_security_bcp"]},
+    {"id": "openai", "match_any": ["openai", "chatgpt"], "source_ids": ["openai_remote_mcp"]}
+  ]
+}
