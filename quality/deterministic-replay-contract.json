@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "normative_date": "2026-08-19",
+  "mandatory_event_fields": [
+    "sequence",
+    "event_id",
+    "event_type",
+    "job_uuid",
+    "step_id",
+    "logical_attempt",
+    "state_from",
+    "state_to",
+    "input_hash",
+    "output_hash",
+    "timestamp"
+  ],
+  "effect_event_fields": [
+    "effect_id",
+    "idempotency_key",
+    "executed"
+  ],
+  "evidence_event_fields": [
+    "evidence_id",
+    "verified",
+    "strength"
+  ],
+  "external_observation_fields": [
+    "source",
+    "observation_hash",
+    "recorded_payload_or_artifact_hash"
+  ],
+  "invariants": {
+    "append_only_sequence": true,
+    "event_ids_unique": true,
+    "state_transitions_replay_identically": true,
+    "external_calls_not_reissued_during_offline_replay": true,
+    "recorded_observations_are_injected": true,
+    "logical_effect_set_identical": true,
+    "final_verdict_identical": true,
+    "replay_never_executes_real_mutation": true,
+    "divergence_must_name_first_event": true
+  }
+}
