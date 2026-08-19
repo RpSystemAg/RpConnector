@@ -34,6 +34,9 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Mark exact build evidence start
+        run: echo "RP_BUILD_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+
       - name: Audit immutable release/build dependencies
         run: python tests/production-supply-chain-source.py --strict --json-output dist/supply-chain-source.json
 
@@ -56,11 +59,16 @@ jobs:
       - name: Generated artifacts must be reproducible
         run: git diff --exit-code
 
-      - name: Generate deterministic CycloneDX SBOM
+      - name: Generate deterministic exact-SHA CycloneDX SBOM
         run: |
           python tests/generate-production-sbom.py --output dist/sbom.cdx.json
           test -s dist/sbom.cdx.json
-          jq -e '.bomFormat == "CycloneDX" and .specVersion == "1.6" and (.components | length > 2)' dist/sbom.cdx.json
+          jq -e --arg sha "$GITHUB_SHA" '
+            .bomFormat == "CycloneDX" and
+            .specVersion == "1.6" and
+            (.components | length > 2) and
+            ([.metadata.properties[] | select(.name == "rpstudio:source_commit") | .value] == [$sha])
+          ' dist/sbom.cdx.json
 
       - name: Package release candidates
         run: |
@@ -117,6 +125,72 @@ jobs:
           cp "$BUNDLE_PATH" dist/provenance.bundle.jsonl
           test -s dist/provenance.bundle.jsonl
 
+      - name: Cryptographically verify every attested subject and signer policy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          verify_dir=$(mktemp -d)
+          export RP_ATTEST_VERIFY_DIR="$verify_dir"
+          subjects=(
+            dist/prstudio-unified-*.zip
+            dist/sbom.cdx.json
+            dist/supply-chain-source.json
+            dist/trivy-vulnerabilities.json
+            dist/SHA256SUMS
+          )
+          for file in "${subjects[@]}"; do
+            test -s "$file"
+            name=$(basename "$file")
+            gh attestation verify "$file" \
+              --repo "$GITHUB_REPOSITORY" \
+              --bundle dist/provenance.bundle.jsonl \
+              --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/build-attest.yml" \
+              --source-digest "$GITHUB_SHA" \
+              --format json \
+              > "$verify_dir/$name.json"
+            test -s "$verify_dir/$name.json"
+          done
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          root=Path(os.environ['RP_ATTEST_VERIFY_DIR'])
+          subjects=[]
+          for report in sorted(root.glob('*.json')):
+              artifact=report.name[:-5]
+              file=Path('dist')/artifact
+              raw=json.loads(report.read_text(encoding='utf-8'))
+              if not isinstance(raw,list) or not raw:
+                  raise SystemExit(f'empty attestation verification for {artifact}')
+              subjects.append({
+                  'name':artifact,
+                  'sha256':hashlib.sha256(file.read_bytes()).hexdigest(),
+                  'verification':raw,
+              })
+          value={
+              'schema_version':1,
+              'commit_sha':os.environ['GITHUB_SHA'],
+              'policy':{
+                  'repository':os.environ['GITHUB_REPOSITORY'],
+                  'signer_workflow':os.environ['GITHUB_REPOSITORY']+'/.github/workflows/build-attest.yml',
+                  'source_digest':os.environ['GITHUB_SHA'],
+                  'predicate_type':'https://slsa.dev/provenance/v1',
+              },
+              'subjects':subjects,
+          }
+          Path('dist/attestation-verification.json').write_text(json.dumps(value,indent=2,sort_keys=True)+'\n',encoding='utf-8')
+          print('verified attestation subjects=',len(subjects))
+          PY
+
+      - name: Generate fail-closed supply-chain release receipt
+        run: |
+          python tests/production-supply-chain-release.py \
+            --commit "$GITHUB_SHA" \
+            --started-at "$RP_BUILD_STARTED_AT" \
+            --dist dist \
+            --output dist/supply-chain-release.json
+          jq -e --arg sha "$GITHUB_SHA" '.ok == true and .commit_sha == $sha and .gate_id == "supply_chain_release"' dist/supply-chain-release.json
+
       - name: Upload self-verifying release candidate
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -128,5 +202,7 @@ jobs:
             dist/supply-chain-source.json
             dist/trivy-vulnerabilities.json
             dist/provenance.bundle.jsonl
+            dist/attestation-verification.json
+            dist/supply-chain-release.json
           if-no-files-found: error
           retention-days: 30
