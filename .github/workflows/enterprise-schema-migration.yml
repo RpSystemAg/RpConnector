@@ -41,3 +41,5 @@ jobs:
         run: php -d auto_prepend_file=tests/strict-php-errors.php tests/browser-orchestrator-v3-single-file.php prstudio-unified-control/includes/class-prstudio-uc-browser-orchestrator-v3.php
       - name: Existing intelligence regression
         run: php -d auto_prepend_file=tests/strict-php-errors.php tests/php-intelligence-smoke.php
+      - name: Exhaustive checkpoint diagnostic
+        run: python3 tests/exhaustive-checkpoint.py --write
