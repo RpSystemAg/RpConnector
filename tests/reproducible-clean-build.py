@@ -3,7 +3,7 @@
 
 The release builder already normalizes ZIP order/timestamps. This test adds a
 second trust boundary: two fresh directories with no shared generated state must
-produce byte-identical component ZIPs and integrity documents.
+produce byte-identical component ZIPs, integrity documents and CycloneDX SBOM.
 """
 from __future__ import annotations
 
@@ -23,8 +23,11 @@ ARTIFACTS = [
     "prstudio-unified-control/FILE-INTEGRITY.json",
     "prstudio-unified-browser-agent/COMPONENT-MANIFEST.json",
     "prstudio-unified-browser-agent/FILE-INTEGRITY.json",
+    "dist/sbom.cdx.json",
 ]
-EXCLUDE = {".git", "vendor", "node_modules", "dist", "megalinter-reports", "__pycache__", ".hypothesis"}
+# Keep .git in each independent copy because the SBOM deliberately binds itself
+# to the exact source commit. Generated/dependency state is excluded.
+EXCLUDE = {"vendor", "node_modules", "dist", "megalinter-reports", "__pycache__", ".hypothesis"}
 
 
 def copy_source(dst: Path) -> None:
@@ -60,6 +63,14 @@ def build(path: Path, epoch: str) -> dict[str, str]:
         timeout=180,
         check=True,
     )
+    subprocess.run(
+        [sys.executable, "tests/generate-production-sbom.py", "--output", "dist/sbom.cdx.json"],
+        cwd=path,
+        env=env,
+        text=True,
+        timeout=180,
+        check=True,
+    )
     result: dict[str, str] = {}
     for rel in ARTIFACTS:
         target = path / rel
@@ -85,4 +96,4 @@ if mismatches:
     for key, values in mismatches.items():
         print(f"ERROR NONDETERMINISTIC {key}: {values[0]} != {values[1]}")
     raise SystemExit(1)
-print("PASS two independent clean builds are byte-identical")
+print("PASS two independent clean builds and SBOM are byte-identical")
