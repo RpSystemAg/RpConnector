@@ -1,0 +1,34 @@
+name: Enterprise schema migration
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: enterprise-schema-migration-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capability-contract-batches:
+    name: Capability contract batch tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: '8.1'
+      - name: Lint migration contract tests
+        run: find tests -maxdepth 1 -name 'enterprise-schema-batch-*.php' -print0 | xargs -0 -r -n1 php -l
+      - name: Execute migration contract tests
+        run: |
+          set -euo pipefail
+          for test in tests/enterprise-schema-batch-*.php; do
+            php -d auto_prepend_file=tests/strict-php-errors.php "$test"
+          done
+      - name: Existing Browser orchestrator regression
+        run: php -d auto_prepend_file=tests/strict-php-errors.php tests/browser-orchestrator-v3-single-file.php prstudio-unified-control/includes/class-prstudio-uc-browser-orchestrator-v3.php
