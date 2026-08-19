@@ -9,6 +9,7 @@ final class PRSTUDIO_UC_Capability_Registry {
     private static ?array $search_index = null;
     private static ?array $compact_document = null;
     private static ?array $legacy_direct_contracts = null;
+    private static ?array $enterprise_contracts = null;
 
     private static function path(): string {
         return ( defined( 'PRSTUDIO_UC_DIR' ) ? PRSTUDIO_UC_DIR : dirname( __DIR__ ) . '/' ) . 'capabilities/capability-registry.json';
@@ -18,6 +19,18 @@ final class PRSTUDIO_UC_Capability_Registry {
     }
     private static function overlay_path(): string {
         return ( defined( 'PRSTUDIO_UC_DIR' ) ? PRSTUDIO_UC_DIR : dirname( __DIR__ ) . '/' ) . 'capabilities/agency-capabilities.json';
+    }
+    private static function enterprise_contract_path(): string {
+        return ( defined( 'PRSTUDIO_UC_DIR' ) ? PRSTUDIO_UC_DIR : dirname( __DIR__ ) . '/' ) . 'capabilities/enterprise-capability-contracts.json';
+    }
+    /** Capability-specific contract migrations; semantics stay distinct by canonical capability id. */
+    private static function enterprise_contracts(): array {
+        if ( is_array( self::$enterprise_contracts ) ) { return self::$enterprise_contracts; }
+        $raw = is_readable( self::enterprise_contract_path() ) ? (string) file_get_contents( self::enterprise_contract_path() ) : '';
+        $decoded = '' !== $raw ? json_decode( $raw, true ) : array();
+        $contracts = is_array( $decoded ) ? (array) ( $decoded['contracts'] ?? array() ) : array();
+        self::$enterprise_contracts = array_filter( $contracts, 'is_array' );
+        return self::$enterprise_contracts;
     }
     private static function overlay(): array {
         $raw=is_readable(self::overlay_path())?(string)file_get_contents(self::overlay_path()):'';
@@ -106,6 +119,13 @@ final class PRSTUDIO_UC_Capability_Registry {
                 $cap['concurrency_policy'] = $read_only ? 'parallel_read' : 'exclusive_resource';
                 if ( is_array( $contract['input_schema'] ?? null ) ) { $cap['input_schema'] = $contract['input_schema']; }
                 if ( is_array( $contract['output_schema'] ?? null ) ) { $cap['output_schema'] = $contract['output_schema']; }
+            }
+        }
+        $id = (string) ( $cap['id'] ?? '' );
+        $enterprise = self::enterprise_contracts()[ $id ] ?? null;
+        if ( is_array( $enterprise ) ) {
+            foreach ( array( 'description', 'input_schema', 'output_schema' ) as $field ) {
+                if ( array_key_exists( $field, $enterprise ) ) { $cap[ $field ] = $enterprise[ $field ]; }
             }
         }
         if ( class_exists( 'PRSTUDIO_UC_Execution_Router' ) ) { $cap = PRSTUDIO_UC_Execution_Router::annotate_capability( $cap ); }

@@ -15,4 +15,23 @@ $tests['real confidence number bounds enforced']=static function(){ $s=array('ty
 $tests['object required and additionalProperties remain enforced']=static function(){ $s=array('type'=>'object','required'=>array('id'),'properties'=>array('id'=>array('type'=>'integer')),'additionalProperties'=>false);svt(PRSTUDIO_UC_Schema_Validator::validate(array('id'=>1),$s)===array(),'valid object rejected');svt(PRSTUDIO_UC_Schema_Validator::validate(array(),$s)!==array(),'required bypassed');svt(PRSTUDIO_UC_Schema_Validator::validate(array('id'=>1,'x'=>2),$s)!==array(),'additional property bypassed');};
 $tests['pattern and enum remain enforced']=static function(){svt(PRSTUDIO_UC_Schema_Validator::validate('abc',array('type'=>'string','pattern'=>'^[a-z]+$','enum'=>array('abc','def')))===array(),'valid pattern/enum rejected');svt(PRSTUDIO_UC_Schema_Validator::validate('123',array('type'=>'string','pattern'=>'^[a-z]+$'))!==array(),'pattern bypassed');svt(PRSTUDIO_UC_Schema_Validator::validate('zzz',array('type'=>'string','enum'=>array('abc','def')))!==array(),'enum bypassed');};
 $tests['invalid schema type returns a technical failure']=static function(){svt(PRSTUDIO_UC_Schema_Validator::validate('x',array('type'=>array('string',new stdClass())))!==array(),'malformed schema type bypassed');svt(PRSTUDIO_UC_Schema_Validator::validate('x',array('type'=>'unknown'))!==array(),'unknown schema type bypassed');};
+$tests['const anyOf oneOf and local ref are enforced']=static function(){
+    svt(PRSTUDIO_UC_Schema_Validator::validate(true,array('const'=>true))===array(),'matching const rejected');
+    svt(PRSTUDIO_UC_Schema_Validator::validate(false,array('const'=>true))!==array(),'const bypassed');
+    $any=array('anyOf'=>array(array('type'=>'integer'),array('type'=>'string','minLength'=>1)));
+    svt(PRSTUDIO_UC_Schema_Validator::validate(3,$any)===array(),'anyOf integer rejected');
+    svt(PRSTUDIO_UC_Schema_Validator::validate('x',$any)===array(),'anyOf string rejected');
+    svt(PRSTUDIO_UC_Schema_Validator::validate(true,$any)!==array(),'anyOf accepted non-matching value');
+    $one=array('oneOf'=>array(array('type'=>'object','required'=>array('a'),'properties'=>array('a'=>array('type'=>'integer')),'additionalProperties'=>true),array('type'=>'object','required'=>array('b'),'properties'=>array('b'=>array('type'=>'integer')),'additionalProperties'=>true)));
+    svt(PRSTUDIO_UC_Schema_Validator::validate(array('a'=>1),$one)===array(),'oneOf first branch rejected');
+    svt(PRSTUDIO_UC_Schema_Validator::validate(array('a'=>1,'b'=>2),$one)!==array(),'oneOf accepted ambiguous value');
+    $ref=array('$defs'=>array('item'=>array('type'=>'string','minLength'=>1)),'type'=>'object','required'=>array('name'),'properties'=>array('name'=>array('$ref'=>'#/$defs/item')),'additionalProperties'=>false);
+    svt(PRSTUDIO_UC_Schema_Validator::validate(array('name'=>'ok'),$ref)===array(),'local $ref rejected valid object');
+    svt(PRSTUDIO_UC_Schema_Validator::validate(array('name'=>''),$ref)!==array(),'local $ref ignored nested constraints');
+};
+$tests['additionalProperties schema validates unknown keys']=static function(){
+    $s=array('type'=>'object','properties'=>array(),'additionalProperties'=>array('type'=>'integer'));
+    svt(PRSTUDIO_UC_Schema_Validator::validate(array('n'=>2),$s)===array(),'schema-valued additionalProperties rejected integer');
+    svt(PRSTUDIO_UC_Schema_Validator::validate(array('n'=>'x'),$s)!==array(),'schema-valued additionalProperties accepted string');
+};
 $pass=0;foreach($tests as $name=>$fn){try{$fn();echo "PASS: $name\n";$pass++;}catch(Throwable $e){fwrite(STDERR,"FAIL: $name :: {$e->getMessage()}\n");exit(1);}}echo "PASS: schema validator targeted $pass/".count($tests)."\n";
