@@ -9,11 +9,21 @@ reporting. The root constitution is canonical; this file cannot weaken it.
 LAW 10 — NO EXCLUSIONS, NO DEFERRAL, NO PARTIAL ACCEPTANCE.  
 LAW 11 — FULL TEST/EXECUTION SURFACE MUST EXECUTE AT 100 PERCENT.  
 LAW 12 — BLOCKERS TRIGGER STUDY AND REMEDIATION; THEY NEVER AUTHORIZE BYPASS OR STOP.  
-LAW 13 — HUMAN INTENT MUST RESOLVE TO ACTION, NOT INTERNAL ENCYCLOPEDIA.
+LAW 13 — HUMAN INTENT MUST RESOLVE TO ACTION, NOT INTERNAL ENCYCLOPEDIA.  
+LAW 14 — ENTERPRISE CAPABILITY CONTRACT MIGRATION HAS ZERO BLOCKED COMPLETION STATES.
 
 An explicit rationale does not legalize an exclusion or a deferral. The only
 acceptable stopping condition is verified closure. No alternative path to
 completion exists.
+
+For Enterprise Capability Contract Migration work, every selected capability
+remains in the current batch until it is `VERIFIED`. `BLOCKED`, `PARTIAL`,
+`DEFERRED`, `N/A`, known-limitation and follow-up/backlog statuses never advance
+the cursor. Missing executors, generic contracts, unclear semantics, absent tests
+and schema/runtime mismatches are defects to study, implement, execute and
+retest in the current batch until proven. A higher-priority external constraint
+may leave the batch open and incomplete; it never creates a completed blocked
+state or permission to start the next batch.
 
 ```text
 ANALYZE
