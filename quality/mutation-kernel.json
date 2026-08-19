@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "tool": "infection/infection",
+  "tool_version": "0.34.1",
+  "minimum_msi_percent": 90,
+  "minimum_covered_msi_percent": 95,
+  "allow_ignored_critical_mutants": false,
+  "targets": [
+    {"id":"store","path":"prstudio-unified-control/includes/class-prstudio-uc-store.php","required_test_marker":"Store"},
+    {"id":"agency_runtime","path":"prstudio-unified-control/includes/class-prstudio-uc-agency-runtime.php","required_test_marker":"Agency_Runtime"},
+    {"id":"job_engine","path":"prstudio-unified-control/includes/class-prstudio-uc-job-engine.php","required_test_marker":"Job_Engine"},
+    {"id":"verifier","path":"prstudio-unified-control/includes/class-prstudio-uc-verifier.php","required_test_marker":"Verifier"},
+    {"id":"oauth","path":"prstudio-unified-control/includes/class-prstudio-uc-mcp-auth-v5.php","required_test_marker":"MCP_Auth_V5"},
+    {"id":"idempotency","path":"prstudio-unified-control/includes/class-prstudio-uc-idempotency.php","required_test_marker":"Idempotency"},
+    {"id":"publish_transaction","path":"prstudio-unified-control/includes/class-prstudio-uc-publish-transaction.php","required_test_marker":"Publish_Transaction"}
+  ]
+}
