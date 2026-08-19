@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "rule": "External production receipts must be downloaded only from successful workflow runs whose head_sha exactly equals the release commit. Local receipt files never override a downloaded receipt with the same name.",
+  "sources": [
+    {
+      "id": "wordpress_lifecycle",
+      "workflow": "production-wordpress-lifecycle.yml",
+      "artifact_name_prefix": "production-evidence-wordpress-lifecycle-",
+      "required_files": [
+        "upgrade-migration.json",
+        "backup-restore.json",
+        "wordpress-lifecycle-details.json"
+      ],
+      "gates": ["upgrade_migration", "backup_restore"]
+    }
+  ]
+}
