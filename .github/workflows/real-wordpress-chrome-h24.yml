@@ -14,7 +14,7 @@ permissions:
 
 concurrency:
   group: real-wordpress-chrome-h24-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   fresh-real-environment:
