@@ -2,17 +2,18 @@
 """Collect external production evidence from GitHub Actions for one exact SHA.
 
 The collector rejects cross-SHA evidence, unsuccessful/in-progress runs, duplicate
-receipt filenames, unsafe ZIP paths and artifact name mismatches. It is intended
-to run immediately before production-readiness-certifier.py in release CI.
+receipt filenames, unsafe ZIP paths, artifact name mismatches, dynamic artifact
+cardinality mismatches and output collisions. It is intended to run immediately
+before production-readiness-certifier.py in release CI.
 """
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import io
 import json
 import os
 import shutil
-import sys
 import urllib.parse
 import urllib.request
 import zipfile
@@ -108,6 +109,40 @@ def receipt_commit(path: Path) -> str:
     return str(value.get("commit_sha", "")) if isinstance(value, dict) else ""
 
 
+def validate_copy_globs(specs: Any, by_name: dict[str, Path]) -> list[str]:
+    """Resolve basename-only dynamic files with explicit cardinality bounds."""
+    if specs in (None, []):
+        return []
+    if not isinstance(specs, list):
+        raise RuntimeError("copy_globs must be a list")
+    selected: list[str] = []
+    seen: set[str] = set()
+    for index, spec in enumerate(specs):
+        if not isinstance(spec, dict):
+            raise RuntimeError(f"copy_globs[{index}] must be an object")
+        pattern = str(spec.get("pattern", "")).strip()
+        if not pattern or Path(pattern).name != pattern or "/" in pattern or "\\" in pattern or ".." in pattern:
+            raise RuntimeError(f"copy_globs[{index}] pattern must be a safe basename glob")
+        try:
+            minimum = int(spec.get("min_count", 1))
+            maximum = int(spec.get("max_count", minimum))
+        except Exception as exc:
+            raise RuntimeError(f"copy_globs[{index}] cardinality is not integer") from exc
+        if minimum < 0 or maximum < minimum:
+            raise RuntimeError(f"copy_globs[{index}] has invalid cardinality {minimum}..{maximum}")
+        matches = sorted(name for name in by_name if fnmatch.fnmatchcase(name, pattern))
+        if len(matches) < minimum or len(matches) > maximum:
+            raise RuntimeError(
+                f"copy_globs[{index}] pattern={pattern!r} expected {minimum}..{maximum} files, found {len(matches)}: {matches}"
+            )
+        duplicate = seen.intersection(matches)
+        if duplicate:
+            raise RuntimeError(f"copy_globs select the same file more than once: {sorted(duplicate)}")
+        seen.update(matches)
+        selected.extend(matches)
+    return selected
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repository", default=os.environ.get("GITHUB_REPOSITORY", ""))
@@ -146,6 +181,7 @@ def main() -> int:
         workflow = str(source.get("workflow", ""))
         prefix = str(source.get("artifact_name_prefix", ""))
         required_files = [str(name) for name in source.get("required_files", [])]
+        copy_globs = source.get("copy_globs", [])
         if not source_id or not workflow or not prefix or not required_files:
             failures.append(f"invalid evidence source definition: {source!r}")
             continue
@@ -155,6 +191,7 @@ def main() -> int:
             continue
         claimed_names.update(required_files)
 
+        temp: Path | None = None
         try:
             run = find_successful_run(repository, workflow, commit, token)
             if not run:
@@ -182,17 +219,28 @@ def main() -> int:
             if missing:
                 raise RuntimeError(f"artifact missing required files: {missing}")
 
-            for name in required_files:
+            dynamic_files = validate_copy_globs(copy_globs, by_name)
+            files_to_copy = required_files + dynamic_files
+            if len(files_to_copy) != len(set(files_to_copy)):
+                raise RuntimeError("required_files and copy_globs overlap")
+            cross_source = claimed_names.intersection(dynamic_files)
+            if cross_source:
+                raise RuntimeError(f"dynamic filenames collide with another evidence source: {sorted(cross_source)}")
+            claimed_names.update(dynamic_files)
+
+            targets = [output / name for name in files_to_copy]
+            collisions = [str(path) for path in targets if path.exists()]
+            if collisions:
+                raise RuntimeError(f"refusing to overwrite existing evidence files: {collisions}")
+
+            for name in files_to_copy:
                 source_path = by_name[name]
-                target = output / name
-                if target.exists():
-                    raise RuntimeError(f"refusing to overwrite existing evidence file {target}")
                 if name.endswith(".json") and name != "wordpress-lifecycle-details.json":
                     bound = receipt_commit(source_path)
                     if bound and bound != commit:
                         raise RuntimeError(f"{name} commit_sha={bound!r} != exact release SHA {commit!r}")
-                shutil.copy2(source_path, target)
-            shutil.rmtree(temp)
+                shutil.copy2(source_path, output / name)
+
             collected.append({
                 "source": source_id,
                 "workflow": workflow,
@@ -200,10 +248,15 @@ def main() -> int:
                 "run_url": run.get("html_url"),
                 "artifact_id": artifact_id,
                 "artifact_name": artifact.get("name"),
-                "files": required_files,
+                "files": files_to_copy,
+                "required_files": required_files,
+                "dynamic_files": dynamic_files,
             })
         except Exception as exc:
             failures.append(f"{source_id}: {type(exc).__name__}: {exc}")
+        finally:
+            if temp is not None and temp.exists():
+                shutil.rmtree(temp)
 
     manifest = {
         "schema_version": 1,
@@ -219,7 +272,7 @@ def main() -> int:
     print("PRODUCTION EVIDENCE COLLECTION")
     print(f"repository={repository} commit={commit}")
     for item in collected:
-        print(f"PASS {item['source']} run={item['run_id']} artifact={item['artifact_name']}")
+        print(f"PASS {item['source']} run={item['run_id']} artifact={item['artifact_name']} files={len(item['files'])}")
     for failure in failures:
         print(f"FAIL {failure}")
     print(f"manifest={manifest_path}")
