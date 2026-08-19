@@ -317,7 +317,14 @@ try {
 
   const extensionTarget = await cdp.send('Target.createTarget', { url: `chrome-extension://${extensionId}/sidepanel.html` });
   extensionSessionId = await attachPage(cdp, extensionTarget.targetId);
-  await waitForExpression(cdp, extensionSessionId, 'Boolean(document.querySelector("#pairButton"))', 'Browser Agent pairing UI');
+  await waitForExpression(
+    cdp,
+    extensionSessionId,
+    `document.readyState === 'complete' && document.querySelector('#commandSuggestions')?.childElementCount > 0`,
+    'Browser Agent sidepanel module ready',
+    15000,
+  );
+  await waitForExpression(cdp, extensionSessionId, 'Boolean(document.querySelector("#pairButton") && !document.querySelector("#pairButton").disabled)', 'Browser Agent pairing UI');
 
   const pairClicked = await evaluate(cdp, extensionSessionId, `(() => {
     const site = document.querySelector('#siteUrl');
