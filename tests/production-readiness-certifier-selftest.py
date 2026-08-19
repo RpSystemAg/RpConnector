@@ -126,7 +126,17 @@ def main() -> int:
         expect("check without evidence fails", lambda r: r.__setitem__("checks", [{"id": "proof", "ok": True}]), 1)
         expect("failed required check fails", lambda r: r["checks"][0].__setitem__("ok", False), 1)
         expect("bad artifact digest fails", lambda r: r["artifacts"][0].__setitem__("sha256", "0" * 64), 1)
-        expect("short duration fails", lambda r: r.__setitem__("started_at", z(now - timedelta(seconds=30))), 1)
+        expect("missing local artifact fails", lambda r: r["artifacts"][0].__setitem__("path", str(base / "does-not-exist.txt")), 1)
+        expect(
+            "unverified remote artifact fails",
+            lambda r: r.__setitem__("artifacts", [{"uri": "artifact://external/proof", "sha256": artifact_sha}]),
+            1,
+        )
+        expect(
+            "short duration fails",
+            lambda r: (r.__setitem__("started_at", z(now - timedelta(seconds=40))), r.__setitem__("finished_at", z(now - timedelta(seconds=10)))),
+            1,
+        )
         expect("stale receipt fails", lambda r: (r.__setitem__("started_at", z(now - timedelta(hours=30))), r.__setitem__("finished_at", z(now - timedelta(hours=29)))), 1)
         expect("duplicate check id fails", lambda r: r.__setitem__("checks", r["checks"] + [copy.deepcopy(r["checks"][0])]), 1)
         expect("future evidence fails", lambda r: r.__setitem__("finished_at", z(now + timedelta(minutes=10))), 1)
