@@ -35,6 +35,8 @@
     "supply_chain_release": {
       "receipt": "supply-chain-release.json",
       "environment": {"real": false, "class": "github-actions-build-and-supply-chain"},
+      "required_local_artifacts": ["sbom.cdx.json", "SHA256SUMS", "supply-chain-source.json"],
+      "checksum_manifest": "SHA256SUMS",
       "checks": {
         "github_actions_commit_pinned": {"requirements": [{"workflow": "workflow-security.yml", "job_regex": "^Production immutable input audit$", "min_count": 1}]},
         "dependencies_locked": {"requirements": [{"workflow": "workflow-security.yml", "job_regex": "^Production immutable input audit$", "min_count": 1}]},
