@@ -9,11 +9,19 @@
     "valid_input",
     "timeout_seconds",
     "expected_terminal",
+    "runner",
     "oracle",
+    "evidence_file",
     "negative_cases",
     "contract",
-    "official_refs"
+    "official_refs",
+    "environment_evidence"
   ],
+  "runner_contract": {
+    "command": "Non-empty argv array. The runner receives RP_ATOMIC_ITEM_ID and must exit non-zero on functional/oracle failure.",
+    "evidence_file": "Runner-generated JSON bound to the exact item and commit; it must contain item_id, ok=true and oracle_observed=true.",
+    "no_shell": true
+  },
   "mutation_required_fields": ["rollback", "idempotency"],
   "browser_required_fields": ["ownership_negative", "no_progress_deadline_seconds"],
   "remote_required_fields": ["live_receipt_class"]
