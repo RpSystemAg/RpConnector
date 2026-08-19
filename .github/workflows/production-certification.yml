@@ -17,7 +17,7 @@ jobs:
   source-and-evidence:
     name: Production proof for exact commit
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -32,6 +32,18 @@ jobs:
         with:
           php-version: '8.1'
           extensions: mysqli, mbstring
+
+      - name: Compile production certification tooling
+        run: |
+          python -m py_compile \
+            tests/production-readiness-certifier.py \
+            tests/production-source-integrity.py \
+            tests/production-test-plan-audit.py \
+            tests/production-h24-soak.py \
+            tests/atomic-capability-assurance.py
+
+      - name: Production test-plan structure must be honest and complete
+        run: python tests/production-test-plan-audit.py
 
       - name: Enterprise source invariants
         run: |
@@ -57,8 +69,17 @@ jobs:
       - name: Generated release artifacts must be reproducible
         run: git diff --exit-code
 
+      - name: Generate and require source-integrity production receipt
+        run: python tests/production-source-integrity.py --commit "$GITHUB_SHA" --strict
+
+      - name: Require executable item-level capability proof
+        run: python tests/atomic-capability-assurance.py --execute --strict
+
       - name: AGENT-BENCH must be measured, not calibrated
         run: python bench/agent-bench-status.py
 
-      - name: Require E6-E8 live evidence for this exact commit
+      - name: Preserve legacy E6-E8 live-evidence gate
         run: python tests/release-evidence-gate.py --require-production-proof --commit "$GITHUB_SHA"
+
+      - name: Final fail-closed production readiness verdict
+        run: python tests/production-readiness-certifier.py --strict --commit "$GITHUB_SHA"
