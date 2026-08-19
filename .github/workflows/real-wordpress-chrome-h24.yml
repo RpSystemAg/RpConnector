@@ -107,6 +107,8 @@ jobs:
             --admin_password="$WP_ADMIN_PASSWORD" \
             --admin_email='h24-e2e@example.invalid' \
             --skip-email
+          wp rewrite structure '/%postname%/' --path="$RP_WP_PATH"
+          wp rewrite flush --path="$RP_WP_PATH"
 
           cp -a prstudio-unified-control "$RP_WP_PATH/wp-content/plugins/prstudio-unified-control"
           wp plugin activate prstudio-unified-control --path="$RP_WP_PATH"
@@ -149,13 +151,17 @@ jobs:
           for i in $(seq 1 100); do
             if curl --fail --silent --output /tmp/rpconnector-h24-login.html "$WP_URL/wp-login.php" \
               && test -s /tmp/rpconnector-h24-login.html; then
-              exit 0
+              break
+            fi
+            if [ "$i" = 100 ]; then
+              cat artifacts/real-e2e/wordpress-server.log
+              exit 1
             fi
             sleep 0.2
           done
 
-          cat artifacts/real-e2e/wordpress-server.log
-          exit 1
+          curl --fail --silent "$WP_URL/wp-json/" > /tmp/rpconnector-h24-rest-index.json
+          jq -e '.namespaces | index("prstudio-unified/v1")' /tmp/rpconnector-h24-rest-index.json >/dev/null
 
       - name: Select real-browser cycle count
         run: |
