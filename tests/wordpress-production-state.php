@@ -6,6 +6,12 @@
  * It seeds deterministic synthetic state and independently fingerprints the
  * persisted WordPress/PR STUDIO state across upgrade, failure and restore.
  */
+if ( ! defined( 'ABSPATH' ) ) {
+    $rp_wp_path = rtrim( (string) getenv( 'RP_WP_PATH' ), "/\\" );
+    $rp_wp_load = '' !== $rp_wp_path ? $rp_wp_path . '/wp-load.php' : '';
+    if ( '' === $rp_wp_load || ! is_file( $rp_wp_load ) ) { fwrite( STDERR, "RP_WP_PATH WordPress bootstrap missing\n" ); exit( 2 ); }
+    require_once $rp_wp_load;
+}
 if ( ! defined( 'ABSPATH' ) ) { fwrite( STDERR, "WordPress bootstrap required\n" ); exit( 2 ); }
 
 function rp_lifecycle_fail( string $message ): void { fwrite( STDERR, "FAIL {$message}\n" ); exit( 1 ); }
@@ -133,8 +139,53 @@ function rp_lifecycle_mutate(): void {
     global $wpdb;$settings=get_option('wpaib_settings',array());$settings=is_array($settings)?$settings:array();$settings['rp_production_marker']='CORRUPTED';update_option('wpaib_settings',$settings,false);delete_option('prstudio_mcp_v5_clients');delete_option('prstudio_mcp_v5_tokens');delete_option('prstudio_mcp_v5_generation');
     $device_uuid=(string)get_option('rp_production_test_device_uuid','');$job_uuid=(string)get_option('rp_production_test_job_uuid','');if($device_uuid)$wpdb->delete(PRSTUDIO_UC_Store::devices_table(),array('device_uuid'=>$device_uuid));if($job_uuid)$wpdb->delete(PRSTUDIO_UC_Store::jobs_table(),array('job_uuid'=>$job_uuid));$summary=PRSTUDIO_UC_Memory::summary_path();if(is_file($summary))file_put_contents($summary,"CORRUPTED\n",LOCK_EX);rp_lifecycle_ok('persistent state intentionally mutated');
 }
+function rp_lifecycle_direct_self_test(): void {
+    if ( ! class_exists( 'PRSTUDIO_UC_Store' ) || ! class_exists( 'PRSTUDIO_UC_Memory' ) ) { rp_lifecycle_fail( 'runtime classes unavailable' ); }
+    if ( ! PRSTUDIO_UC_Store::schema_ready() ) { rp_lifecycle_fail( 'schema not ready for direct self-test' ); }
+
+    $wp_path = rtrim( (string) getenv( 'RP_WP_PATH' ), "/\\" );
+    $expected_plugin_root = realpath( $wp_path . '/wp-content/plugins/prstudio-unified-control' );
+    $store_file = realpath( (string) ( new ReflectionClass( 'PRSTUDIO_UC_Store' ) )->getFileName() );
+    $memory_file = realpath( (string) ( new ReflectionClass( 'PRSTUDIO_UC_Memory' ) )->getFileName() );
+    if ( false === $expected_plugin_root || false === $store_file || false === $memory_file ) { rp_lifecycle_fail( 'runtime source paths unavailable' ); }
+    $expected_prefix = rtrim( str_replace( '\\', '/', $expected_plugin_root ), '/' ) . '/';
+    foreach ( array( 'store' => $store_file, 'memory' => $memory_file ) as $name => $runtime_file ) {
+        $normalized = str_replace( '\\', '/', (string) $runtime_file );
+        if ( 0 !== strpos( $normalized, $expected_prefix ) ) { rp_lifecycle_fail( "{$name} runtime is not the RP_WP_PATH candidate" ); }
+    }
+
+    $first = rp_lifecycle_snapshot();
+    $second = rp_lifecycle_snapshot();
+    foreach ( array( $first, $second ) as $snapshot ) {
+        if ( ! is_array( $snapshot['preserved'] ?? null ) ) { rp_lifecycle_fail( 'snapshot preserved payload missing' ); }
+        $hash = (string) ( $snapshot['preserved_hash'] ?? '' );
+        if ( 1 !== preg_match( '/^[a-f0-9]{64}$/', $hash ) ) { rp_lifecycle_fail( 'snapshot fingerprint invalid' ); }
+        $canonical = wp_json_encode( $snapshot['preserved'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+        if ( ! hash_equals( $hash, hash( 'sha256', (string) $canonical ) ) ) { rp_lifecycle_fail( 'snapshot fingerprint does not match preserved payload' ); }
+    }
+    if ( ! hash_equals( (string) $first['preserved_hash'], (string) $second['preserved_hash'] ) ) { rp_lifecycle_fail( 'read-only snapshots are not deterministic' ); }
+
+    $memory = $first['preserved']['memory'] ?? null;
+    if ( ! is_array( $memory ) ) { rp_lifecycle_fail( 'memory filesystem evidence missing' ); }
+    foreach ( array( 'memory-summary.txt', 'memory-index.json', 'memory-chain.ndjson' ) as $name ) {
+        $fact = $memory[$name] ?? null;
+        if ( ! is_array( $fact ) || ! array_key_exists( 'exists', $fact ) || ! array_key_exists( 'bytes', $fact ) || ! array_key_exists( 'sha256', $fact ) ) { rp_lifecycle_fail( "filesystem fact missing for {$name}" ); }
+        if ( ! empty( $fact['exists'] ) && ( (int) $fact['bytes'] < 0 || 1 !== preg_match( '/^[a-f0-9]{64}$/', (string) $fact['sha256'] ) ) ) { rp_lifecycle_fail( "filesystem fact invalid for {$name}" ); }
+    }
+
+    fwrite( STDOUT, rp_lifecycle_json( array(
+        'ok' => true,
+        'mode' => 'direct-real-wordpress',
+        'plugin_root' => $expected_plugin_root,
+        'plugin_version' => (string) ( $first['plugin_version'] ?? '' ),
+        'schema_version' => (string) ( $first['schema_version'] ?? '' ),
+        'preserved_hash' => (string) $first['preserved_hash'],
+        'memory' => $memory,
+    ) ) . "\n" );
+}
 
 $action=(string)getenv('RP_LIFECYCLE_ACTION');$file=(string)getenv('RP_LIFECYCLE_FILE');
+if ( '' === $action ) { rp_lifecycle_direct_self_test(); exit( 0 ); }
 switch($action){
     case 'seed':rp_lifecycle_seed();break;
     case 'snapshot':$snapshot=rp_lifecycle_snapshot();if(''===$file)fwrite(STDOUT,rp_lifecycle_json($snapshot)."\n");else{rp_lifecycle_atomic_write($file,rp_lifecycle_json($snapshot)."\n");rp_lifecycle_ok("snapshot {$file}");}break;
