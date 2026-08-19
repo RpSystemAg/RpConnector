@@ -28,6 +28,7 @@ jobs:
       WP_URL: http://127.0.0.1:8080
       WP_ADMIN_USER: rpadmin
       WP_ADMIN_PASSWORD: Full-Surface-Only-2026!
+      CHROME_BIN: /usr/bin/chromium
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
