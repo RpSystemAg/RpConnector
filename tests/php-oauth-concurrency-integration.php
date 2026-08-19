@@ -37,7 +37,7 @@ function oauth_result($value): array {
     return ['kind' => 'scalar', 'value' => $value];
 }
 
-function child_emit($value, int $exit = 0): never {
+function child_emit($value, int $exit = 0): void {
     echo 'RP_OAUTH_CHILD=' . wp_json_encode(oauth_result($value), JSON_UNESCAPED_SLASHES) . "\n";
     exit($exit);
 }
@@ -122,7 +122,7 @@ function oauth_children(string $mode, array $payloads): array {
         $encoded = base64_encode((string)json_encode($payload, JSON_UNESCAPED_SLASHES));
         $pipes = [];
         $process = proc_open(
-            [PHP_BINARY, __FILE__, '--child', $mode, $encoded],
+            [PHP_BINARY, '-d', 'auto_prepend_file=' . __DIR__ . '/strict-php-errors.php', __FILE__, '--child', $mode, $encoded],
             [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
             $pipes,
             dirname(__DIR__),
@@ -138,6 +138,10 @@ function oauth_children(string $mode, array $payloads): array {
         $stderr = stream_get_contents($child['stderr']);
         fclose($child['stdout']); fclose($child['stderr']);
         $exit = proc_close($child['process']);
+        if ('' !== trim((string)$stderr)) {
+            $results[] = ['kind' => 'diagnostic_error', 'exit' => $exit, 'stdout' => $stdout, 'stderr' => trim((string)$stderr)];
+            continue;
+        }
         if (!preg_match_all('/^RP_OAUTH_CHILD=(.+)$/m', (string)$stdout, $matches) || empty($matches[1])) {
             $results[] = ['kind' => 'transport_error', 'exit' => $exit, 'stdout' => $stdout, 'stderr' => $stderr];
             continue;
@@ -145,7 +149,7 @@ function oauth_children(string $mode, array $payloads): array {
         $decoded = json_decode((string)end($matches[1]), true);
         if (!is_array($decoded)) { $decoded = ['kind' => 'decode_error']; }
         $decoded['exit'] = $exit;
-        $decoded['stderr'] = trim((string)$stderr);
+        $decoded['stderr'] = '';
         $results[] = $decoded;
     }
     return $results;
@@ -153,7 +157,7 @@ function oauth_children(string $mode, array $payloads): array {
 
 function oauth_count_kind(array $results, string $kind, string $code = ''): int {
     return count(array_filter($results, static function (array $row) use ($kind, $code): bool {
-        return ($row['kind'] ?? '') === $kind && ('' === $code || ($row['code'] ?? '') === $code) && 0 === (int)($row['exit'] ?? -1);
+        return ($row['kind'] ?? '') === $kind && ('' === $code || ($row['code'] ?? '') === $code) && 0 === (int)($row['exit'] ?? -1) && '' === (string)($row['stderr'] ?? '');
     }));
 }
 
@@ -293,8 +297,8 @@ try {
     delete_transient($rateKey);
     $ratePayloads = array_fill(0, 32, ['key' => $rateKey, 'limit' => 12]);
     $rates = oauth_children('rate', $ratePayloads);
-    $rateAllowed = count(array_filter($rates, static fn(array $r): bool => ($r['kind'] ?? '') === 'scalar' && true === ($r['value'] ?? null) && 0 === (int)($r['exit'] ?? -1)));
-    $rateDenied = count(array_filter($rates, static fn(array $r): bool => ($r['kind'] ?? '') === 'scalar' && false === ($r['value'] ?? null) && 0 === (int)($r['exit'] ?? -1)));
+    $rateAllowed = count(array_filter($rates, static fn(array $r): bool => ($r['kind'] ?? '') === 'scalar' && true === ($r['value'] ?? null) && 0 === (int)($r['exit'] ?? -1) && '' === (string)($r['stderr'] ?? '')));
+    $rateDenied = count(array_filter($rates, static fn(array $r): bool => ($r['kind'] ?? '') === 'scalar' && false === ($r['value'] ?? null) && 0 === (int)($r['exit'] ?? -1) && '' === (string)($r['stderr'] ?? '')));
     oauth_check(12 === $rateAllowed && 20 === $rateDenied, 'atomic rate limit cannot overrun', "allowed={$rateAllowed} denied={$rateDenied}");
     oauth_cache_reset();
     oauth_check(12 === (int)get_transient($rateKey), 'rate-limit persisted counter equals admitted requests');
@@ -321,7 +325,7 @@ try {
         ];
     }
     $capacity = oauth_children('register', $capacityPayloads);
-    $capacityAccepted = array_values(array_filter($capacity, static fn(array $r): bool => ($r['kind'] ?? '') === 'array' && 0 === (int)($r['exit'] ?? -1)));
+    $capacityAccepted = array_values(array_filter($capacity, static fn(array $r): bool => ($r['kind'] ?? '') === 'array' && 0 === (int)($r['exit'] ?? -1) && '' === (string)($r['stderr'] ?? '')));
     $capacityRejected = oauth_count_kind($capacity, 'wp_error', 'client_registry_full');
     foreach ($capacityAccepted as $row) { if (!empty($row['client_id'])) { $acceptedIds[] = (string)$row['client_id']; } }
     oauth_check(10 === count($capacityAccepted) && 10 === $capacityRejected, 'DCR capacity has exactly ten winners and ten explicit rejections', 'accepted=' . count($capacityAccepted) . " rejected={$capacityRejected}");
