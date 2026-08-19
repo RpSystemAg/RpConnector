@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Repository-wide ONE_GUARD_CONSTITUTION release test.
+"""Repository-wide execution constitution release test.
 
 Scans deployable runtime and generated execution contracts. Legacy vocabulary is
 allowed only inside the two one-way migration files that delete/migrate old state.
+Also proves that the mandatory no-exclusion/no-deferral law is present in every
+agent entry point, including Claude's project constitution.
 """
 from __future__ import annotations
 import json,re,sys
@@ -117,7 +119,7 @@ ui='\n'.join(p.read_text(errors='replace') for p in [BROWSER/'sidepanel.html',BR
 if re.search(r'\bresume\b|riprendi|takeover|acknowledge',ui,re.I): fail.append('manual human control surface remains')
 
 # Constitution files and exact laws.
-required_laws=[
+required_agent_laws=[
  'ANTI-CRASH IS THE ONLY MUTATION GUARD',
  'VERIFICATION IS EVIDENCE, NEVER AUTHORIZATION',
  'EXECUTABLE ACTIONS EXECUTE',
@@ -126,11 +128,31 @@ required_laws=[
  'OWNERSHIP IS SESSION/LANE SCOPED',
  'NO TRIAL INPUT',
  'NO MODEL ROUND-TRIP WITHOUT NEW JUDGMENT',
+ 'NO EXCLUSIONS, NO DEFERRAL, NO PARTIAL ACCEPTANCE',
 ]
-for p in [CONTROL/'AGENTS.md',BROWSER/'AGENTS.md']:
+agent_constitutions=[ROOT/'AGENTS.md',CONTROL/'AGENTS.md',BROWSER/'AGENTS.md']
+for p in agent_constitutions:
     text=p.read_text(errors='replace') if p.exists() else ''
-    for law in required_laws:
+    for law in required_agent_laws:
         if law not in text: fail.append(f'{p.relative_to(ROOT)}: missing law {law}')
+
+claude=ROOT/'CLAUDE.md'
+claude_text=claude.read_text(errors='replace') if claude.exists() else ''
+if 'NO EXCLUSIONS, NO DEFERRAL, NO PARTIAL ACCEPTANCE' not in claude_text:
+    fail.append('CLAUDE.md: missing no-exclusion/no-deferral law')
+if 'must read and obey the repository-root `AGENTS.md`' not in claude_text:
+    fail.append('CLAUDE.md: missing mandatory AGENTS.md handoff')
+
+law10_clauses=[
+ 'An explicit rationale does not legalize an exclusion or a deferral.',
+ 'REPEAT UNTIL PROVEN',
+ 'The only acceptable stopping condition is verified closure',
+ 'No alternative path to completion exists.',
+]
+for p in [ROOT/'AGENTS.md',CONTROL/'AGENTS.md',BROWSER/'AGENTS.md',claude]:
+    text=p.read_text(errors='replace') if p.exists() else ''
+    for clause in law10_clauses:
+        if clause not in text: fail.append(f'{p.relative_to(ROOT)}: missing Law 10 clause {clause}')
 
 if fail:
     print('ONE_GUARD_CONSTITUTION: FAIL')
@@ -150,3 +172,7 @@ print('budget_block=false')
 print('same_lane_task_binding_block=false')
 print('verification_is_nonblocking=true')
 print('transient_failure_retries=true')
+print('no_exclusions=true')
+print('no_deferral=true')
+print('no_partial_acceptance=true')
+print('claude_constitution_enforced=true')
