@@ -35,6 +35,13 @@
       "artifact_name_prefix": "production-evidence-h24-",
       "required_files": ["h24-soak.json", "h24-soak-events.ndjson"],
       "gates": ["h24_soak"]
+    },
+    {
+      "id": "attested_build",
+      "workflow": "build-attest.yml",
+      "artifact_name_prefix": "prstudio-build-",
+      "required_files": ["sbom.cdx.json", "SHA256SUMS", "supply-chain-source.json"],
+      "gates": ["supply_chain_release"]
     }
   ]
 }
