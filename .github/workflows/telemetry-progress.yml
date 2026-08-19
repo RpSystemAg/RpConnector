@@ -1,0 +1,35 @@
+name: Trace and progress oracle
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 3 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: telemetry-progress-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  readiness:
+    name: OpenTelemetry-compatible correlation + anti-loop progress contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Mission traces must make progress and causal effects provable
+        run: python3 tests/telemetry-progress-readiness.py | tee /tmp/telemetry-progress.txt
+      - name: Preserve readiness evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: trace-progress-oracle-${{ github.sha }}
+          path: /tmp/telemetry-progress.txt
+          if-no-files-found: warn
+          retention-days: 30
