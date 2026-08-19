@@ -9,6 +9,7 @@ final class PRSTUDIO_UC_Capability_Registry {
     private static ?array $search_index = null;
     private static ?array $compact_document = null;
     private static ?array $legacy_direct_contracts = null;
+    private static ?array $enterprise_contracts = null;
 
     private static function path(): string {
         return ( defined( 'PRSTUDIO_UC_DIR' ) ? PRSTUDIO_UC_DIR : dirname( __DIR__ ) . '/' ) . 'capabilities/capability-registry.json';
@@ -19,10 +20,27 @@ final class PRSTUDIO_UC_Capability_Registry {
     private static function overlay_path(): string {
         return ( defined( 'PRSTUDIO_UC_DIR' ) ? PRSTUDIO_UC_DIR : dirname( __DIR__ ) . '/' ) . 'capabilities/agency-capabilities.json';
     }
+    private static function enterprise_contract_path(): string {
+        return ( defined( 'PRSTUDIO_UC_DIR' ) ? PRSTUDIO_UC_DIR : dirname( __DIR__ ) . '/' ) . 'capabilities/enterprise-capability-contracts.json';
+    }
     private static function overlay(): array {
         $raw=is_readable(self::overlay_path())?(string)file_get_contents(self::overlay_path()):'';
         $decoded=''!==$raw?json_decode($raw,true):array();
         return is_array($decoded)?array_values((array)($decoded['capabilities']??array())):array();
+    }
+    /** Capability-specific semantic contract migrations keyed by canonical capability id. */
+    private static function enterprise_contracts(): array {
+        if ( is_array( self::$enterprise_contracts ) ) { return self::$enterprise_contracts; }
+        $raw=is_readable(self::enterprise_contract_path())?(string)file_get_contents(self::enterprise_contract_path()):'';
+        $decoded=''!==$raw?json_decode($raw,true):array();
+        if(!is_array($decoded)){self::$enterprise_contracts=array();return self::$enterprise_contracts;}
+        $dialect=(string)($decoded['json_schema_dialect']??'');$out=array();
+        foreach((array)($decoded['contracts']??array()) as $id=>$contract){
+            if(!is_array($contract))continue;
+            $contract['json_schema_dialect']=$dialect;$out[strtolower((string)$id)]=$contract;
+        }
+        self::$enterprise_contracts=$out;
+        return self::$enterprise_contracts;
     }
     /** Canonical runtime annotations for the old direct-tool compatibility set. */
     private static function legacy_direct_contracts(): array {
@@ -107,6 +125,16 @@ final class PRSTUDIO_UC_Capability_Registry {
                 if ( is_array( $contract['input_schema'] ?? null ) ) { $cap['input_schema'] = $contract['input_schema']; }
                 if ( is_array( $contract['output_schema'] ?? null ) ) { $cap['output_schema'] = $contract['output_schema']; }
             }
+        }
+        $id=strtolower((string)($cap['id']??''));$enterprise=self::enterprise_contracts()[$id]??null;
+        if(is_array($enterprise)){
+            if(isset($enterprise['description']))$cap['description']=(string)$enterprise['description'];
+            if(is_array($enterprise['input_schema']??null))$cap['input_schema']=$enterprise['input_schema'];
+            if(is_array($enterprise['output_schema']??null))$cap['output_schema']=$enterprise['output_schema'];
+            $cap['enterprise_contract_version']=(string)($enterprise['contract_version']??'');
+            $cap['json_schema_dialect']=(string)($enterprise['json_schema_dialect']??'');
+            $cap['error_contract']=array_values(array_filter((array)($enterprise['error_contract']??array()),'is_array'));
+            $cap['tool_annotations']=is_array($enterprise['annotations']??null)?$enterprise['annotations']:array();
         }
         if ( class_exists( 'PRSTUDIO_UC_Execution_Router' ) ) { $cap = PRSTUDIO_UC_Execution_Router::annotate_capability( $cap ); }
         return $cap;
@@ -239,6 +267,10 @@ final class PRSTUDIO_UC_Capability_Registry {
             'execution_class'=>(string)($cap['execution_class']??''), 'preferred_executor'=>(string)($cap['preferred_executor']??''),
             'estimated_work'=>(string)($cap['estimated_work']??''), 'supports_flow'=>!empty($cap['supports_flow']), 'can_execute_inline'=>!empty($cap['can_execute_inline']),
             'minimal_verification'=>(string)($cap['minimal_verification']??''),
+            'enterprise_contract_version'=>(string)($cap['enterprise_contract_version']??''),
+            'json_schema_dialect'=>(string)($cap['json_schema_dialect']??''),
+            'error_contract'=>array_values((array)($cap['error_contract']??array())),
+            'tool_annotations'=>(array)($cap['tool_annotations']??array()),
             'prerequisites'=>array_values( array_filter( array( !empty($cap['browser_required'])?'browser_agent_online':'', !empty($cap['gsc_required'])?'gsc_provider_available':'' ) ) ),
         );
     }
