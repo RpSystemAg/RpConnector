@@ -53,6 +53,10 @@ def check_equal(before: dict[str, Any], after: dict[str, Any], keys: list[str]) 
     return not mismatches, {"keys": keys, "mismatches": mismatches}
 
 
+def local_artifact_path(path: Path) -> str:
+    return str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path)
+
+
 def receipt(
     gate_id: str,
     commit: str,
@@ -70,7 +74,7 @@ def receipt(
         "finished_at": iso_now(),
         "environment": environment,
         "checks": checks,
-        "artifacts": [{"path": str(detail_path), "sha256": sha256(detail_path)}],
+        "artifacts": [{"path": local_artifact_path(detail_path), "sha256": sha256(detail_path)}],
         "waivers": [],
         "skipped": [],
     }
@@ -101,10 +105,7 @@ def main() -> int:
     post_restore = load(post_restore_path)
     metrics = load(metrics_path)
 
-    if baseline.get("preserved_hash") != post_upgrade.get("preserved_hash"):
-        upgrade_hash_ok = False
-    else:
-        upgrade_hash_ok = True
+    upgrade_hash_ok = baseline.get("preserved_hash") == post_upgrade.get("preserved_hash")
     restore_hash_ok = baseline.get("preserved_hash") == post_restore.get("preserved_hash")
 
     fresh_ok, fresh_ev = marker(marker_dir, "fresh_install")
