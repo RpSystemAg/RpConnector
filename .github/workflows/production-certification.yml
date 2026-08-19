@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: production-certification-${{ github.sha }}
@@ -41,6 +42,9 @@ jobs:
             tests/production-source-integrity.py \
             tests/production-test-plan-audit.py \
             tests/production-h24-soak.py \
+            tests/production-fault-injection.py \
+            tests/production-wordpress-lifecycle-receipt.py \
+            tests/collect-production-evidence.py \
             tests/atomic-capability-assurance.py
 
       - name: Production certifier must reject manufactured green evidence
@@ -78,6 +82,11 @@ jobs:
 
       - name: Require executable item-level capability proof
         run: python tests/atomic-capability-assurance.py --execute --strict
+
+      - name: Collect successful external production evidence for exact SHA
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python tests/collect-production-evidence.py --commit "$GITHUB_SHA" --strict
 
       - name: AGENT-BENCH must be measured, not calibrated
         run: python bench/agent-bench-status.py
