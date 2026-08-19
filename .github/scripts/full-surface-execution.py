@@ -42,7 +42,7 @@ CODE_SUFFIXES = {".php", ".py", ".js", ".mjs", ".cjs", ".sh", ".bash"}
 DATA_SUFFIXES = {".json", ".yaml", ".yml", ".xml"}
 SYNTAX_SUFFIXES = CODE_SUFFIXES | DATA_SUFFIXES
 DEFAULT_TIMEOUT_SECONDS = 180
-FAILURE_OUTPUT_RE = re.compile(r"\bFAIL(?:ED|URE)?\b")
+FAILURE_OUTPUT_RE = re.compile(r"\b(?:FAIL(?:ED|URE)?|SKIP(?:PED)?)\b")
 
 
 def utc_now() -> str:
@@ -96,7 +96,7 @@ def source_kind(rel: Path) -> str | None:
 
 
 def output_has_failure_marker(output: str) -> bool:
-    """Treat an explicit FAIL/FAILED/FAILURE token as failure even with exit 0."""
+    """Treat explicit failure/skip tokens as non-success even with exit 0."""
     return FAILURE_OUTPUT_RE.search(output) is not None
 
 
@@ -345,6 +345,7 @@ def main() -> int:
             "direct_execution_requires_syscall_evidence": True,
             "failed_process_trace_cannot_count_data_execution": True,
             "failure_output_with_zero_exit_is_failure": True,
+            "skip_output_with_zero_exit_is_failure": True,
             "required_execution_percent": 100.0,
         },
         "counts": {
