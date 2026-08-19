@@ -64,6 +64,7 @@ final class PRSTUDIO_UC_Business_Intelligence {
             $state=self::load_unlocked();
             $result=$callback($state);
             if(is_wp_error($result))return $result;
+            if(is_array($result)&&array_key_exists('changed',$result)&&false===$result['changed'])return $result;
             if(!self::atomic_write($state))return new WP_Error('business_state_write_failed','Unable to persist business intelligence state.',array('status'=>503,'retryable'=>true));
             return $result;
         } finally { @flock($fh,LOCK_UN);@fclose($fh); }
@@ -137,7 +138,6 @@ final class PRSTUDIO_UC_Business_Intelligence {
         $core=self::clean(array('decision'=>$decision,'rationale'=>$rationale,'alternatives'=>$alternatives,'evidence'=>$evidence,'expected_outcome'=>$expected));$content_hash=hash('sha256',self::canonical_json($core));
         $provided_id=self::bounded_text($args['decision_id']??'',96);$decision_id=''!==$provided_id?self::key($provided_id,96):'decision_'.substr($content_hash,0,24);
         if(''===$decision_id)return new WP_Error('business_decision_id_invalid','decision_id is invalid.',array('status'=>400));
-        $existing_state=self::state();foreach((array)($existing_state['decisions']??array()) as $row){if(is_array($row)&&$decision_id===(string)($row['decision_id']??'')){if(hash_equals((string)($row['content_hash']??''),$content_hash))return array('ok'=>true,'version'=>self::VERSION,'created'=>false,'changed'=>false,'replayed'=>true,'decision'=>$row,'journal_count'=>count((array)$existing_state['decisions']));return new WP_Error('business_decision_id_conflict','decision_id already refers to different immutable content.',array('status'=>409,'decision_id'=>$decision_id));}}
         return self::mutate(static function(array &$state)use($decision_id,$core,$content_hash){
             foreach((array)($state['decisions']??array()) as $row){if(!is_array($row)||$decision_id!==(string)($row['decision_id']??''))continue;if(hash_equals((string)($row['content_hash']??''),$content_hash))return array('ok'=>true,'version'=>self::VERSION,'created'=>false,'changed'=>false,'replayed'=>true,'decision'=>$row,'journal_count'=>count((array)$state['decisions']));return new WP_Error('business_decision_id_conflict','decision_id already refers to different immutable content.',array('status'=>409,'decision_id'=>$decision_id));}
             $row=array_merge(array('decision_id'=>$decision_id),$core,array('content_hash'=>$content_hash,'decided_gmt'=>gmdate('c')));$state['decisions'][]=$row;if(count($state['decisions'])>self::MAX_DECISIONS)$state['decisions']=array_slice($state['decisions'],-self::MAX_DECISIONS);
