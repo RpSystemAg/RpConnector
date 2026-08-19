@@ -20,6 +20,7 @@ import hashlib
 import json
 import os
 import py_compile
+import re
 import shutil
 import subprocess
 import sys
@@ -41,6 +42,7 @@ CODE_SUFFIXES = {".php", ".py", ".js", ".mjs", ".cjs", ".sh", ".bash"}
 DATA_SUFFIXES = {".json", ".yaml", ".yml", ".xml"}
 SYNTAX_SUFFIXES = CODE_SUFFIXES | DATA_SUFFIXES
 DEFAULT_TIMEOUT_SECONDS = 180
+FAILURE_OUTPUT_RE = re.compile(r"\bFAIL(?:ED|URE)?\b")
 
 
 def utc_now() -> str:
@@ -93,6 +95,11 @@ def source_kind(rel: Path) -> str | None:
     return None
 
 
+def output_has_failure_marker(output: str) -> bool:
+    """Treat an explicit FAIL/FAILED/FAILURE token as failure even with exit 0."""
+    return FAILURE_OUTPUT_RE.search(output) is not None
+
+
 def run_command(command: list[str], *, timeout: int, env: dict[str, str] | None = None, trace: Path | None = None) -> dict[str, Any]:
     effective = list(command)
     if trace is not None:
@@ -108,12 +115,14 @@ def run_command(command: list[str], *, timeout: int, env: dict[str, str] | None 
             stderr=subprocess.STDOUT,
             timeout=timeout,
         )
+        failure_marker = output_has_failure_marker(proc.stdout)
         return {
             "command": command,
             "returncode": proc.returncode,
             "duration_seconds": round(time.monotonic() - started, 3),
             "output_tail": proc.stdout[-12000:],
-            "ok": proc.returncode == 0,
+            "failure_marker": failure_marker,
+            "ok": proc.returncode == 0 and not failure_marker,
         }
     except subprocess.TimeoutExpired as exc:
         output = exc.stdout if isinstance(exc.stdout, str) else ""
@@ -262,7 +271,7 @@ def main() -> int:
 
     syntax_records: dict[str, Any] = {}
     execution_records: dict[str, Any] = {}
-    trace_texts: list[str] = []
+    successful_trace_texts: list[str] = []
     failures: list[str] = []
 
     with tempfile.TemporaryDirectory(prefix="rp-full-surface-") as tmp:
@@ -283,7 +292,6 @@ def main() -> int:
             trace = temp / f"trace-{index:04d}.log"
             result = run_command(command, timeout=args.timeout_seconds, env=env, trace=trace)
             trace_text = trace.read_text(encoding="utf-8", errors="replace") if trace.exists() else ""
-            trace_texts.append(trace_text)
             evidence = successful_runtime_evidence(trace_text, rel)
             result["sha256"] = sha256(ROOT / rel)
             result["mode"] = "direct-runtime"
@@ -291,14 +299,17 @@ def main() -> int:
             if result["ok"] and evidence is None:
                 result["ok"] = False
                 result["evidence_error"] = "successful process had no syscall evidence for the exact file"
+            if result["ok"]:
+                successful_trace_texts.append(trace_text)
             execution_records[rel.as_posix()] = result
             if not result["ok"]:
                 failures.append(
                     f"execution:{rel.as_posix()}: rc={result.get('returncode')} timeout={result.get('timeout', False)} "
-                    f"evidence={bool(evidence)} output={result.get('output_tail', '')[-3000:]}"
+                    f"failure_marker={result.get('failure_marker', False)} evidence={bool(evidence)} "
+                    f"output={result.get('output_tail', '')[-3000:]}"
                 )
 
-        combined_trace = "\n".join(trace_texts)
+        combined_trace = "\n".join(successful_trace_texts)
         for rel in surface:
             key = rel.as_posix()
             if key in execution_records:
@@ -332,6 +343,8 @@ def main() -> int:
             "test_execution_target_source": [root.as_posix() for root in TEST_ROOTS],
             "parse_does_not_count_as_execution": True,
             "direct_execution_requires_syscall_evidence": True,
+            "failed_process_trace_cannot_count_data_execution": True,
+            "failure_output_with_zero_exit_is_failure": True,
             "required_execution_percent": 100.0,
         },
         "counts": {
