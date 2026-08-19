@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   toxiproxy:
-    name: Toxiproxy 2.12.0 / latency bandwidth reset recovery
+    name: Toxiproxy 2.12.0 / latency bandwidth reset mid-operation recovery
     runs-on: ubuntu-latest
     timeout-minutes: 50
     services:
@@ -59,6 +59,8 @@ jobs:
 
       - name: Start proxy and route WordPress database through it
         run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ >/tmp/network-chaos-started-at.txt
           /tmp/toxiproxy-server-linux-amd64 -host 127.0.0.1 -port 8474 >/tmp/toxiproxy.log 2>&1 &
           for i in $(seq 1 50); do curl --fail --silent http://127.0.0.1:8474/version && break; sleep 0.1; done
           curl --fail --silent --show-error -X POST http://127.0.0.1:8474/proxies \
@@ -76,6 +78,7 @@ jobs:
 
       - name: Inject DB latency plus jitter and prove it is observable but bounded
         run: |
+          set -euo pipefail
           curl --fail --silent --show-error -X POST http://127.0.0.1:8474/proxies/mysql/toxics \
             -H 'Content-Type: application/json' \
             --data '{"name":"db-latency","type":"latency","stream":"downstream","toxicity":1.0,"attributes":{"latency":700,"jitter":250}}' >/tmp/toxi-latency.json
@@ -84,29 +87,139 @@ jobs:
           end=$(date +%s%3N)
           elapsed=$((end-start))
           echo "observed DB latency=${elapsed}ms"
-          test "$elapsed" -ge 400
-          test "$elapsed" -lt 8000
           curl --fail --silent -X DELETE http://127.0.0.1:8474/proxies/mysql/toxics/db-latency >/dev/null
+          jq -n \
+            --arg commit "$GITHUB_SHA" \
+            --argjson elapsed_ms "$elapsed" \
+            --slurpfile toxic /tmp/toxi-latency.json \
+            '{commit_sha:$commit,elapsed_ms:$elapsed_ms,configured_latency_ms:$toxic[0].attributes.latency,configured_jitter_ms:$toxic[0].attributes.jitter,siteurl_observed:true}' \
+            >/tmp/db-latency-evidence.json
+          jq -e '.elapsed_ms >= 400 and .elapsed_ms < 8000 and .configured_latency_ms == 700 and .configured_jitter_ms == 250' /tmp/db-latency-evidence.json >/dev/null
 
       - name: Cut DB stream and require bounded failure followed by clean recovery
         run: |
+          set -euo pipefail
           curl --fail --silent --show-error -X POST http://127.0.0.1:8474/proxies/mysql/toxics \
             -H 'Content-Type: application/json' \
             --data '{"name":"db-timeout","type":"timeout","stream":"downstream","toxicity":1.0,"attributes":{"timeout":100}}' >/tmp/toxi-timeout.json
+          start=$(date +%s%3N)
           set +e
           timeout 6s wp option get siteurl --path="$WP_PATH" >/tmp/db-cut.out 2>/tmp/db-cut.err
           code=$?
           set -e
-          test "$code" -ne 0
-          test "$code" -ne 124
+          end=$(date +%s%3N)
+          elapsed=$((end-start))
           curl --fail --silent -X DELETE http://127.0.0.1:8474/proxies/mysql/toxics/db-timeout >/dev/null
           sleep 0.5
-          timeout 8s wp db check --path="$WP_PATH"
+          recovery_start=$(date +%s%3N)
+          timeout 8s wp db check --path="$WP_PATH" >/tmp/post-timeout-db-check.txt
           timeout 8s wp eval --path="$WP_PATH" 'echo wp_json_encode(PRSTUDIO_UC_Store::queue_stats()),"\n";' >/tmp/post-db-recovery.json
-          jq -e 'type == "object"' /tmp/post-db-recovery.json
+          recovery_end=$(date +%s%3N)
+          recovery_elapsed=$((recovery_end-recovery_start))
+          jq -e 'type == "object"' /tmp/post-db-recovery.json >/dev/null
+          jq -n \
+            --arg commit "$GITHUB_SHA" \
+            --argjson exit_code "$code" \
+            --argjson elapsed_ms "$elapsed" \
+            --argjson recovery_elapsed_ms "$recovery_elapsed" \
+            --slurpfile toxic /tmp/toxi-timeout.json \
+            '{commit_sha:$commit,operation_exit_code:$exit_code,elapsed_ms:$elapsed_ms,harness_deadline_ms:6000,configured_timeout_ms:$toxic[0].attributes.timeout,db_check_ok:true,queue_queryable:true,recovery_elapsed_ms:$recovery_elapsed_ms}' \
+            >/tmp/db-timeout-evidence.json
+          jq -e '.operation_exit_code != 0 and .operation_exit_code != 124 and .elapsed_ms < .harness_deadline_ms and .configured_timeout_ms == 100 and .db_check_ok == true and .queue_queryable == true and .recovery_elapsed_ms < 12000' /tmp/db-timeout-evidence.json >/dev/null
+
+      - name: Disconnect database while a transaction is already in flight
+        run: |
+          set -euo pipefail
+          table="$(wp db prefix --path="$WP_PATH")rpconnector_chaos_tx"
+          wp db query --path="$WP_PATH" "DROP TABLE IF EXISTS \`${table}\`; CREATE TABLE \`${table}\` (id BIGINT UNSIGNED NOT NULL PRIMARY KEY, state VARCHAR(32) NOT NULL) ENGINE=InnoDB;"
+          cat >/tmp/db-mid-operation.sql <<SQL
+          START TRANSACTION;
+          INSERT INTO \`${table}\` (id, state) VALUES (1, 'started');
+          SELECT SLEEP(20);
+          UPDATE \`${table}\` SET state = 'successful' WHERE id = 1;
+          COMMIT;
+          SELECT 'RPCHAOS_SUCCESS';
+          SQL
+          cat >/tmp/probe-inflight.php <<'PHP'
+          <?php
+          $db = new mysqli('127.0.0.1', 'root', '', 'wordpress_chaos', 3306);
+          if ($db->connect_errno) {
+              exit(2);
+          }
+          $result = $db->query("SELECT ID, STATE FROM information_schema.PROCESSLIST WHERE DB='wordpress_chaos' AND INFO LIKE '%SLEEP(20)%' LIMIT 1");
+          if ($result && ($row = $result->fetch_assoc())) {
+              echo $row['ID'], ':', (string) $row['STATE'];
+          }
+          PHP
+
+          operation_start=$(date +%s%3N)
+          timeout 12s wp db query --path="$WP_PATH" </tmp/db-mid-operation.sql >/tmp/db-mid-operation.out 2>/tmp/db-mid-operation.err &
+          operation_pid=$!
+
+          inflight=0
+          backend_probe=''
+          for i in $(seq 1 100); do
+            backend_probe="$(php /tmp/probe-inflight.php 2>/dev/null || true)"
+            if test -n "$backend_probe"; then
+              inflight=1
+              break
+            fi
+            sleep 0.05
+          done
+          test "$inflight" -eq 1
+          echo "$backend_probe" >/tmp/db-mid-operation-process.txt
+
+          restore_proxy() {
+            curl --silent --show-error -X POST http://127.0.0.1:8474/proxies/mysql \
+              -H 'Content-Type: application/json' --data '{"enabled":true}' >/tmp/toxi-mid-op-enable-cleanup.json || true
+          }
+          trap restore_proxy EXIT
+
+          curl --fail --silent --show-error -X POST http://127.0.0.1:8474/proxies/mysql \
+            -H 'Content-Type: application/json' --data '{"enabled":false}' >/tmp/toxi-mid-op-disable.json
+          jq -e '.enabled == false' /tmp/toxi-mid-op-disable.json >/dev/null
+
+          set +e
+          wait "$operation_pid"
+          code=$?
+          set -e
+          operation_end=$(date +%s%3N)
+          elapsed=$((operation_end-operation_start))
+
+          curl --fail --silent --show-error -X POST http://127.0.0.1:8474/proxies/mysql \
+            -H 'Content-Type: application/json' --data '{"enabled":true}' >/tmp/toxi-mid-op-enable.json
+          jq -e '.enabled == true' /tmp/toxi-mid-op-enable.json >/dev/null
+          trap - EXIT
+          sleep 0.3
+
+          recovery_start=$(date +%s%3N)
+          timeout 8s wp option get siteurl --path="$WP_PATH" >/tmp/post-mid-operation-siteurl.txt
+          timeout 8s wp db check --path="$WP_PATH" >/tmp/post-mid-operation-db-check.txt
+          timeout 8s wp eval --path="$WP_PATH" 'echo wp_json_encode(PRSTUDIO_UC_Store::queue_stats()),"\n";' >/tmp/post-mid-operation-queue.json
+          jq -e 'type == "object"' /tmp/post-mid-operation-queue.json >/dev/null
+          partial_rows="$(timeout 8s wp db query --path="$WP_PATH" --skip-column-names "SELECT COUNT(*) FROM \`${table}\` WHERE id = 1;" | tr -d '[:space:]')"
+          recovery_end=$(date +%s%3N)
+          recovery_elapsed=$((recovery_end-recovery_start))
+
+          success_marker=false
+          if grep -q 'RPCHAOS_SUCCESS' /tmp/db-mid-operation.out; then success_marker=true; fi
+          jq -n \
+            --arg commit "$GITHUB_SHA" \
+            --arg backend_probe "$backend_probe" \
+            --argjson inflight "$inflight" \
+            --argjson exit_code "$code" \
+            --argjson elapsed_ms "$elapsed" \
+            --argjson success_marker "$success_marker" \
+            --argjson partial_rows "$partial_rows" \
+            --argjson recovery_elapsed_ms "$recovery_elapsed" \
+            '{commit_sha:$commit,operation:"transaction_insert_sleep_update_commit",backend_probe:$backend_probe,inflight_observed:($inflight == 1),disconnect_action:"toxiproxy_proxy_enabled_false",operation_exit_code:$exit_code,elapsed_ms:$elapsed,harness_deadline_ms:12000,success_marker_present:$success_marker,proxy_restored:true,wordpress_operational:true,db_check_ok:true,queue_queryable:true,partial_transaction_rows:$partial_rows,recovery_elapsed_ms:$recovery_elapsed_ms}' \
+            >/tmp/db-mid-operation-evidence.json
+
+          jq -e '.inflight_observed == true and .operation_exit_code != 0 and .operation_exit_code != 124 and .elapsed_ms < .harness_deadline_ms and .success_marker_present == false and .proxy_restored == true and .wordpress_operational == true and .db_check_ok == true and .queue_queryable == true and .partial_transaction_rows == 0 and .recovery_elapsed_ms < 12000' /tmp/db-mid-operation-evidence.json >/dev/null
 
       - name: Put WordPress HTTP itself behind Toxiproxy
         run: |
+          set -euo pipefail
           dd if=/dev/zero of="$WP_PATH/bandwidth.bin" bs=1024 count=256 status=none
           PHP_CLI_SERVER_WORKERS=8 php -S 127.0.0.1:8080 -t "$WP_PATH" "$WP_PATH/index.php" >/tmp/chaos-wp.log 2>&1 &
           for i in $(seq 1 100); do curl --fail --silent http://127.0.0.1:8080/ >/dev/null && break; sleep 0.1; done
@@ -117,6 +230,7 @@ jobs:
 
       - name: Bandwidth backpressure is real, measurable and bounded
         run: |
+          set -euo pipefail
           curl --fail --silent --show-error -X POST http://127.0.0.1:8474/proxies/http/toxics \
             -H 'Content-Type: application/json' \
             --data '{"name":"http-bandwidth","type":"bandwidth","stream":"downstream","toxicity":1.0,"attributes":{"rate":32}}' >/tmp/toxi-bandwidth.json
@@ -126,34 +240,225 @@ jobs:
           elapsed=$((end-start))
           bytes=$(wc -c </tmp/bandwidth-received.bin)
           echo "bandwidth transfer bytes=$bytes elapsed=${elapsed}ms"
-          test "$bytes" -eq 262144
-          test "$elapsed" -ge 5000
-          test "$elapsed" -lt 15000
           curl --fail --silent -X DELETE http://127.0.0.1:8474/proxies/http/toxics/http-bandwidth >/dev/null
+          jq -n \
+            --arg commit "$GITHUB_SHA" \
+            --argjson bytes "$bytes" \
+            --argjson elapsed_ms "$elapsed" \
+            --slurpfile toxic /tmp/toxi-bandwidth.json \
+            '{commit_sha:$commit,bytes:$bytes,elapsed_ms:$elapsed_ms,configured_rate_kib_per_second:$toxic[0].attributes.rate}' \
+            >/tmp/http-bandwidth-evidence.json
+          jq -e '.bytes == 262144 and .elapsed_ms >= 5000 and .elapsed_ms < 15000 and .configured_rate_kib_per_second == 32' /tmp/http-bandwidth-evidence.json >/dev/null
 
       - name: HTTP latency/reset is bounded and target recovers
         run: |
+          set -euo pipefail
           curl --fail --silent --show-error -X POST http://127.0.0.1:8474/proxies/http/toxics \
             -H 'Content-Type: application/json' \
-            --data '{"name":"http-latency","type":"latency","stream":"downstream","toxicity":1.0,"attributes":{"latency":900,"jitter":300}}' >/dev/null
-          start=$(date +%s%3N)
+            --data '{"name":"http-latency","type":"latency","stream":"downstream","toxicity":1.0,"attributes":{"latency":900,"jitter":300}}' >/tmp/toxi-http-latency.json
+          latency_start=$(date +%s%3N)
           curl --fail --silent --max-time 6 http://127.0.0.1:18080/ >/dev/null
-          end=$(date +%s%3N)
-          test $((end-start)) -ge 500
+          latency_end=$(date +%s%3N)
+          latency_elapsed=$((latency_end-latency_start))
+          test "$latency_elapsed" -ge 500
           curl --fail --silent -X DELETE http://127.0.0.1:8474/proxies/http/toxics/http-latency >/dev/null
 
           curl --fail --silent --show-error -X POST http://127.0.0.1:8474/proxies/http/toxics \
             -H 'Content-Type: application/json' \
-            --data '{"name":"http-reset","type":"reset_peer","stream":"downstream","toxicity":1.0,"attributes":{"timeout":0}}' >/dev/null
+            --data '{"name":"http-reset","type":"reset_peer","stream":"downstream","toxicity":1.0,"attributes":{"timeout":0}}' >/tmp/toxi-http-reset.json
+          reset_start=$(date +%s%3N)
           set +e
           curl --fail --silent --max-time 4 http://127.0.0.1:18080/ >/tmp/http-reset.out 2>/tmp/http-reset.err
           code=$?
           set -e
-          test "$code" -ne 0
+          reset_end=$(date +%s%3N)
+          reset_elapsed=$((reset_end-reset_start))
           curl --fail --silent -X DELETE http://127.0.0.1:8474/proxies/http/toxics/http-reset >/dev/null
           sleep 0.2
+          recovery_start=$(date +%s%3N)
           curl --fail --silent --max-time 6 http://127.0.0.1:18080/ >/dev/null
-          wp db check --path="$WP_PATH"
+          wp db check --path="$WP_PATH" >/tmp/post-http-reset-db-check.txt
+          recovery_end=$(date +%s%3N)
+          recovery_elapsed=$((recovery_end-recovery_start))
+          jq -n \
+            --arg commit "$GITHUB_SHA" \
+            --argjson exit_code "$code" \
+            --argjson reset_elapsed_ms "$reset_elapsed" \
+            --argjson latency_elapsed_ms "$latency_elapsed" \
+            --argjson recovery_elapsed_ms "$recovery_elapsed" \
+            --slurpfile toxic /tmp/toxi-http-reset.json \
+            '{commit_sha:$commit,reset_exit_code:$exit_code,reset_elapsed_ms:$reset_elapsed_ms,reset_deadline_ms:4000,latency_elapsed_ms:$latency_elapsed_ms,reset_timeout_ms:$toxic[0].attributes.timeout,http_recovered:true,db_check_ok:true,recovery_elapsed_ms:$recovery_elapsed_ms}' \
+            >/tmp/http-reset-evidence.json
+          jq -e '.reset_exit_code != 0 and .reset_exit_code != 28 and .reset_elapsed_ms < .reset_deadline_ms and .reset_timeout_ms == 0 and .http_recovered == true and .db_check_ok == true and .recovery_elapsed_ms < 8000' /tmp/http-reset-evidence.json >/dev/null
+
+      - name: Produce property-specific network chaos production receipt
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from __future__ import annotations
+          import hashlib
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          root = Path('/tmp')
+          commit = os.environ['GITHUB_SHA']
+          leaf_names = [
+              'db-latency-evidence.json',
+              'db-timeout-evidence.json',
+              'db-mid-operation-evidence.json',
+              'http-bandwidth-evidence.json',
+              'http-reset-evidence.json',
+          ]
+          leaf = {name: json.loads((root / name).read_text(encoding='utf-8')) for name in leaf_names}
+          for name, value in leaf.items():
+              if value.get('commit_sha') != commit:
+                  raise SystemExit(f'{name}: commit binding mismatch')
+
+          latency = leaf['db-latency-evidence.json']
+          timeout = leaf['db-timeout-evidence.json']
+          mid = leaf['db-mid-operation-evidence.json']
+          bandwidth = leaf['http-bandwidth-evidence.json']
+          reset = leaf['http-reset-evidence.json']
+
+          checks = [
+              {
+                  'id': 'latency',
+                  'step': 'Inject DB latency plus jitter and prove it is observable but bounded',
+                  'ok': 400 <= latency['elapsed_ms'] < 8000 and latency['configured_latency_ms'] == 700,
+                  'evidence': [{'file': 'db-latency-evidence.json'}],
+                  'metrics': {'elapsed_ms': latency['elapsed_ms'], 'configured_latency_ms': latency['configured_latency_ms']},
+              },
+              {
+                  'id': 'jitter',
+                  'step': 'Inject DB latency plus jitter and prove it is observable but bounded',
+                  'ok': latency['configured_jitter_ms'] == 250,
+                  'evidence': [{'file': 'db-latency-evidence.json'}],
+                  'metrics': {'configured_jitter_ms': latency['configured_jitter_ms']},
+              },
+              {
+                  'id': 'connection_reset',
+                  'step': 'HTTP latency/reset is bounded and target recovers',
+                  'ok': reset['reset_exit_code'] not in (0, 28) and reset['reset_elapsed_ms'] < reset['reset_deadline_ms'] and reset['http_recovered'] is True,
+                  'evidence': [{'file': 'http-reset-evidence.json'}],
+                  'metrics': {'exit_code': reset['reset_exit_code'], 'elapsed_ms': reset['reset_elapsed_ms'], 'deadline_ms': reset['reset_deadline_ms']},
+              },
+              {
+                  'id': 'timeout',
+                  'step': 'Cut DB stream and require bounded failure followed by clean recovery',
+                  'ok': timeout['operation_exit_code'] not in (0, 124) and timeout['elapsed_ms'] < timeout['harness_deadline_ms'] and timeout['configured_timeout_ms'] == 100,
+                  'evidence': [{'file': 'db-timeout-evidence.json'}],
+                  'metrics': {'exit_code': timeout['operation_exit_code'], 'elapsed_ms': timeout['elapsed_ms'], 'deadline_ms': timeout['harness_deadline_ms']},
+              },
+              {
+                  'id': 'bandwidth_limit',
+                  'step': 'Bandwidth backpressure is real, measurable and bounded',
+                  'ok': bandwidth['bytes'] == 262144 and 5000 <= bandwidth['elapsed_ms'] < 15000 and bandwidth['configured_rate_kib_per_second'] == 32,
+                  'evidence': [{'file': 'http-bandwidth-evidence.json'}],
+                  'metrics': {'bytes': bandwidth['bytes'], 'elapsed_ms': bandwidth['elapsed_ms'], 'rate_kib_per_second': bandwidth['configured_rate_kib_per_second']},
+              },
+              {
+                  'id': 'database_disconnect_mid_operation',
+                  'step': 'Disconnect database while a transaction is already in flight',
+                  'ok': (
+                      mid['inflight_observed'] is True
+                      and mid['operation_exit_code'] not in (0, 124)
+                      and mid['elapsed_ms'] < mid['harness_deadline_ms']
+                      and mid['success_marker_present'] is False
+                      and mid['proxy_restored'] is True
+                      and mid['wordpress_operational'] is True
+                      and mid['db_check_ok'] is True
+                      and mid['queue_queryable'] is True
+                      and mid['partial_transaction_rows'] == 0
+                  ),
+                  'evidence': [{'file': 'db-mid-operation-evidence.json'}],
+                  'metrics': {
+                      'exit_code': mid['operation_exit_code'],
+                      'elapsed_ms': mid['elapsed_ms'],
+                      'deadline_ms': mid['harness_deadline_ms'],
+                      'partial_transaction_rows': mid['partial_transaction_rows'],
+                      'backend_probe': mid['backend_probe'],
+                  },
+              },
+              {
+                  'id': 'recovery_is_bounded',
+                  'step': 'DB timeout, DB mid-operation disconnect, and HTTP reset recovery probes',
+                  'ok': (
+                      timeout['db_check_ok'] is True
+                      and timeout['queue_queryable'] is True
+                      and timeout['recovery_elapsed_ms'] < 12000
+                      and mid['proxy_restored'] is True
+                      and mid['wordpress_operational'] is True
+                      and mid['db_check_ok'] is True
+                      and mid['queue_queryable'] is True
+                      and mid['recovery_elapsed_ms'] < 12000
+                      and reset['http_recovered'] is True
+                      and reset['db_check_ok'] is True
+                      and reset['recovery_elapsed_ms'] < 8000
+                  ),
+                  'evidence': [
+                      {'file': 'db-timeout-evidence.json'},
+                      {'file': 'db-mid-operation-evidence.json'},
+                      {'file': 'http-reset-evidence.json'},
+                  ],
+                  'metrics': {
+                      'db_timeout_recovery_ms': timeout['recovery_elapsed_ms'],
+                      'db_mid_operation_recovery_ms': mid['recovery_elapsed_ms'],
+                      'http_reset_recovery_ms': reset['recovery_elapsed_ms'],
+                  },
+              },
+          ]
+
+          def sha256(path: Path) -> str:
+              return hashlib.sha256(path.read_bytes()).hexdigest()
+
+          evidence_files = [
+              {'name': name, 'bytes': (root / name).stat().st_size, 'sha256': sha256(root / name)}
+              for name in leaf_names
+          ]
+          details = {
+              'schema_version': 1,
+              'gate_id': 'network_chaos',
+              'commit_sha': commit,
+              'workflow': '.github/workflows/network-chaos.yml',
+              'tool': 'Shopify Toxiproxy',
+              'tool_version': os.environ.get('TOXIPROXY_VERSION', ''),
+              'checks': checks,
+              'evidence_files': evidence_files,
+              'official_sources': ['https://github.com/Shopify/toxiproxy'],
+          }
+          details_path = root / 'network-chaos-details.json'
+          details_path.write_text(json.dumps(details, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+
+          artifact_names = [*leaf_names, 'network-chaos-details.json']
+          artifacts = [
+              {'path': f'evidence/production/{name}', 'sha256': sha256(root / name)}
+              for name in artifact_names
+          ]
+          all_ok = all(check['ok'] is True for check in checks)
+          receipt = {
+              'schema_version': 1,
+              'gate_id': 'network_chaos',
+              'commit_sha': commit,
+              'ok': all_ok,
+              'started_at': (root / 'network-chaos-started-at.txt').read_text(encoding='utf-8').strip(),
+              'finished_at': datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'),
+              'environment': {'real': True, 'class': 'github-actions-wordpress-mariadb-toxiproxy'},
+              'checks': checks,
+              'artifacts': artifacts,
+              'waivers': [],
+              'skipped': [],
+              'degraded': False,
+          }
+          (root / 'network-chaos.json').write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          if not all_ok:
+              for check in checks:
+                  if check['ok'] is not True:
+                      print('FAIL network_chaos.' + check['id'])
+              raise SystemExit(1)
+          print('PASS network_chaos property-specific receipt checks=7/7')
+          PY
 
       - name: Preserve chaos evidence
         if: always()
@@ -161,12 +466,22 @@ jobs:
         with:
           name: network-chaos-${{ github.sha }}
           path: |
+            /tmp/network-chaos.json
+            /tmp/network-chaos-details.json
+            /tmp/db-latency-evidence.json
+            /tmp/db-timeout-evidence.json
+            /tmp/db-mid-operation-evidence.json
+            /tmp/http-bandwidth-evidence.json
+            /tmp/http-reset-evidence.json
+            /tmp/network-chaos-started-at.txt
             /tmp/toxiproxy.log
             /tmp/toxi-*.json
             /tmp/db-cut.*
+            /tmp/db-mid-operation.*
+            /tmp/post-*.json
+            /tmp/post-*.txt
             /tmp/http-reset.*
-            /tmp/post-db-recovery.json
             /tmp/bandwidth-received.bin
             /tmp/chaos-wp.log
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 30
