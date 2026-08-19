@@ -14,6 +14,12 @@ final class PRSTUDIO_UC_Job_Engine {
 		return PRSTUDIO_UC_Store::create_task( $action, $arguments, $device_uuid, $idempotency, $plan_hash, $job_uuid );
 	}
 
+	private static function persistent_browser_payload( array $payload ): array {
+		if ( ! class_exists( 'PRSTUDIO_UC_Memory' ) ) { return $payload; }
+		$clean = PRSTUDIO_UC_Memory::redact( $payload );
+		return is_array( $clean ) ? $clean : array();
+	}
+
 	private static function reconcile_browser_parent( array $task, bool $ok, array $payload ): bool {
 		$job_uuid = (string) ( $task['job_uuid'] ?? '' );
 		if ( '' === $job_uuid ) { return false; }
@@ -27,14 +33,15 @@ final class PRSTUDIO_UC_Job_Engine {
 		$checkpoint['browser_completed_gmt'] = gmdate( 'c' );
 		$checkpoint['browser_terminal_status'] = $status;
 		if ( $ok || PRSTUDIO_UC_State_Machine::COMPLETED === $status ) {
-			$checkpoint['browser_result'] = $payload;
+			$checkpoint['browser_result'] = self::persistent_browser_payload( $payload );
 			$checkpoint['browser_error'] = null;
 			return is_array( PRSTUDIO_UC_Store::set_job_state( $job_uuid, 'READY', array( 'checkpoint'=>$checkpoint, 'available_gmt'=>gmdate('Y-m-d H:i:s') ) ) );
 		}
 		if ( PRSTUDIO_UC_State_Machine::CANCELLED === $status ) {
 			$error = $payload ?: array( 'code'=>'browser_task_cancelled', 'message'=>'Browser task cancelled.', 'retryable'=>false );
-			$checkpoint['browser_error'] = $error;
-			return is_array( PRSTUDIO_UC_Store::set_job_state( $job_uuid, 'CANCELLED', array( 'checkpoint'=>$checkpoint, 'error'=>$error, 'failure_class'=>'browser_cancelled' ) ) );
+			$persistent_error = self::persistent_browser_payload( $error );
+			$checkpoint['browser_error'] = $persistent_error;
+			return is_array( PRSTUDIO_UC_Store::set_job_state( $job_uuid, 'CANCELLED', array( 'checkpoint'=>$checkpoint, 'error'=>$persistent_error, 'failure_class'=>'browser_cancelled' ) ) );
 		}
 		if ( PRSTUDIO_UC_State_Machine::EXPIRED === $status && empty( $payload ) ) {
 			$payload = array( 'code'=>'browser_task_expired', 'message'=>'Browser task expired before completion.', 'retryable'=>true );
@@ -42,11 +49,12 @@ final class PRSTUDIO_UC_Job_Engine {
 		if ( empty( $payload ) ) {
 			$payload = (array) ( $task['error'] ?? array( 'code'=>'browser_task_failed', 'message'=>'Browser task terminated without a result.', 'retryable'=>false ) );
 		}
-		$checkpoint['browser_error'] = $payload;
+		$persistent_error = self::persistent_browser_payload( $payload );
+		$checkpoint['browser_error'] = $persistent_error;
 		if ( ! empty( $payload['retryable'] ) && (int) $job['attempts'] < (int) $job['max_attempts'] ) {
-			return is_array( PRSTUDIO_UC_Store::set_job_state( $job_uuid, 'READY', array( 'checkpoint'=>$checkpoint, 'error'=>$payload, 'failure_class'=>'browser_retryable', 'available_gmt'=>gmdate('Y-m-d H:i:s',time()+30) ) ) );
+			return is_array( PRSTUDIO_UC_Store::set_job_state( $job_uuid, 'READY', array( 'checkpoint'=>$checkpoint, 'error'=>$persistent_error, 'failure_class'=>'browser_retryable', 'available_gmt'=>gmdate('Y-m-d H:i:s',time()+30) ) ) );
 		}
-		return is_array( PRSTUDIO_UC_Store::set_job_state( $job_uuid, 'TECHNICAL_ERROR', array( 'checkpoint'=>$checkpoint, 'error'=>$payload, 'failure_class'=>'browser_terminal' ) ) );
+		return is_array( PRSTUDIO_UC_Store::set_job_state( $job_uuid, 'TECHNICAL_ERROR', array( 'checkpoint'=>$checkpoint, 'error'=>$persistent_error, 'failure_class'=>'browser_terminal' ) ) );
 	}
 
 	private static function reconcile_terminal_browser_task( array $task ): bool {
@@ -61,7 +69,7 @@ final class PRSTUDIO_UC_Job_Engine {
 			return self::reconcile_browser_parent( $task, false, array( 'code'=>'browser_task_cancelled', 'message'=>'Browser task cancelled.', 'retryable'=>false ) );
 		}
 		if ( PRSTUDIO_UC_State_Machine::EXPIRED === $status ) {
-			return self::reconcile_browser_parent( $task, false, array( 'code'=>'browser_task_expired', 'message'=>'Browser task expired before completion.', 'retryable'=>true ) );
+			return self::reconcile_browser_parent( $task, false, array( 'code'=>'browser_task_expired', 'message'=>'Browser task expired.', 'retryable'=>true ) );
 		}
 		return false;
 	}
