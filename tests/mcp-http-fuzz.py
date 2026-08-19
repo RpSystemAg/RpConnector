@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Deterministic black-box fuzzing for the real MCP HTTP endpoint.
 
-Requires RP_MCP_URL and RP_MCP_TOKEN. Secrets are never printed. The invariant
-is fail-closed: malformed/bounded attacker-controlled input may be rejected but
-must never yield 5xx, hang beyond the request deadline, or bypass the modern
-protocol envelope.
+Requires RP_MCP_URL and RP_MCP_TOKEN. Secrets are never printed. Before fuzzing,
+a valid authenticated MCP ping must succeed against the same endpoint/token. The
+fuzz run therefore cannot turn an always-401 authentication failure into green.
+Malformed/bounded attacker-controlled input may be rejected but must never yield
+5xx, hang beyond the request deadline, or bypass the modern protocol envelope.
 """
 from __future__ import annotations
 
@@ -22,7 +23,9 @@ if not URL or not TOKEN:
     print('FAIL RP_MCP_URL and RP_MCP_TOKEN are required', file=sys.stderr)
     sys.exit(2)
 
-ALLOWED = {200, 204, 400, 401, 403, 404, 405, 409, 413, 429}
+# The same known-valid Bearer token is used for every case. Authentication loss
+# is therefore a test failure, not an acceptable malformed-input response.
+ALLOWED = {200, 204, 400, 404, 405, 409, 413, 429}
 MAX_SECONDS = 5.0
 
 
@@ -50,6 +53,30 @@ def meta() -> dict:
         'io.modelcontextprotocol/clientCapabilities': {},
         'io.modelcontextprotocol/clientInfo': {'name': 'rpconnector-fuzz', 'version': '1.0'},
     }
+
+
+baseline_payload = json.dumps({
+    'jsonrpc': '2.0',
+    'id': 'authenticated-baseline',
+    'method': 'ping',
+    'params': {'_meta': meta()},
+}).encode('utf-8')
+try:
+    baseline_status, baseline_body, baseline_elapsed = request(baseline_payload, 'ping', '')
+except Exception as exc:
+    print(f'FAIL authenticated MCP baseline transport exception {type(exc).__name__}: {exc}', file=sys.stderr)
+    sys.exit(1)
+if baseline_status not in {200, 204}:
+    print(
+        f'FAIL authenticated MCP baseline returned HTTP {baseline_status}; '
+        f'body_prefix={baseline_body[:240]!r}',
+        file=sys.stderr,
+    )
+    sys.exit(1)
+if baseline_elapsed > MAX_SECONDS:
+    print(f'FAIL authenticated MCP baseline exceeded {MAX_SECONDS}s: {baseline_elapsed:.3f}s', file=sys.stderr)
+    sys.exit(1)
+print(f'PASS authenticated MCP baseline HTTP {baseline_status} latency={baseline_elapsed:.3f}s')
 
 cases: list[tuple[str, bytes, str, str]] = [
     ('malformed-json', b'{', 'ping', ''),
@@ -83,7 +110,7 @@ for i in range(120):
     cases.append((f'random-{i:03d}', raw, expected_method, ''))
 
 failures: list[str] = []
-max_latency = 0.0
+max_latency = baseline_elapsed
 for name, raw, method_header, name_header in cases:
     try:
         status, body, elapsed = request(raw, method_header, name_header)
@@ -98,7 +125,7 @@ for name, raw, method_header, name_header in cases:
     if len(body) >= 2_000_000:
         failures.append(f'{name}: response exceeded 2MB fuzz safety bound')
 
-print(f'MCP HTTP FUZZ: cases={len(cases)} failures={len(failures)} max_latency={max_latency:.3f}s')
+print(f'MCP HTTP FUZZ: baseline=authenticated cases={len(cases)} failures={len(failures)} max_latency={max_latency:.3f}s')
 for failure in failures:
     print('ERROR', failure)
 sys.exit(1 if failures else 0)

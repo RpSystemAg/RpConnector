@@ -6,6 +6,10 @@ Each scenario is fail-closed and ordered:
   -> recover -> post_recovery
 No shell is used. A scenario cannot pass if cleanup/recovery fails even when the
 product correctly detected the original fault.
+
+A bare invocation runs a deterministic self-test of the harness. It exercises
+real subprocess success/failure and validates every required phase contract, but
+never claims destructive production-staging evidence.
 """
 from __future__ import annotations
 
@@ -15,6 +19,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -99,13 +104,66 @@ def run(command: list[Any], timeout: int, env: dict[str, str]) -> tuple[bool, di
         return False, {"argv": argv, "error": f"{type(exc).__name__}: {exc}"}
 
 
+def self_test() -> int:
+    failures: list[str] = []
+    if len(REQUIRED) != len(set(REQUIRED)) or not REQUIRED:
+        failures.append("required scenario inventory is empty or duplicated")
+    if PHASES != ["inject", "exercise", "oracle", "recover", "post_recovery"]:
+        failures.append(f"fault phase order changed unexpectedly: {PHASES}")
+
+    valid = [sys.executable, "-c", "import sys; sys.exit(0)"]
+    for scenario in REQUIRED:
+        for phase in PHASES:
+            errors = validate_command(valid, scenario, phase)
+            if errors:
+                failures.append(f"valid command rejected for {scenario}.{phase}: {errors}")
+    if not validate_command([], "self_test", "inject"):
+        failures.append("empty command was accepted")
+    if not validate_command(["REPLACE_ME"], "self_test", "oracle"):
+        failures.append("placeholder command was accepted")
+
+    env = os.environ.copy()
+    env["RP_FAULT_SCENARIO"] = "self_test"
+    env["RP_FAULT_PHASE"] = "exercise"
+    ok, detail = run([sys.executable, "-c", "print('fault-self-test-ok')"], 10, env)
+    if not ok or detail.get("returncode") != 0 or "fault-self-test-ok" not in detail.get("output_tail", ""):
+        failures.append(f"successful subprocess was not observed: {detail}")
+    bad_ok, bad_detail = run([sys.executable, "-c", "import sys; sys.exit(9)"], 10, env)
+    if bad_ok or bad_detail.get("returncode") != 9:
+        failures.append(f"failing subprocess was not observed: {bad_detail}")
+
+    with tempfile.TemporaryDirectory(prefix="rp-fault-self-test-") as tmp_name:
+        probe = Path(tmp_name) / "evidence.json"
+        probe.write_text(json.dumps({"required": REQUIRED, "phases": PHASES}, sort_keys=True) + "\n", encoding="utf-8")
+        if len(digest(probe)) != 64:
+            failures.append("evidence SHA-256 digest is invalid")
+
+    print("PRODUCTION FAULT INJECTION HARNESS SELF-TEST")
+    if failures:
+        for failure in failures:
+            print("FAIL", failure)
+        return 1
+    print("PASS required_scenario_inventory")
+    print("PASS five_phase_contract")
+    print("PASS command_validation")
+    print("PASS subprocess_success_failure_observation")
+    print("PASS evidence_digest")
+    print("SELF_TEST production_fault_evidence_claimed=false")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--profile", required=True)
+    parser.add_argument("--profile", default="")
     parser.add_argument("--commit", default="")
     parser.add_argument("--timeout-seconds", type=int, default=300)
     parser.add_argument("--strict", action="store_true")
     args = parser.parse_args()
+
+    if len(sys.argv) == 1:
+        return self_test()
+    if not args.profile:
+        raise SystemExit("--profile is required for production fault injection")
 
     profile_path = Path(args.profile)
     if not profile_path.is_absolute():
@@ -168,9 +226,6 @@ def main() -> int:
                         scenario_ok = False
                         break
             finally:
-                # Recovery is mandatory after an attempted injection, including when
-                # exercise/oracle fails. We still run it if inject returned nonzero
-                # because a partially applied fault must not be left behind.
                 for phase in ("recover", "post_recovery"):
                     phase_env = env.copy()
                     phase_env["RP_FAULT_SCENARIO"] = scenario
@@ -192,8 +247,6 @@ def main() -> int:
                 },
             })
             if not scenario_ok and args.strict:
-                # Stop additional destructive injections after a failed recovery,
-                # but retain a receipt showing which scenarios were not executed.
                 break
 
     executed_ids = {check["id"] for check in checks}
@@ -241,7 +294,7 @@ def main() -> int:
     for check in checks:
         print(f"{'PASS' if check['ok'] else 'FAIL'} {check['id']}")
     print(f"receipt={receipt_path.relative_to(ROOT)} ok={str(receipt['ok']).lower()}")
-    return 1 if args.strict and not receipt["ok"] else 0
+    return 0 if receipt["ok"] else 1
 
 
 if __name__ == "__main__":
