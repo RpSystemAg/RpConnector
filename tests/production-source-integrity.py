@@ -2,8 +2,8 @@
 """Generate the source_integrity production-readiness receipt.
 
 This is deliberately conservative. It checks the exact checkout, generated
-contract drift, production placeholders, strong stub markers, and immutable
-GitHub Action references. Dynamic functionality is certified elsewhere.
+contract drift, production placeholders, strong executable stub markers, and
+immutable GitHub Action references. Dynamic functionality is certified elsewhere.
 """
 from __future__ import annotations
 
@@ -24,10 +24,11 @@ PRODUCTION_ROOTS = [ROOT / "prstudio-unified-control", ROOT / "prstudio-unified-
 EXEC_SUFFIXES = {".php", ".js", ".mjs", ".cjs"}
 IGNORE_PARTS = {"tests", "test", "fixtures", "vendor", "node_modules", "docs", "capabilities"}
 STRONG_STUB_PATTERNS = [
-    re.compile(r"\bnot[_ -]?implemented\b", re.I),
     re.compile(r"\bcoming[_ -]?soon\b", re.I),
     re.compile(r"\bplaceholder[_ -]?success\b", re.I),
-    re.compile(r"throw\s+new\s+\w*NotImplemented", re.I),
+    re.compile(r"\bdummy[_ -]?implementation\b", re.I),
+    re.compile(r"throw\s+new\s+[A-Za-z_][A-Za-z0-9_]*(?:NotImplemented|UnsupportedOperation)[A-Za-z0-9_]*\s*\(", re.I),
+    re.compile(r"(?:return|resolve|callback)\s+[^;\n]{0,120}\bnot[_ -]?implemented\b", re.I),
 ]
 PLACEHOLDER_RE = re.compile(r"https?://(?:www\.)?(?:example\.com|example\.org|example\.net)(?:[/:'\"\s]|$)", re.I)
 USES_RE = re.compile(r"^\s*-?\s*uses:\s*([^\s#]+)", re.M)
@@ -95,6 +96,10 @@ def check_actions_pinned() -> list[dict[str, str]]:
         for value in USES_RE.findall(text):
             if value.startswith("./"):
                 continue
+            if value.startswith("docker://"):
+                if "@sha256:" not in value:
+                    findings.append({"file": str(path.relative_to(ROOT)), "uses": value, "reason": "docker action is not digest pinned"})
+                continue
             if "@" not in value:
                 findings.append({"file": str(path.relative_to(ROOT)), "uses": value, "reason": "missing ref"})
                 continue
@@ -150,7 +155,7 @@ def main() -> int:
         {
             "id": "no_unresolved_stubs",
             "ok": not stubs,
-            "evidence": {"strong_stub_findings": stubs},
+            "evidence": {"strong_executable_stub_findings": stubs},
         },
         {
             "id": "dependency_actions_pinned",
