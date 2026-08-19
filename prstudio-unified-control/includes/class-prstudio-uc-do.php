@@ -98,6 +98,10 @@ final class PRSTUDIO_UC_Do {
             'repo_map'    => array( 'tool' => 'engineering_repo_map' ),
             'validate_code' => array( 'tool' => 'engineering_validate' ),
             'mission'     => array( 'tool' => 'agency_submit' ),
+            'run_playbook' => array( 'tool' => 'agency_submit' ),
+            'execute_playbook' => array( 'tool' => 'agency_submit' ),
+            'esegui_playbook' => array( 'tool' => 'agency_submit' ),
+            'avvia_playbook' => array( 'tool' => 'agency_submit' ),
         );
     }
 
