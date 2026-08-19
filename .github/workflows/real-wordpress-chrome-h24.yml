@@ -147,7 +147,8 @@ jobs:
           echo $! > /tmp/rpconnector-h24-wp.pid
 
           for i in $(seq 1 100); do
-            if curl --fail --silent "$WP_URL/wp-login.php" | grep -q 'id="user_login"'; then
+            if curl --fail --silent --output /tmp/rpconnector-h24-login.html "$WP_URL/wp-login.php" \
+              && test -s /tmp/rpconnector-h24-login.html; then
               exit 0
             fi
             sleep 0.2
