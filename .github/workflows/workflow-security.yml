@@ -25,6 +25,8 @@ jobs:
           persist-credentials: false
       - name: Block floating Actions, containers and package inputs
         run: python tests/production-supply-chain-source.py --strict
+      - name: Supply-chain receipt verifier rejects forged evidence
+        run: python tests/production-supply-chain-selftest.py
 
   actionlint:
     name: actionlint 1.7.12
