@@ -1,0 +1,164 @@
+{
+  "schema_version": "1.0.0",
+  "contracts": {
+    "agency.status": {
+      "description": "Read the durable agency runtime status, including queue/store health, deterministic playbooks, scheduler topology, and H24 sentinel state; use for diagnostics only and do not infer continuity when the runtime reports unavailable or unscheduled components.",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "version": { "type": "string", "minLength": 1 },
+              "enabled": { "type": "boolean" },
+              "legacy_agency_enabled": { "type": "boolean" },
+              "store": { "type": "object", "additionalProperties": true },
+              "playbooks": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "version": { "type": "string", "minLength": 1 },
+                    "steps": { "type": "integer", "minimum": 0 },
+                    "plan_hash": { "type": "string" }
+                  },
+                  "required": ["version", "steps", "plan_hash"],
+                  "additionalProperties": false
+                }
+              },
+              "scheduler": {
+                "type": "object",
+                "properties": {
+                  "mode": { "type": "string", "enum": ["action_scheduler", "wp_cron"] },
+                  "wp_cron_next": { "type": ["integer", "boolean"] },
+                  "action_scheduler_available": { "type": "boolean" },
+                  "action_scheduler_next": { "type": ["integer", "string", "boolean"] },
+                  "scheduled": { "type": "boolean" },
+                  "next_gmt": { "type": "string" },
+                  "next_run_pending_without_timestamp": { "type": "boolean" },
+                  "topology": { "type": "string" }
+                },
+                "required": ["mode", "wp_cron_next", "action_scheduler_available", "action_scheduler_next", "scheduled", "next_gmt", "next_run_pending_without_timestamp", "topology"],
+                "additionalProperties": false
+              },
+              "h24": { "type": "object", "additionalProperties": true }
+            },
+            "required": ["version", "enabled", "legacy_agency_enabled", "store", "playbooks", "scheduler", "h24"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "ok": { "const": false },
+              "error": { "const": "agency_runtime_unavailable" }
+            },
+            "required": ["ok", "error"],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "browser.inspect": {
+      "description": "Inspect a live Browser Agent target using runtime DOM/network evidence, or a screenshot/OCR path when OCR evidence is explicitly requested; returns the Browser task envelope and never mutates WordPress/site state.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "target": { "type": "string", "minLength": 1, "description": "Live URL or browser target to inspect." },
+          "evidence_required": {
+            "type": "array",
+            "items": { "type": "string" },
+            "maxItems": 25,
+            "description": "Evidence signals; OCR aliases select the screenshot/OCR execution path."
+          }
+        },
+        "required": ["target"],
+        "additionalProperties": false
+      },
+      "output_schema": { "$ref": "#/$defs/browser_task_envelope", "$defs": {
+        "browser_task_envelope": {
+          "type": "object",
+          "properties": {
+            "provider": { "const": "prstudio_chrome_extension" },
+            "target": { "const": "live" },
+            "task_id": { "type": "string" },
+            "correlation_id": { "type": "string", "maxLength": 128 },
+            "correlation_id_canonical": { "type": "boolean" },
+            "status": { "type": "string", "minLength": 1 },
+            "checkpoint": { "type": "object", "additionalProperties": true },
+            "result": { "type": "object", "additionalProperties": true },
+            "error": { "type": "object", "additionalProperties": true },
+            "message": { "type": "string" },
+            "_control_outcome": {
+              "type": "object",
+              "properties": {
+                "status": { "type": "string", "enum": ["verified", "degraded", "cancelled", "expired", "technical_error", "queued"] },
+                "executed": { "type": "boolean" },
+                "mutated": { "const": false },
+                "verified": { "type": "boolean" },
+                "degraded": { "type": "boolean" },
+                "blocking": { "const": false }
+              },
+              "required": ["status", "executed", "mutated", "verified", "degraded", "blocking"],
+              "additionalProperties": false
+            }
+          },
+          "required": ["provider", "target", "task_id", "correlation_id", "correlation_id_canonical", "status", "checkpoint", "result", "error", "message", "_control_outcome"],
+          "additionalProperties": false
+        }
+      } }
+    },
+    "browser.navigate": {
+      "description": "Navigate the live Browser Agent to a target URL with a bounded document readiness mode; returns the Browser task envelope and changes browser navigation state but not WordPress/site state.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "target": { "type": "string", "minLength": 1, "description": "Live URL to navigate to." },
+          "wait_until": {
+            "type": "string",
+            "enum": ["complete", "interactive", "domcontentloaded", "dom_content_loaded", "none", "no_wait", "nowait", "loading"],
+            "default": "complete",
+            "description": "Document readiness mode normalized by the Browser orchestrator."
+          }
+        },
+        "required": ["target"],
+        "additionalProperties": false
+      },
+      "output_schema": { "$ref": "#/$defs/browser_task_envelope", "$defs": {
+        "browser_task_envelope": {
+          "type": "object",
+          "properties": {
+            "provider": { "const": "prstudio_chrome_extension" },
+            "target": { "const": "live" },
+            "task_id": { "type": "string" },
+            "correlation_id": { "type": "string", "maxLength": 128 },
+            "correlation_id_canonical": { "type": "boolean" },
+            "status": { "type": "string", "minLength": 1 },
+            "checkpoint": { "type": "object", "additionalProperties": true },
+            "result": { "type": "object", "additionalProperties": true },
+            "error": { "type": "object", "additionalProperties": true },
+            "message": { "type": "string" },
+            "_control_outcome": {
+              "type": "object",
+              "properties": {
+                "status": { "type": "string", "enum": ["verified", "degraded", "cancelled", "expired", "technical_error", "queued"] },
+                "executed": { "type": "boolean" },
+                "mutated": { "const": false },
+                "verified": { "type": "boolean" },
+                "degraded": { "type": "boolean" },
+                "blocking": { "const": false }
+              },
+              "required": ["status", "executed", "mutated", "verified", "degraded", "blocking"],
+              "additionalProperties": false
+            }
+          },
+          "required": ["provider", "target", "task_id", "correlation_id", "correlation_id_canonical", "status", "checkpoint", "result", "error", "message", "_control_outcome"],
+          "additionalProperties": false
+        }
+      } }
+    }
+  }
+}
