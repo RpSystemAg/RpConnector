@@ -5,6 +5,8 @@ A workflow conclusion alone is not sufficient. Every configured selector must
 match the expected minimum number of jobs and every matched job must conclude
 successfully. Receipt timestamps are inherited from the source runs so stale
 workflow evidence cannot be made fresh merely by regenerating the receipt.
+Collected release artifacts can additionally be required and independently
+rehash-validated before becoming part of a receipt.
 """
 from __future__ import annotations
 
@@ -85,6 +87,111 @@ def z(dt: datetime) -> str:
 
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def validate_sbom(path: Path) -> list[str]:
+    errors: list[str] = []
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return [f"{path.name}: invalid JSON: {exc}"]
+    if value.get("bomFormat") != "CycloneDX" or value.get("specVersion") != "1.6":
+        errors.append(f"{path.name}: expected CycloneDX 1.6")
+    components = value.get("components")
+    if not isinstance(components, list) or len(components) < 3:
+        errors.append(f"{path.name}: components are missing/incomplete")
+        return errors
+    file_components = [component for component in components if isinstance(component, dict) and component.get("type") == "file"]
+    if not file_components:
+        errors.append(f"{path.name}: no shipped file components")
+    for component in file_components:
+        hashes = component.get("hashes")
+        if not isinstance(hashes, list) or not any(
+            item.get("alg") == "SHA-256"
+            and isinstance(item.get("content"), str)
+            and len(item.get("content")) == 64
+            for item in hashes if isinstance(item, dict)
+        ):
+            errors.append(f"{path.name}: file component {component.get('bom-ref')} lacks SHA-256")
+            break
+    return errors
+
+
+def validate_supply_source(path: Path) -> list[str]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return [f"{path.name}: invalid JSON: {exc}"]
+    checks = value.get("checks") if isinstance(value.get("checks"), dict) else {}
+    errors = []
+    for check_id in ("github_actions_commit_pinned", "dependencies_locked"):
+        if checks.get(check_id, {}).get("ok") is not True:
+            errors.append(f"{path.name}: {check_id} is not ok=true")
+    return errors
+
+
+def parse_checksum_manifest(path: Path) -> tuple[dict[str, str], list[str]]:
+    entries: dict[str, str] = {}
+    errors: list[str] = []
+    for line_no, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+        if not line.strip():
+            continue
+        match = re.fullmatch(r"([0-9a-fA-F]{64})\s+[* ]?(.+)", line.strip())
+        if not match:
+            errors.append(f"{path.name}:{line_no}: invalid sha256sum line")
+            continue
+        digest = match.group(1).lower()
+        name = Path(match.group(2).strip()).name
+        if name in entries and entries[name] != digest:
+            errors.append(f"{path.name}:{line_no}: duplicate conflicting checksum for {name}")
+        entries[name] = digest
+    return entries, errors
+
+
+def validate_local_artifacts(gate: dict[str, Any]) -> tuple[list[dict[str, str]], list[str], dict[str, Any]]:
+    required = [str(name) for name in gate.get("required_local_artifacts", [])]
+    artifacts: list[dict[str, str]] = []
+    errors: list[str] = []
+    details: dict[str, Any] = {"required": required, "files": {}}
+    for name in required:
+        path = OUT / name
+        if not path.is_file():
+            errors.append(f"required collected artifact missing: {name}")
+            details["files"][name] = {"exists": False}
+            continue
+        digest = sha256(path)
+        artifacts.append({"path": str(path.relative_to(ROOT)), "sha256": digest})
+        details["files"][name] = {"exists": True, "bytes": path.stat().st_size, "sha256": digest}
+        if name == "sbom.cdx.json":
+            sbom_errors = validate_sbom(path)
+            errors.extend(sbom_errors)
+            details["files"][name]["validation_errors"] = sbom_errors
+        elif name == "supply-chain-source.json":
+            source_errors = validate_supply_source(path)
+            errors.extend(source_errors)
+            details["files"][name]["validation_errors"] = source_errors
+
+    checksum_name = str(gate.get("checksum_manifest", "")).strip()
+    if checksum_name:
+        checksum_path = OUT / checksum_name
+        if not checksum_path.is_file():
+            errors.append(f"checksum manifest missing: {checksum_name}")
+        else:
+            entries, checksum_errors = parse_checksum_manifest(checksum_path)
+            errors.extend(checksum_errors)
+            verification: dict[str, Any] = {}
+            for name in required:
+                if name == checksum_name:
+                    continue
+                path = OUT / name
+                expected = entries.get(name)
+                actual = sha256(path) if path.is_file() else None
+                ok = bool(expected and actual and expected == actual)
+                verification[name] = {"expected": expected, "actual": actual, "ok": ok}
+                if not ok:
+                    errors.append(f"checksum manifest does not verify collected artifact {name}")
+            details["checksum_verification"] = verification
+    return artifacts, errors, details
 
 
 def main() -> int:
@@ -198,11 +305,12 @@ def main() -> int:
                         for job in matched
                     ],
                 })
-
             checks.append({"id": check_id, "ok": check_ok, "evidence": requirement_evidence})
 
+        local_artifacts, artifact_errors, artifact_details = validate_local_artifacts(gate)
+        gate_errors.extend(artifact_errors)
+
         run_values = list(gate_runs.values())
-        time_errors: list[str] = []
         starts: list[datetime] = []
         finishes: list[datetime] = []
         for run in run_values:
@@ -210,10 +318,8 @@ def main() -> int:
                 starts.append(parse_time(str(run.get("created_at", ""))))
                 finishes.append(parse_time(str(run.get("updated_at", ""))))
             except Exception as exc:
-                time_errors.append(f"run {run.get('id')}: invalid timestamps: {exc}")
-        gate_errors.extend(time_errors)
+                gate_errors.append(f"run {run.get('id')}: invalid timestamps: {exc}")
 
-        # Evidence time is inherited from the actual workflows, not the receipt-generation time.
         started_at = z(min(starts)) if starts else "1970-01-01T00:00:00Z"
         finished_at = z(max(finishes)) if finishes else "1970-01-01T00:00:00Z"
         gate_ok = bool(checks) and not gate_errors and all(check.get("ok") is True for check in checks)
@@ -239,10 +345,12 @@ def main() -> int:
                 for run in run_values
             ],
             "checks": checks,
+            "local_artifact_validation": artifact_details,
             "errors": gate_errors,
         }
         detail_path = OUT / f"{gate_id.replace('_', '-')}-workflow-details.json"
         detail_path.write_text(json.dumps(detail, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        receipt_artifacts = [{"path": str(detail_path.relative_to(ROOT)), "sha256": sha256(detail_path)}, *local_artifacts]
         receipt = {
             "schema_version": 1,
             "gate_id": gate_id,
@@ -252,7 +360,7 @@ def main() -> int:
             "finished_at": finished_at,
             "environment": gate.get("environment", {"real": False, "class": "github-actions"}),
             "checks": checks,
-            "artifacts": [{"path": str(detail_path.relative_to(ROOT)), "sha256": sha256(detail_path)}],
+            "artifacts": receipt_artifacts,
             "waivers": [],
             "skipped": [],
             "errors": gate_errors,
