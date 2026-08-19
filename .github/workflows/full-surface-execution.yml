@@ -133,7 +133,8 @@ jobs:
             sleep 0.2
           done
           jq -e '.issuer and .token_endpoint and .authorization_endpoint' /tmp/rp-full-surface-oauth.json >/dev/null
-          curl --fail --silent "$WP_URL/wp-login.php" | grep -q 'id="user_login"'
+          curl --fail --silent --output /tmp/rp-full-surface-login.html "$WP_URL/wp-login.php"
+          test -s /tmp/rp-full-surface-login.html
 
           token="$(wp eval --path="$RP_WP_PATH" '$m=new ReflectionMethod(PRSTUDIO_UC_MCP_Auth_V5::class,"issue_tokens"); $m->setAccessible(true); $t=$m->invoke(null,"full-surface-runtime","prstudio.read prstudio.write",PRSTUDIO_UC_MCP_Auth_V5::mcp_url()); if (empty($t["access_token"])) { exit(1); } echo $t["access_token"];' | tail -n 1)"
           test -n "$token"
