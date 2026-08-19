@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "sources": {
+    "repository_governance": {"workflow":"repository-governance.yml","min_successful_jobs":1},
+    "mcp_official_conformance": {"workflow":"mcp-official-conformance.yml","min_successful_jobs":1},
+    "php_taint_analysis": {"workflow":"php-taint-analysis.yml","min_successful_jobs":1},
+    "generative_stateful": {"workflow":"generative-stateful.yml","min_successful_jobs":1},
+    "mutation_testing": {"workflow":"mutation-testing.yml","min_successful_jobs":1},
+    "authenticated_dast": {"workflow":"dast-security.yml","min_successful_jobs":1},
+    "browser_forward_compatibility": {"workflow":"browser-forward-compatibility.yml","min_successful_jobs":3},
+    "network_chaos": {"workflow":"network-chaos.yml","min_successful_jobs":1},
+    "wordpress_forward_canary": {"workflow":"wordpress-forward-canary.yml","min_successful_jobs":6},
+    "reproducible_build": {"workflow":"reproducible-build.yml","min_successful_jobs":1}
+  },
+  "intentionally_not_status_derived": {
+    "trace_progress_oracle": "requires a real correlated mission trace, not the static readiness workflow",
+    "deterministic_replay": "requires a real mission journal plus offline replay transcript, not the readiness workflow"
+  }
+}
