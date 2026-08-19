@@ -2,6 +2,7 @@
 """Fail if Laws 11-13 or their mechanical enforcement are weakened."""
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -40,6 +41,28 @@ REQUIRED_CLAUSES = (
 def fail(message: str) -> None:
     print(f"FAIL {message}", file=sys.stderr)
     raise SystemExit(1)
+
+
+def assert_failure_output_contract(gate: str) -> None:
+    match = re.search(r'FAILURE_OUTPUT_RE\s*=\s*re\.compile\(r"([^"]+)"\)', gate)
+    if match is None:
+        fail("execution gate missing explicit failure-output matcher")
+    pattern = re.compile(match.group(1))
+    for sample in (
+        "FAIL invariant broken",
+        "worker: FAILED after recovery",
+        "receipt FAILURE detected",
+        "prefix FAIL token with exit zero",
+    ):
+        if pattern.search(sample) is None:
+            fail(f"failure-output matcher accepts explicit failure marker: {sample!r}")
+    for sample in (
+        "PASS invariant",
+        "fail-closed policy text",
+        "failure handling is enabled",
+    ):
+        if pattern.search(sample) is not None:
+            fail(f"failure-output matcher rejects non-failure text: {sample!r}")
 
 
 def main() -> int:
@@ -92,15 +115,25 @@ def main() -> int:
         "ET.parse",
         '"strace"',
         "def successful_runtime_evidence",
+        "def output_has_failure_marker",
         'result["trace_evidence"] = evidence',
+        'successful_trace_texts: list[str] = []',
+        'successful_trace_texts.append(trace_text)',
+        'combined_trace = "\\n".join(successful_trace_texts)',
         '"parse_does_not_count_as_execution": True',
         '"direct_execution_requires_syscall_evidence": True',
+        '"failed_process_trace_cannot_count_data_execution": True',
+        '"failure_output_with_zero_exit_is_failure": True',
         '"required_execution_percent": 100.0',
         "exact_100 = executed_ok == total_surface",
     )
     for fragment in gate_requirements:
         if fragment not in gate:
             fail(f"execution gate missing mechanical invariant {fragment!r}")
+
+    if "trace_texts.append(trace_text)" in gate:
+        fail("failed-process trace aggregation was reintroduced")
+    assert_failure_output_contract(gate)
 
     workflow_requirements = (
         "push:",
@@ -133,6 +166,8 @@ def main() -> int:
     print("parse_only_execution=false")
     print("shebang_scripts_included=true")
     print("direct_runtime_requires_syscall_evidence=true")
+    print("failed_process_trace_counts=false")
+    print("zero_exit_failure_output_counts=false")
     print("independent_enterprise_crosscheck=true")
     print("required_execution_percent=100")
     print("blocker_bypass=false")
