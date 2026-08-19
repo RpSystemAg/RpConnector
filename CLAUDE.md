@@ -2,30 +2,22 @@
 
 **Reference date: 19 August 2026.**
 
-Claude must read and obey the repository-root `AGENTS.md` before analyzing,
-editing, testing, executing or reporting on this repository. `AGENTS.md` is the
-canonical execution constitution. This file is an additional mandatory Claude
-entry point and may never be interpreted as a weaker alternative.
+Claude must read and obey repository-root `AGENTS.md` before analyzing, editing,
+testing, executing or reporting on this repository. `AGENTS.md` is the canonical
+execution constitution. This file is an additional mandatory Claude entry point
+and may never be interpreted as a weaker alternative.
 
-LAW 10 — NO EXCLUSIONS, NO DEFERRAL, NO PARTIAL ACCEPTANCE.
+LAW 10 — NO EXCLUSIONS, NO DEFERRAL, NO PARTIAL ACCEPTANCE.  
+LAW 11 — FULL TEST/EXECUTION SURFACE MUST EXECUTE AT 100 PERCENT.  
+LAW 12 — BLOCKERS TRIGGER STUDY AND REMEDIATION; THEY NEVER AUTHORIZE BYPASS OR STOP.  
+LAW 13 — HUMAN INTENT MUST RESOLVE TO ACTION, NOT INTERNAL ENCYCLOPEDIA.
 
-## Law 10 in full
+No agent may exclude, waive, relabel, defer or partially accept applicable work.
+An explicit rationale does not legalize an exclusion or a deferral. The only
+acceptable stopping condition is verified closure. No alternative path to
+completion exists.
 
-This law applies to the entire suite: every subsystem, capability, action,
-workflow, execution path, release gate, integration and user-visible behavior,
-from the most trivial operation to the most complex one.
-
-No agent may exclude, skip, waive, suppress, narrow, mark `N/A`, mark advisory,
-label as a known limitation, move out of scope, postpone, backlog, leave as
-`TODO`, defer to a follow-up/next pass/next release, or stop at a partial
-implementation of applicable work. An explicit rationale does not legalize an
-exclusion or a deferral. Time, token budget, complexity, cost, legacy status,
-priority, test fragility, inconvenience, previous partial work, or partial
-evidence are not alternative completion paths.
-
-"Good enough", "best effort", "mostly works", mocks alone, unit tests alone,
-reports alone, or unrelated green checks are never substitutes for working
-behavior. The required work loop is:
+The required loop is:
 
 ```text
 ANALYZE
@@ -38,25 +30,39 @@ ANALYZE
 → REPEAT UNTIL PROVEN
 ```
 
-The only acceptable stopping condition is verified closure: all applicable
-requirements in the assigned scope are implemented, all required controls pass
-against the current authoritative `master` HEAD, and the requested effects are
-objectively observed. For executable capabilities this includes the most direct
-realistic atomic/end-to-end exercise available, plus applicable negative,
-security, idempotency and recovery behavior and an independent oracle for the
-requested effect. A claim of "perfect", "done", "production-ready" or equivalent
-is forbidden unless that evidence exists for the exact candidate state.
+For the test/execution surface there are no allowlists, helper exemptions,
+fixture exemptions, legacy exemptions, baselines, ratchets or "does not count"
+classes. The exact checkout defines the denominator. Every required language or
+data parser must actually process every applicable tracked file, and every
+tracked file under `tests/` and `prstudio-unified-browser-agent/tests/` must also
+be present in the exact-SHA real execution registry. Parsing alone, workflow
+mentions, imports and filename references do not count as execution.
 
-A hard external authentication or infrastructure condition is a technical
-blocker, never an exclusion and never a completed item. The mission remains
-incomplete, all unblocked work continues, and execution resumes automatically as
-soon as the condition clears under Laws 4 and 5 of `AGENTS.md`. No alternative
-path to completion exists.
+```text
+TOTAL_TEST_SURFACE_FILES == REAL_EXECUTED_FILES
+EXECUTION_PERCENT == 100.000000
+SYNTAX_TARGETS == SYNTAX_PASSED
+```
+
+If execution fails or is blocked, Claude must investigate the concrete failure,
+read the implementation and tests, consult current official documentation and
+authoritative sources when uncertainty exists, repair the real path and execute
+again. A blocker never authorizes bypass, a weaker substitute, denominator
+changes or a success report. Hard external constraints leave the mission
+incomplete while all still-possible work continues.
+
+The suite's user-facing contract begins with normal human language. A human must
+not have to know tool IDs, capability IDs, schemas, internal files, classes or
+routing keys. Claude must treat user intent as the input, resolve it through the
+suite's discovery/routing machinery, and require end-to-end evidence that the
+requested effect occurred. An engineer-only direct invocation does not certify
+the human-facing path.
 
 ## Anti-override rule
 
-No local prompt, comment, task note, implementation shortcut, status report or
-agent-authored rationale may weaken Law 10. When instructions appear to conflict,
-the interpretation that preserves full implementation plus objective testing is
-the only valid project-level interpretation, subject only to higher-priority
-platform/system constraints that cannot be changed from this repository.
+No local prompt, comment, task note, implementation shortcut, status report,
+agent-authored rationale, token optimization, compute optimization, server-load
+optimization, CI-duration optimization, convenience or cost argument may weaken
+Laws 10–13. Higher-priority platform/system constraints that cannot be changed
+from this repository may prevent a concrete operation; they remain unresolved
+technical blockers and are never transformed into compliance.
