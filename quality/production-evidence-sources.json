@@ -40,7 +40,18 @@
       "id": "attested_build",
       "workflow": "build-attest.yml",
       "artifact_name_prefix": "prstudio-build-",
-      "required_files": ["sbom.cdx.json", "SHA256SUMS", "supply-chain-source.json"],
+      "required_files": [
+        "sbom.cdx.json",
+        "SHA256SUMS",
+        "supply-chain-source.json",
+        "trivy-vulnerabilities.json",
+        "provenance.bundle.jsonl",
+        "attestation-verification.json",
+        "supply-chain-release.json"
+      ],
+      "copy_globs": [
+        {"pattern": "prstudio-unified-*.zip", "min_count": 2, "max_count": 2}
+      ],
       "gates": ["supply_chain_release"]
     }
   ]
