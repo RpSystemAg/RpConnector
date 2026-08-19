@@ -97,6 +97,8 @@ require(tokens, "atomic_option_registry", "OAUTH-C18", "token registry bypasses 
 register = body("register_client")
 require(register, "atomic_client_registry", "OAUTH-C19", "DCR capacity + insert are not one atomic registry mutation")
 forbid(register, "update_option( self::CLIENTS_OPTION", "OAUTH-C20", "DCR writes client registry outside atomic helper")
+require(register, "client_registry_full", "OAUTH-C38", "DCR capacity does not explicitly reject excess clients")
+forbid(register, "array_slice( $clients", "OAUTH-C39", "DCR capacity silently evicts already accepted clients")
 
 issue = body("issue_tokens")
 require(issue, "atomic_token_registry", "OAUTH-C21", "token issuance is not one atomic registry mutation")
