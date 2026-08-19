@@ -6,11 +6,7 @@
       "id": "wordpress_lifecycle",
       "workflow": "production-wordpress-lifecycle.yml",
       "artifact_name_prefix": "production-evidence-wordpress-lifecycle-",
-      "required_files": [
-        "upgrade-migration.json",
-        "backup-restore.json",
-        "wordpress-lifecycle-details.json"
-      ],
+      "required_files": ["upgrade-migration.json", "backup-restore.json", "wordpress-lifecycle-details.json"],
       "gates": ["upgrade_migration", "backup_restore"]
     },
     {
@@ -18,45 +14,27 @@
       "workflow": "production-real-staging.yml",
       "artifact_name_prefix": "production-evidence-real-staging-",
       "required_files": [
-        "auth-security.json",
-        "auth-security-scenario-events.ndjson",
-        "auth-security-scenario-details.json",
-        "browser-isolation.json",
-        "browser-isolation-scenario-events.ndjson",
-        "browser-isolation-scenario-details.json",
-        "transaction-integrity.json",
-        "transaction-integrity-scenario-events.ndjson",
-        "transaction-integrity-scenario-details.json",
-        "concurrency-recovery.json",
-        "concurrency-recovery-scenario-events.ndjson",
-        "concurrency-recovery-scenario-details.json",
-        "load-backpressure.json",
-        "load-backpressure-scenario-events.ndjson",
-        "load-backpressure-scenario-details.json",
-        "remote-live-integration.json",
-        "remote-live-integration-scenario-events.ndjson",
-        "remote-live-integration-scenario-details.json",
-        "observability-operability.json",
-        "observability-operability-scenario-events.ndjson",
-        "observability-operability-scenario-details.json",
-        "compatibility-degradation.json",
-        "compatibility-degradation-scenario-events.ndjson",
-        "compatibility-degradation-scenario-details.json",
-        "fault-injection.json",
-        "fault-injection-events.ndjson",
-        "fault-injection-details.json"
+        "auth-security.json", "auth-security-scenario-events.ndjson", "auth-security-scenario-details.json",
+        "browser-isolation.json", "browser-isolation-scenario-events.ndjson", "browser-isolation-scenario-details.json",
+        "transaction-integrity.json", "transaction-integrity-scenario-events.ndjson", "transaction-integrity-scenario-details.json",
+        "concurrency-recovery.json", "concurrency-recovery-scenario-events.ndjson", "concurrency-recovery-scenario-details.json",
+        "load-backpressure.json", "load-backpressure-scenario-events.ndjson", "load-backpressure-scenario-details.json",
+        "remote-live-integration.json", "remote-live-integration-scenario-events.ndjson", "remote-live-integration-scenario-details.json",
+        "observability-operability.json", "observability-operability-scenario-events.ndjson", "observability-operability-scenario-details.json",
+        "compatibility-degradation.json", "compatibility-degradation-scenario-events.ndjson", "compatibility-degradation-scenario-details.json",
+        "fault-injection.json", "fault-injection-events.ndjson", "fault-injection-details.json"
       ],
       "gates": [
-        "auth_security",
-        "browser_isolation",
-        "transaction_integrity",
-        "concurrency_recovery",
-        "fault_injection",
-        "load_backpressure",
-        "remote_live_integration",
-        "observability_operability",
-        "compatibility_degradation"
+        "auth_security", "browser_isolation", "transaction_integrity", "concurrency_recovery", "fault_injection",
+        "load_backpressure", "remote_live_integration", "observability_operability", "compatibility_degradation"
       ]
+    },
+    {
+      "id": "h24_soak",
+      "workflow": "production-h24-promote.yml",
+      "artifact_name_prefix": "production-evidence-h24-",
+      "required_files": ["h24-soak.json", "h24-soak-events.ndjson"],
+      "gates": ["h24_soak"]
     }
   ]
 }
