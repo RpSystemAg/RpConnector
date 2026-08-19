@@ -1,0 +1,121 @@
+rules:
+  - id: rpconnector-rest-to-sql
+    message: User/MCP-controlled WordPress REST data reaches a SQL execution sink.
+    severity: ERROR
+    languages: [php]
+    mode: taint
+    pattern-sources:
+      - patterns:
+          - pattern-either:
+              - pattern: $REQ->get_param(...)
+              - pattern: $REQ->get_params(...)
+              - pattern: $REQ->get_json_params(...)
+              - pattern: $REQ->get_body_params(...)
+              - pattern: $REQ->get_query_params(...)
+              - pattern: json_decode($REQ->get_body(...), ...)
+    pattern-sinks:
+      - pattern-either:
+          - pattern: $DB->query($SQL)
+          - pattern: $DB->get_results($SQL, ...)
+          - pattern: $DB->get_row($SQL, ...)
+          - pattern: $DB->get_var($SQL, ...)
+          - pattern: mysqli_query($CONN, $SQL, ...)
+
+  - id: rpconnector-rest-to-ssrf
+    message: User/MCP-controlled WordPress REST data reaches an outbound HTTP URL.
+    severity: ERROR
+    languages: [php]
+    mode: taint
+    pattern-sources:
+      - pattern-either:
+          - pattern: $REQ->get_param(...)
+          - pattern: $REQ->get_params(...)
+          - pattern: $REQ->get_json_params(...)
+          - pattern: $REQ->get_body_params(...)
+          - pattern: $REQ->get_query_params(...)
+    pattern-sinks:
+      - pattern-either:
+          - pattern: wp_remote_request($URL, ...)
+          - pattern: wp_remote_get($URL, ...)
+          - pattern: wp_remote_post($URL, ...)
+          - pattern: curl_setopt($CH, CURLOPT_URL, $URL)
+
+  - id: rpconnector-rest-to-filesystem-path
+    message: User/MCP-controlled WordPress REST data reaches a filesystem path sink.
+    severity: ERROR
+    languages: [php]
+    mode: taint
+    pattern-sources:
+      - pattern-either:
+          - pattern: $REQ->get_param(...)
+          - pattern: $REQ->get_params(...)
+          - pattern: $REQ->get_json_params(...)
+          - pattern: $REQ->get_body_params(...)
+          - pattern: $REQ->get_query_params(...)
+    pattern-sinks:
+      - pattern-either:
+          - pattern: file_put_contents($PATH, ...)
+          - pattern: fopen($PATH, ...)
+          - pattern: unlink($PATH)
+          - pattern: rename($PATH, ...)
+          - pattern: copy($PATH, ...)
+          - pattern: file_get_contents($PATH, ...)
+
+  - id: rpconnector-rest-to-process
+    message: User/MCP-controlled WordPress REST data reaches a process/shell sink.
+    severity: ERROR
+    languages: [php]
+    mode: taint
+    pattern-sources:
+      - pattern-either:
+          - pattern: $REQ->get_param(...)
+          - pattern: $REQ->get_params(...)
+          - pattern: $REQ->get_json_params(...)
+          - pattern: $REQ->get_body_params(...)
+          - pattern: $REQ->get_query_params(...)
+    pattern-sinks:
+      - pattern-either:
+          - pattern: exec($CMD, ...)
+          - pattern: shell_exec($CMD)
+          - pattern: system($CMD, ...)
+          - pattern: passthru($CMD, ...)
+          - pattern: proc_open($CMD, ...)
+
+  - id: rpconnector-rest-to-header-redirect
+    message: User/MCP-controlled WordPress REST data reaches a response-header or redirect sink.
+    severity: ERROR
+    languages: [php]
+    mode: taint
+    pattern-sources:
+      - pattern-either:
+          - pattern: $REQ->get_param(...)
+          - pattern: $REQ->get_params(...)
+          - pattern: $REQ->get_json_params(...)
+          - pattern: $REQ->get_body_params(...)
+          - pattern: $REQ->get_query_params(...)
+    pattern-sinks:
+      - pattern-either:
+          - pattern: header($VALUE, ...)
+          - pattern: wp_redirect($URL, ...)
+          - pattern: wp_safe_redirect($URL, ...)
+
+  - id: rpconnector-superglobal-to-critical-sink
+    message: Direct request superglobal reaches a critical sink without an explicit framework boundary.
+    severity: ERROR
+    languages: [php]
+    mode: taint
+    pattern-sources:
+      - pattern-either:
+          - pattern: $_GET[$K]
+          - pattern: $_POST[$K]
+          - pattern: $_REQUEST[$K]
+          - pattern: $_COOKIE[$K]
+          - pattern: $_SERVER[$K]
+    pattern-sinks:
+      - pattern-either:
+          - pattern: $DB->query($X)
+          - pattern: wp_remote_request($X, ...)
+          - pattern: file_put_contents($X, ...)
+          - pattern: exec($X, ...)
+          - pattern: shell_exec($X)
+          - pattern: header($X, ...)
