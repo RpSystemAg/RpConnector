@@ -1,0 +1,9 @@
+{
+  "_comment": "Protocol versions the plugin accepts. Removing an entry strands every installed extension speaking it. See validate-protocol-compatibility.py.",
+  "accepted": [
+    "3.0.0",
+    "4.0.0"
+  ],
+  "preferred": "3.0.0",
+  "extension": "3.0.0"
+}

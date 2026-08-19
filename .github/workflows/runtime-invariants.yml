@@ -42,7 +42,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - run: php -l tests/php-runtime-recovery-prepare-smoke.php
       - name: Strict wpdb prepare arity
-        run: php tests/php-runtime-recovery-prepare-smoke.php
+        run: php -d auto_prepend_file=tests/strict-php-errors.php tests/php-runtime-recovery-prepare-smoke.php
 
   verification-monotonicity:
     name: Verification monotonicity
@@ -52,7 +52,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - run: php -l tests/php-agency-verification-monotonicity-smoke.php
       - name: Weak child evidence cannot become verified mission evidence
-        run: php tests/php-agency-verification-monotonicity-smoke.php
+        run: php -d auto_prepend_file=tests/strict-php-errors.php tests/php-agency-verification-monotonicity-smoke.php
 
   browser-parent-regression:
     name: Browser parent reconciliation regression
@@ -61,4 +61,4 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Existing parent reconciliation smoke
-        run: php tests/php-browser-parent-reconciliation-smoke.php
+        run: php -d auto_prepend_file=tests/strict-php-errors.php tests/php-browser-parent-reconciliation-smoke.php

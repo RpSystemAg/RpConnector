@@ -48,13 +48,13 @@ jobs:
         run: find prstudio-unified-control tests -name '*.php' -print0 | xargs -0 -n1 -P4 php -l
       - name: Core deterministic PHP smokes
         run: |
-          php tests/php-agent-model-constitution.php
-          php tests/php-mcp-catalog-runtime-smoke.php
-          php tests/php-new-capabilities-smoke.php
-          php tests/php-tools-list-budget.php
-          php tests/php-browser-parent-reconciliation-smoke.php
-          php tests/php-runtime-recovery-prepare-smoke.php
-          php tests/php-agency-verification-monotonicity-smoke.php
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/php-agent-model-constitution.php
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/php-mcp-catalog-runtime-smoke.php
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/php-new-capabilities-smoke.php
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/php-tools-list-budget.php
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/php-browser-parent-reconciliation-smoke.php
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/php-runtime-recovery-prepare-smoke.php
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/php-agency-verification-monotonicity-smoke.php
 
   python-runtime-matrix:
     name: Python ${{ matrix.python }} tooling
@@ -164,7 +164,7 @@ jobs:
           PRSTUDIO_TEST_DB_USER: root
           PRSTUDIO_TEST_DB_PASS: ''
           PRSTUDIO_TEST_DB_NAME: prstudio_queue_test
-        run: php tests/php-task-queue-integration.php
+        run: php -d auto_prepend_file=tests/strict-php-errors.php tests/php-task-queue-integration.php
       - name: Real durable-job liveness and recovery integration
         env:
           PRSTUDIO_TEST_DB_HOST: 127.0.0.1
@@ -172,7 +172,7 @@ jobs:
           PRSTUDIO_TEST_DB_USER: root
           PRSTUDIO_TEST_DB_PASS: ''
           PRSTUDIO_TEST_DB_NAME: prstudio_runtime_liveness
-        run: php tests/php-runtime-db-liveness-integration.php
+        run: php -d auto_prepend_file=tests/strict-php-errors.php tests/php-runtime-db-liveness-integration.php
       - name: Database logs on failure
         if: failure()
         run: docker logs rpconnector-db

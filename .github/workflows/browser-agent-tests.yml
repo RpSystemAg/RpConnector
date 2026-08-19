@@ -72,7 +72,18 @@ jobs:
           PRSTUDIO_TEST_DB_USER: root
           PRSTUDIO_TEST_DB_PASS: ''
           PRSTUDIO_TEST_DB_NAME: prstudio_queue_test
-        run: php tests/php-task-queue-integration.php
+        run: php -d auto_prepend_file=tests/strict-php-errors.php tests/php-task-queue-integration.php
+      - name: No claimed write without a statement that reached the server
+        # Reads MariaDB's general log back: a mutation that reports 0 must still
+        # have sent something. Both defects that stopped this product were
+        # statements that never arrived, and both returned a plausible number.
+        env:
+          PRSTUDIO_TEST_DB_HOST: 127.0.0.1
+          PRSTUDIO_TEST_DB_PORT: '3306'
+          PRSTUDIO_TEST_DB_USER: root
+          PRSTUDIO_TEST_DB_PASS: ''
+          PRSTUDIO_TEST_DB_NAME: prstudio_writeobs
+        run: php -d auto_prepend_file=tests/strict-php-errors.php tests/php-write-observability-integration.php
       - name: Durable-job liveness and stale-lease recovery against real DB
         env:
           PRSTUDIO_TEST_DB_HOST: 127.0.0.1
@@ -80,7 +91,7 @@ jobs:
           PRSTUDIO_TEST_DB_USER: root
           PRSTUDIO_TEST_DB_PASS: ''
           PRSTUDIO_TEST_DB_NAME: prstudio_runtime_liveness
-        run: php tests/php-runtime-db-liveness-integration.php
+        run: php -d auto_prepend_file=tests/strict-php-errors.php tests/php-runtime-db-liveness-integration.php
 
   wordpress-plugin:
     runs-on: ubuntu-latest
@@ -97,14 +108,24 @@ jobs:
           find . -name '*.php' -print0 | xargs -0 -n1 -P4 php -l
       - name: PHP smoke suites
         run: |
-          php tests/php-agent-model-constitution.php
-          php tests/php-mcp-catalog-runtime-smoke.php
-          php tests/php-new-capabilities-smoke.php
-          php tests/php-runtime-recovery-prepare-smoke.php
-          php tests/php-agency-verification-monotonicity-smoke.php
-          php tests/php-browser-parent-reconciliation-smoke.php
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/php-agent-model-constitution.php
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/php-mcp-catalog-runtime-smoke.php
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/php-new-capabilities-smoke.php
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/php-runtime-recovery-prepare-smoke.php
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/php-agency-verification-monotonicity-smoke.php
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/php-browser-parent-reconciliation-smoke.php
       - name: tools/list must stay within the host tool-schema budget
-        run: php tests/php-tools-list-budget.php
+        run: php -d auto_prepend_file=tests/strict-php-errors.php tests/php-tools-list-budget.php
+      - name: Every test in tests/ must be executed by some workflow
+        # A suite nothing runs is not a suite: it passes review, counts in the
+        # total, and goes stale silently. 66 were unexecuted when this landed.
+        # The baseline may only shrink.
+        run: python3 tests/validate-test-inventory.py
+      - name: Plugin and extension must still agree on a protocol
+        # The two halves are installed and updated separately, by hand, so a
+        # user on the previous extension is the normal case. Dropping a
+        # protocol strands them while every test still passes.
+        run: python3 tests/validate-protocol-compatibility.py
       - name: One-guard constitution
         run: python3 tests/one_guard_constitution.py
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4

@@ -68,7 +68,7 @@ jobs:
         run: |
           for i in $(seq 1 25); do
             echo "=== runtime DB soak iteration $i/25 ==="
-            php tests/php-runtime-db-liveness-integration.php
+            php -d auto_prepend_file=tests/strict-php-errors.php tests/php-runtime-db-liveness-integration.php
           done
       - name: Repeat task dispatcher integration 10 times
         env:
@@ -80,7 +80,7 @@ jobs:
         run: |
           for i in $(seq 1 10); do
             echo "=== queue soak iteration $i/10 ==="
-            php tests/php-task-queue-integration.php
+            php -d auto_prepend_file=tests/strict-php-errors.php tests/php-task-queue-integration.php
           done
       - name: DB diagnostics on failure
         if: failure()

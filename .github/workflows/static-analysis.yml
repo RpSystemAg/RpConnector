@@ -53,11 +53,11 @@ jobs:
         run: find prstudio-unified-control -name '*.php' -print0 | xargs -0 -n1 -P4 php -l
       - name: Execute the suites on this PHP version
         run: |
-          php tests/php-agent-model-constitution.php
-          php tests/php-mcp-catalog-runtime-smoke.php
-          php tests/php-tools-list-budget.php
-          php tests/php-new-capabilities-smoke.php
-          php tests/php-intelligence-smoke.php
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/php-agent-model-constitution.php
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/php-mcp-catalog-runtime-smoke.php
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/php-tools-list-budget.php
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/php-new-capabilities-smoke.php
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/php-intelligence-smoke.php
 
   # Broad multi-language linting, run as a ratchet.
   #
