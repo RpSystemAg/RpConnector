@@ -52,7 +52,11 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y strace
-          python -m pip install --disable-pip-version-check --no-input PyYAML "hypothesis==6.164.0"
+          # tiktoken measures the LAW 9 tools/list ceiling with a real tokenizer
+          # instead of the assembler's four-bytes-per-token divisor. Pinned like
+          # the others: a tokenizer that changes under us would move the number
+          # the law is enforced against.
+          python -m pip install --disable-pip-version-check --no-input PyYAML "hypothesis==6.164.0" "tiktoken==0.14.0"
           python - <<'PY'
           import hypothesis, yaml
           assert hypothesis.__version__ == '6.164.0', hypothesis.__version__
