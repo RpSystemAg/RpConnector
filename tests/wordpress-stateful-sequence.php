@@ -3,29 +3,52 @@
  * Execute one generated durable-job sequence inside a real WordPress process.
  *
  * Input: PR_STATEFUL_SCENARIO points to JSON with {actions:[...],max_attempts:n}.
- * Output: one JSON object. Any invariant violation exits non-zero.
+ * Without that variable, direct execution bootstraps RP_WP_PATH and runs one
+ * deterministic real Store sequence. Output is one JSON object; invariant
+ * violations and runtime/bootstrap failures exit non-zero.
  */
 declare(strict_types=1);
 
 $scenarioPath = (string) getenv('PR_STATEFUL_SCENARIO');
-if ($scenarioPath === '' || !is_file($scenarioPath)) {
-    fwrite(STDERR, "PR_STATEFUL_SCENARIO missing\n");
-    exit(2);
+$selfTest = $scenarioPath === '';
+
+if ($selfTest) {
+    $wpPath = rtrim((string) getenv('RP_WP_PATH'), "/\\");
+    $wpLoad = $wpPath !== '' ? $wpPath . '/wp-load.php' : '';
+    if ($wpLoad === '' || !is_file($wpLoad)) {
+        fwrite(STDERR, "RP_WP_PATH WordPress bootstrap missing\n");
+        exit(2);
+    }
+    require_once $wpLoad;
+    $scenario = [
+        'actions' => ['claim', 'yield', 'claim', 'stale_recover', 'observe'],
+        'max_attempts' => 3,
+    ];
+} else {
+    if (!is_file($scenarioPath)) {
+        fwrite(STDERR, "PR_STATEFUL_SCENARIO missing\n");
+        exit(2);
+    }
+    $scenario = json_decode((string) file_get_contents($scenarioPath), true);
+    if (!is_array($scenario) || !is_array($scenario['actions'] ?? null)) {
+        fwrite(STDERR, "invalid scenario JSON\n");
+        exit(2);
+    }
 }
-$scenario = json_decode((string) file_get_contents($scenarioPath), true);
-if (!is_array($scenario) || !is_array($scenario['actions'] ?? null)) {
-    fwrite(STDERR, "invalid scenario JSON\n");
-    exit(2);
-}
+
 if (!class_exists('PRSTUDIO_UC_Store')) {
     fwrite(STDERR, "PRSTUDIO_UC_Store unavailable\n");
+    exit(2);
+}
+if ($selfTest && !PRSTUDIO_UC_Store::maybe_upgrade()) {
+    fwrite(STDERR, "PRSTUDIO_UC_Store schema unavailable\n");
     exit(2);
 }
 
 $maxAttempts = max(1, min(8, (int) ($scenario['max_attempts'] ?? 3)));
 $planHash = hash('sha256', 'hypothesis-stateful-' . wp_generate_uuid4());
 $created = PRSTUDIO_UC_Store::create_job(
-    'hypothesis generated sequence',
+    $selfTest ? 'full-surface direct stateful self-test' : 'hypothesis generated sequence',
     'agency',
     [],
     ['steps' => [], 'hash' => $planHash],
@@ -37,6 +60,19 @@ $jobId = (string) ($created['job_uuid'] ?? '');
 if ($jobId === '') {
     fwrite(STDERR, "job creation failed\n");
     exit(1);
+}
+
+$cleanupJobId = $selfTest ? $jobId : '';
+if ($selfTest) {
+    register_shutdown_function(static function () use (&$cleanupJobId): void {
+        if ($cleanupJobId === '' || !class_exists('PRSTUDIO_UC_Store')) {
+            return;
+        }
+        global $wpdb;
+        if (isset($wpdb)) {
+            $wpdb->delete(PRSTUDIO_UC_Store::jobs_table(), ['job_uuid' => $cleanupJobId], ['%s']);
+        }
+    });
 }
 
 $currentLease = '';
@@ -168,9 +204,24 @@ foreach ($scenario['actions'] as $index => $actionRaw) {
 }
 
 $final = PRSTUDIO_UC_Store::get_job($jobId);
+if (!is_array($final)) {
+    $fail('job missing before final oracle');
+}
+
+$outputJobId = $jobId;
+if ($selfTest) {
+    global $wpdb;
+    $deleted = $wpdb->delete(PRSTUDIO_UC_Store::jobs_table(), ['job_uuid' => $jobId], ['%s']);
+    if ($deleted === false || PRSTUDIO_UC_Store::get_job($jobId) !== null) {
+        $fail('self-test job cleanup failed');
+    }
+    $cleanupJobId = '';
+}
+
 echo json_encode([
     'ok' => true,
-    'job_uuid' => $jobId,
+    'mode' => $selfTest ? 'direct-real-wordpress' : 'generated-parent',
+    'job_uuid' => $outputJobId,
     'healthy_claims' => $healthyClaims,
     'recoveries' => $recoveries,
     'final_status' => (string) ($final['status'] ?? ''),
