@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "policy": "Every key under cases is an exact executable inventory ID. Pattern or wildcard entries never count as item-level execution coverage.",
+  "cases": {},
+  "required_fields": [
+    "environment",
+    "implementation",
+    "fixture",
+    "valid_input",
+    "timeout_seconds",
+    "expected_terminal",
+    "oracle",
+    "negative_cases",
+    "contract",
+    "official_refs"
+  ],
+  "mutation_required_fields": ["rollback", "idempotency"],
+  "browser_required_fields": ["ownership_negative", "no_progress_deadline_seconds"],
+  "remote_required_fields": ["live_receipt_class"]
+}
