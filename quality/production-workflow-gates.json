@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "rule": "A workflow-backed production check passes only when every required workflow has a successful completed run for the exact release SHA and every configured job selector matches at least its declared cardinality with all matched jobs successful.",
+  "rule": "A workflow-backed production check passes only when every required workflow has a successful completed run for the exact release SHA and every configured job selector matches at least its declared cardinality with all matched jobs successful. Attested release supply-chain evidence is intentionally excluded here and must come from the exact-SHA build artifact receipt.",
   "gates": {
     "static_security": {
       "receipt": "static-security.json",
@@ -30,20 +30,6 @@
           {"workflow": "enterprise-verification.yml", "job_regex": "^Real Chrome extension load$", "min_count": 1},
           {"workflow": "enterprise-verification.yml", "job_regex": "^Browser Agent .* / Node .*$", "min_count": 6}
         ]}
-      }
-    },
-    "supply_chain_release": {
-      "receipt": "supply-chain-release.json",
-      "environment": {"real": false, "class": "github-actions-build-and-supply-chain"},
-      "required_local_artifacts": ["sbom.cdx.json", "SHA256SUMS", "supply-chain-source.json"],
-      "checksum_manifest": "SHA256SUMS",
-      "checks": {
-        "github_actions_commit_pinned": {"requirements": [{"workflow": "workflow-security.yml", "job_regex": "^Production immutable input audit$", "min_count": 1}]},
-        "dependencies_locked": {"requirements": [{"workflow": "workflow-security.yml", "job_regex": "^Production immutable input audit$", "min_count": 1}]},
-        "sbom_generated": {"requirements": [{"workflow": "build-attest.yml", "job_regex": "^Build, SBOM, checksum and provenance$", "min_count": 1}]},
-        "artifact_checksums": {"requirements": [{"workflow": "build-attest.yml", "job_regex": "^Build, SBOM, checksum and provenance$", "min_count": 1}]},
-        "build_attestation": {"requirements": [{"workflow": "build-attest.yml", "job_regex": "^Build, SBOM, checksum and provenance$", "min_count": 1}]},
-        "known_critical_vulnerabilities_zero": {"requirements": [{"workflow": "security-supply-chain.yml", "job_regex": "^Trivy filesystem \\+ secrets \\+ misconfiguration$", "min_count": 1}]}
       }
     }
   }
