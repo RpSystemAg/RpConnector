@@ -48,13 +48,13 @@ export function buildScreenshotCandidates({ format = "png", quality = 82, fullPa
 
   if (fullPage && clip) {
     surface.push({ format: imageFormat, ...withQuality, fromSurface: true, clip: { ...clip, scale: 1 } });
-    surface.push({ format: imageFormat, ...withQuality, clip: { ...clip, scale: 1 } });
+    surface.push({ format: imageFormat, ...withQuality, fromSurface: true, clip: { ...clip, scale: 1 } });
   } else {
     surface.push({ format: imageFormat, ...withQuality, fromSurface: true });
   }
 
   surface.push({ format: "png", fromSurface: true });
-  surface.push({ format: "png" });
+  surface.push({ format: "png", fromSurface: true });
 
   // Renderer capture. Keep the requested clip (including its scale), but never
   // combine it with captureBeyondViewport: that combination is not consistently
