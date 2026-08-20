@@ -1,0 +1,57 @@
+name: Temporary ChatGPT MCP contract refinement
+
+on:
+  push:
+    branches:
+      - chatgpt/mcp-public-schema-quality-v2-2026-08-20
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Wire public contract refinement into MCP catalog
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('prstudio-unified-control/includes/class-prstudio-uc-mcp-v5.php')
+          text = path.read_text()
+
+          include_anchor = "if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }\n\n/**"
+          include_replacement = "if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }\nrequire_once __DIR__ . '/class-prstudio-uc-public-tool-contracts.php';\n\n/**"
+          if text.count(include_anchor) != 1:
+              raise SystemExit(f'include anchor count={text.count(include_anchor)}, expected 1')
+          text = text.replace(include_anchor, include_replacement, 1)
+
+          refine_anchor = "        }\n        self::$manual[$name]=array('title'=>$title,'guidance'=>trim($description),'annotations'=>$annotations);"
+          refine_replacement = "        }\n        array( $description, $input, $annotations ) = PRSTUDIO_UC_Public_Tool_Contracts::refine( $name, $description, $input, $annotations );\n        self::$manual[$name]=array('title'=>$title,'guidance'=>trim($description),'annotations'=>$annotations);"
+          if text.count(refine_anchor) != 1:
+              raise SystemExit(f'refine anchor count={text.count(refine_anchor)}, expected 1')
+          text = text.replace(refine_anchor, refine_replacement, 1)
+          path.write_text(text)
+          PY
+
+      - name: Verify refined catalog
+        run: |
+          php -l prstudio-unified-control/includes/class-prstudio-uc-public-tool-contracts.php
+          php -l prstudio-unified-control/includes/class-prstudio-uc-mcp-v5.php
+          php -l tests/php-mcp-public-contracts-smoke.php
+          php tests/php-mcp-catalog-runtime-smoke.php
+          php tests/php-mcp-public-contracts-smoke.php
+          php tests/php-prstudio-flow-smoke.php
+          if [ -f tests/php-tools-list-budget.php ]; then php tests/php-tools-list-budget.php; fi
+
+      - name: Commit verified source change and remove temporary workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/tmp-chatgpt-mcp-contract-refine.yml
+          git add prstudio-unified-control/includes/class-prstudio-uc-mcp-v5.php
+          git commit -m "Refine public ChatGPT MCP tool schemas"
+          git push
