@@ -1,6 +1,16 @@
 name: CodeQL
 
+# A weekly scan tells you about a vulnerability up to seven days after it was
+# merged, which is after the code it describes has already shipped. Running on
+# the pull request moves the finding to the moment someone can still act on it
+# cheaply, and running on master keeps the default-branch baseline current --
+# without that baseline GitHub cannot tell "this PR introduces an alert" from
+# "this alert already existed", so every PR would report the same backlog.
 on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
   schedule:
     - cron: '19 3 * * 1'
   workflow_dispatch:

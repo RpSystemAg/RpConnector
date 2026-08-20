@@ -1,6 +1,20 @@
 name: Security and supply chain
 
+# The dependency-review job below was already written and already carried
+# `if: github.event_name == 'pull_request'`, but `pull_request` was never a
+# trigger -- so the condition was never true and the job never ran once. A
+# guard against a case the workflow cannot reach is indistinguishable from a
+# guard that works, which is the worst state for a security control to be in:
+# it appears in the file, it appears in the settings, and it checks nothing.
+#
+# `pull_request` is added here for that job specifically. The two scanners
+# below stay on the weekly schedule: both examine the whole tree rather than
+# the change, so on a pull request they would report the repository's existing
+# findings as though the PR had introduced them, and a check that fails for
+# reasons the author cannot fix teaches people to merge past it.
 on:
+  pull_request:
+    branches: [master]
   schedule:
     - cron: '43 2 * * 2'
   workflow_dispatch:
@@ -15,6 +29,8 @@ concurrency:
 jobs:
   trivy:
     name: Trivy filesystem + secrets + misconfiguration
+    # Whole-tree scan: see the note on the triggers above.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions:
@@ -50,6 +66,9 @@ jobs:
 
   openssf-scorecard:
     name: OpenSSF Scorecard evidence
+    # Scores the repository, not the change, and needs id-token on the default
+    # branch to publish. Nothing about it is per-pull-request.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions:

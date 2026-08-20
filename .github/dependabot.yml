@@ -38,4 +38,35 @@ updates:
       prefix: "ci"
     labels:
       - "dependencies"
+
+  # Composer. The note above is right that the shipped plugin is dependency-free
+  # PHP -- and composer.json/composer.lock exist anyway, pinning phpstan,
+  # wordpress-stubs and phpstan-wordpress to exact versions for the static
+  # analysis toolchain.
+  #
+  # Those pins are the reason to watch this, not an exception to it. They are
+  # dev dependencies, so nothing here reaches a customer's site; but they are
+  # installed and executed inside CI, which is the environment that holds the
+  # repository token. That is the same argument the actions entry above makes,
+  # and it applies with equal force to anything else CI runs.
+  #
+  # Exact pins also do not update themselves. Left alone they go stale silently:
+  # the lockfile keeps resolving, the job keeps passing, and the version drifts
+  # further from the one the advisories are written about.
+  - package-ecosystem: "composer"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "05:00"
+      timezone: "Europe/Rome"
+    open-pull-requests-limit: 5
+    groups:
+      php-quality-toolchain:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "ci"
+    labels:
+      - "dependencies"
       - "github-actions"
