@@ -184,6 +184,10 @@ try {
       title: typeof row?.result?.title === 'string' ? row.result.title : '',
       readyState: typeof row?.result?.readyState === 'string' ? row.result.readyState : '',
     }));
+    const withTimeout = (promise, label, timeoutMs = 5000) => Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error(label + '_timeout')), timeoutMs)),
+    ]);
     const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
     const output = {
       tab: tab ? { id: tab.id, url: tab.url || '', title: tab.title || '' } : null,
@@ -193,10 +197,10 @@ try {
     };
     if (!tab?.id) return output;
     try {
-      const rows = await chrome.scripting.executeScript({
+      const rows = await withTimeout(chrome.scripting.executeScript({
         target: { tabId: tab.id, allFrames: false },
         func: () => ({ url: location.href, title: document.title || '', readyState: document.readyState }),
-      });
+      }), 'inline_executeScript');
       output.inline.rows = summarizeRows(rows);
       output.inline.ok = Boolean(rows?.[0]?.result?.url);
     } catch (error) {
@@ -205,7 +209,7 @@ try {
 
     let module = null;
     try {
-      module = await import(chrome.runtime.getURL('lib/local-page-functions.js'));
+      module = await withTimeout(import(chrome.runtime.getURL('lib/local-page-functions.js')), 'module_import');
     } catch (error) {
       const serialized = { name: error?.name || '', message: error?.message || String(error), stack: String(error?.stack || '').slice(0, 4000) };
       output.importedHealth.error = serialized;
@@ -214,10 +218,10 @@ try {
     }
 
     try {
-      const rows = await chrome.scripting.executeScript({
+      const rows = await withTimeout(chrome.scripting.executeScript({
         target: { tabId: tab.id, allFrames: false },
         func: module.collectLocalPageHealth,
-      });
+      }), 'health_executeScript');
       output.importedHealth.rows = summarizeRows(rows);
       output.importedHealth.ok = Boolean(rows?.[0]?.result?.url);
     } catch (error) {
@@ -225,10 +229,10 @@ try {
     }
 
     try {
-      const rows = await chrome.scripting.executeScript({
+      const rows = await withTimeout(chrome.scripting.executeScript({
         target: { tabId: tab.id, allFrames: false },
         func: module.collectLocalResponsiveSnapshot,
-      });
+      }), 'responsive_executeScript');
       output.importedResponsive.rows = summarizeRows(rows);
       output.importedResponsive.ok = Boolean(rows?.[0]?.result?.url);
     } catch (error) {
