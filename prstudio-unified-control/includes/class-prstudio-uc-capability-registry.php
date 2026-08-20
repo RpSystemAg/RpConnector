@@ -1,5 +1,6 @@
 <?php
 if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
+require_once __DIR__ . '/class-prstudio-uc-action-lexicon.php';
 /** Central, bounded discovery layer over native 4.0 capabilities and the mapped 2.0 catalog. */
 final class PRSTUDIO_UC_Capability_Registry {
     public const VERSION = '1.0.0';
@@ -191,39 +192,39 @@ final class PRSTUDIO_UC_Capability_Registry {
         $tokens = array_values( array_unique( array_filter( explode( ' ', str_replace( '.', ' ', self::normalize( $value ) ) ), static fn( $x ) => strlen( (string) $x ) >= 2 ) ) );
         return array_slice( $tokens, 0, 32 );
     }
-    /** Query vocabulary stays bilingual while the generated catalog keeps canonical IDs. */
-    private static function query_tokens( string $value ): array {
-        $stop_words = array_fill_keys( array(
-            'a','ad','agli','ai','al','all','alla','alle','allo','and','an','con','da','dal','dalla','dalle','dallo',
-            'de','dei','del','della','delle','dello','di','e','ed','for','gli','i','il','in','la','le','lo','nei','nel',
-            'nella','nelle','nello','of','on','per','please','su','the','to','un','una','uno','with',
-        ), true );
-        $aliases = array(
-            'aggiorna'=>array('update'), 'aggiornare'=>array('update'), 'articolo'=>array('content'), 'articoli'=>array('content'),
-            'backup'=>array('backup'), 'cancella'=>array('delete'), 'cancellare'=>array('delete'), 'cerca'=>array('search'), 'cercare'=>array('search'),
-            'controlla'=>array('check','list'), 'controllare'=>array('check','list'), 'crea'=>array('create'), 'creare'=>array('create'),
-            'elenca'=>array('list'), 'elencare'=>array('list'), 'elimina'=>array('delete'), 'eliminare'=>array('delete'),
-            'modifica'=>array('update','edit'), 'modificare'=>array('update','edit'), 'mostra'=>array('list'), 'mostrare'=>array('list'),
-            'ordine'=>array('order','orders'), 'ordini'=>array('orders'), 'pagina'=>array('page'), 'pagine'=>array('pages'),
-            'prezzo'=>array('price'), 'prezzi'=>array('prices'), 'prodotto'=>array('product'), 'prodotti'=>array('products'),
-            'pubblica'=>array('publish'), 'pubblicare'=>array('publish'), 'pulisci'=>array('purge'), 'pulire'=>array('purge'),
-            'ripristina'=>array('restore'), 'ripristinare'=>array('restore'), 'sicurezza'=>array('security'), 'sito'=>array('site'),
-            'svuota'=>array('purge'), 'svuotare'=>array('purge'), 'trova'=>array('find'), 'trovare'=>array('find'),
-            'utente'=>array('user','users'), 'utenti'=>array('users'), 'verifica'=>array('verify'), 'verificare'=>array('verify'),
-            'article'=>array('content'), 'articles'=>array('content'),
-        );
-        $expanded = array();
-        foreach ( self::tokens( $value ) as $token ) {
-            if ( isset( $stop_words[ $token ] ) ) { continue; }
-            $expanded[ $token ] = true;
-            foreach ( $aliases[ $token ] ?? array() as $alias ) { $expanded[ $alias ] = true; }
-        }
-        return array_slice( array_keys( $expanded ), 0, 32 );
+    /**
+     * What a query means, as units of intent rather than as words.
+     *
+     * PRSTUDIO_UC_Action_Lexicon groups words by meaning across both languages,
+     * so "elimina un file" and "delete a file" arrive here as the same list of
+     * concepts. Everything below scores concepts, never the raw words, and that
+     * is the whole reason the two languages return the same rows in the same
+     * order instead of merely similar ones.
+     *
+     * @param string $value Normalised query.
+     * @return array<int,array<int,string>>
+     */
+    private static function query_concepts( string $value ): array {
+        return array_slice( PRSTUDIO_UC_Action_Lexicon::concepts( self::tokens( $value ) ), 0, 32 );
     }
-    private static function contains_whole_phrase( string $haystack, string $needle ): bool {
-        $haystack = trim( str_replace( '.', ' ', self::normalize( $haystack ) ) );
-        $needle = trim( str_replace( '.', ' ', self::normalize( $needle ) ) );
-        return '' !== $needle && str_contains( ' ' . $haystack . ' ', ' ' . $needle . ' ' );
+    /**
+     * Whether one unit of intent is satisfied by one field of a capability.
+     *
+     * A concept holds every catalog token that satisfies it, so any single hit
+     * settles it. Counting the hits instead would let a concept that happens to
+     * name four tokens outweigh one that names a single token, which would make
+     * a capability's rank depend on how richly this vocabulary happens to
+     * describe the word the operator used.
+     *
+     * @param array<string,bool>  $field_tokens Token set of id, tool name or description.
+     * @param array<int,string>   $concept      Catalog tokens for one meaning.
+     * @return bool
+     */
+    private static function concept_matches( array $field_tokens, array $concept ): bool {
+        foreach ( $concept as $token ) {
+            if ( isset( $field_tokens[ $token ] ) ) { return true; }
+        }
+        return false;
     }
     private static function executor_name_available( string $executor ): bool {
         if(''===$executor||!str_contains($executor,'::'))return false;
@@ -259,36 +260,55 @@ final class PRSTUDIO_UC_Capability_Registry {
         self::$search_index=array('rows'=>$rows,'postings'=>$postings); return self::$search_index;
     }
     public static function search( string $query, array $filters = array() ): array {
-        $q = self::normalize( $query ); $tokens = self::query_tokens( $q );
+        $q = self::normalize( $query ); $concepts = self::query_concepts( $q );
         $limit = max( 1, min( self::MAX_LIMIT, (int) ( $filters['limit'] ?? self::DEFAULT_LIMIT ) ) );
         $domain = strtolower( trim( (string) ( $filters['domain'] ?? '' ) ) );
         $include_legacy = array_key_exists( 'include_legacy', $filters ) ? (bool) $filters['include_legacy'] : true;
         $index=self::search_index(); $candidate_ids=array();
-        if(''===$q){$candidate_ids=array_fill_keys(array_keys($index['rows']),true);}else{foreach($tokens as $token){if(isset($index['postings'][$token])){$candidate_ids += $index['postings'][$token];}}}
+        if(''===$q){$candidate_ids=array_fill_keys(array_keys($index['rows']),true);}else{foreach(PRSTUDIO_UC_Action_Lexicon::catalog_tokens($concepts) as $token){if(isset($index['postings'][$token])){$candidate_ids += $index['postings'][$token];}}}
         $scored = array();
         foreach ( array_keys($candidate_ids) as $idx ) { $row=$index['rows'][$idx]??null; if(!$row)continue; $cap=$row['cap'];
             if ( ! $include_legacy && 'native' !== (string) ( $cap['source']['kind'] ?? '' ) ) { continue; }
             if ( '' !== $domain && strtolower( (string) ( $cap['domain'] ?? '' ) ) !== $domain ) { continue; }
             if(!self::executor_name_available((string)($cap['executor']??''))){continue;}
-            $id=$row['id']; $desc=$row['desc']; $source_name=$row['source']; $haystack=$row['text'];
-            $score = 0;
+            $score = 0; $covered_specific = 0; $covered_any = 0; $source_matches = 0;
             if ( '' === $q ) { $score += 1; }
-            elseif ( self::contains_whole_phrase( $id, $q ) || self::contains_whole_phrase( $source_name, $q ) ) { $score += 100; }
-            elseif ( self::contains_whole_phrase( $haystack, $q ) ) { $score += 60; }
-            foreach ( $tokens as $token ) {
-                if ( isset( $row['id_tokens'][ $token ] ) ) { $score += 16; }
-                elseif ( isset( $row['source_tokens'][ $token ] ) ) { $score += 12; }
-                elseif ( isset( $row['desc_tokens'][ $token ] ) ) { $score += 4; }
+            foreach ( $concepts as $concept ) {
+                $in_id     = self::concept_matches( $row['id_tokens'], $concept );
+                $in_source = self::concept_matches( $row['source_tokens'], $concept );
+                $in_desc   = self::concept_matches( $row['desc_tokens'], $concept );
+                if ( $in_id ) { $score += 16; }
+                elseif ( $in_source ) { $score += 12; }
+                elseif ( $in_desc ) { $score += 4; }
+                if ( $in_id || $in_source ) { ++$covered_specific; ++$covered_any; }
+                elseif ( $in_desc ) { ++$covered_any; }
+                if ( $in_source ) { ++$source_matches; }
             }
+            // Answering the whole request beats answering part of it loudly.
+            //
+            // This replaces a bonus for containing the query as a literal
+            // phrase, which could only ever fire for the language the catalog
+            // happens to be written in: "list orders" matched the id
+            // legacy.direct.list-orders and collected 100 points, while
+            // "elenca gli ordini" -- the same request -- collected none, and
+            // the two languages ranked differently for a reason that had
+            // nothing to do with what was being asked. Coverage asks the same
+            // question of both: is every unit of intent accounted for.
+            $total = count( $concepts );
+            if ( 0 < $total && $covered_specific === $total ) { $score += 100; }
+            elseif ( 0 < $total && $covered_any === $total ) { $score += 60; }
             if ( $score <= 0 ) { continue; }
             $kind = (string) ( $cap['source']['kind'] ?? '' );
             $specific_tokens = $row['source_tokens'] ?: $row['id_tokens'];
-            $specific_matches = count( array_intersect_key( $specific_tokens, array_fill_keys( $tokens, true ) ) );
+            $specific_matches = 0;
+            foreach ( $concepts as $concept ) {
+                if ( self::concept_matches( $specific_tokens, $concept ) ) { ++$specific_matches; }
+            }
             $scored[] = array(
                 'score'=>$score,
                 'native'=>'native' === $kind,
                 'legacy_action'=>'legacy_action' === $kind,
-                'source_matches'=>count( array_intersect_key( $row['source_tokens'], array_fill_keys( $tokens, true ) ) ),
+                'source_matches'=>$source_matches,
                 'extra_tokens'=>max( 0, count( $specific_tokens ) - $specific_matches ),
                 'cap'=>$cap,
             );
