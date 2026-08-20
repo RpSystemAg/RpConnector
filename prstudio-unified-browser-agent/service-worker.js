@@ -39,6 +39,7 @@ import { createObservationEnvelope, redactObservation } from "./lib/observation-
 import { migrateOneGuardLegacyState } from "./lib/legacy-one-guard-migration.js";
 import { parseUserUrl, describeUrlInput } from "./lib/url-input.js";
 import { agentCursorPainter, isDrawablePoint, cursorModeForEvent, CURSOR_ELEMENT_ID } from "./lib/agent-cursor.js";
+import { buildScreenshotCandidates } from "./lib/screenshot-candidates.js";
 import { AGENT_GROUP_TITLE, AGENT_GROUP_COLOR, isReusableGroup } from "./lib/agent-tab-group.js";
 import {
   LOCAL_STUDIO_VERSION,
@@ -5188,20 +5189,16 @@ async function captureScreenshot(tabId, fullPage = false, lazyLoad = false, opti
   const perception = Boolean(options.perception);
   const scale = perception ? Math.min(1, PERCEPTION_MAX_DIMENSION / Math.max(plannedWidth, plannedHeight), Math.sqrt(maxPixels / Math.max(1, plannedWidth * plannedHeight))) : 1;
   if (fullPage || perception) base.clip = { x: 0, y: 0, width: plannedWidth, height: plannedHeight, scale };
-  const compatible = fullPage
-    ? [
-        base,
-        { format, ...(format === "jpeg" ? { quality } : {}), fromSurface: true, clip: { x: 0, y: 0, width: plannedWidth, height: plannedHeight, scale: 1 } },
-        { format, ...(format === "jpeg" ? { quality } : {}), clip: { x: 0, y: 0, width: plannedWidth, height: plannedHeight, scale: 1 } },
-        { format: "png", fromSurface: true },
-        { format: "png" },
-      ]
-    : [
-        base,
-        { format, ...(format === "jpeg" ? { quality } : {}), fromSurface: true },
-        { format: "png", fromSurface: true },
-        { format: "png" },
-      ];
+  // Built by lib/screenshot-candidates.js so the chain and the test that
+  // guards it cannot drift. The property that matters is that the chain ends
+  // with a renderer capture: a tab created with active:false has no compositor
+  // surface, and every surface variant photographs nothing at all.
+  const compatible = buildScreenshotCandidates({
+    format,
+    quality,
+    fullPage: Boolean(fullPage),
+    clip: (fullPage || perception) ? { x: 0, y: 0, width: plannedWidth, height: plannedHeight, scale } : null,
+  });
   const captured = await captureScreenshotWithFallback(tabId, compatible, { deadlineAt });
   const actualFormat = captured.actualFormat === "jpeg" ? "jpeg" : "png";
   const capturedCssWidth = Number(captured.params?.clip?.width || metrics.viewportWidth || plannedWidth);
