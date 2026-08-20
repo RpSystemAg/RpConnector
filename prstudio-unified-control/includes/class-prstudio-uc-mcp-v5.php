@@ -203,11 +203,13 @@ final class PRSTUDIO_UC_MCP_V5 {
         }
         if ( 'resources/read' === $method ) {
             $uri=(string)($params['uri']??'');
-            $ui_meta=array('ui'=>array(
-                'prefersBorder'=>true,
-                'domain'=>'https://example.com',
-                'csp'=>array('connectDomains'=>array('https://example.com'),'resourceDomains'=>array('https://example.com')),
-            ));
+            $ui=array('prefersBorder'=>true);
+            $origin=self::site_origin();
+            if(''!==$origin){
+                $ui['domain']=$origin;
+                $ui['csp']=array('connectDomains'=>array($origin),'resourceDomains'=>array($origin));
+            }
+            $ui_meta=array('ui'=>$ui);
             if($uri===self::BROWSER_VIEWER_URI)return self::rpc_result($id,array('contents'=>array(array('uri'=>self::BROWSER_VIEWER_URI,'mimeType'=>'text/html;profile=mcp-app','text'=>self::browser_viewer_html(),'_meta'=>$ui_meta))));
             if($uri===self::BROWSER_LIVE_URI)return self::rpc_result($id,array('contents'=>array(array('uri'=>self::BROWSER_LIVE_URI,'mimeType'=>'text/html;profile=mcp-app','text'=>self::browser_live_html(),'_meta'=>$ui_meta))));
             return self::rpc_error($id,-32602,'Unknown resource URI.');
@@ -269,6 +271,17 @@ final class PRSTUDIO_UC_MCP_V5 {
     }
 
     private static function is_list( array $value ): bool { $i=0; foreach($value as $key=>$_){ if($key!==$i++) return false; } return true; }
+
+    private static function site_origin(): string {
+        $url=function_exists('home_url')?(string)home_url('/'):'';
+        $parts=function_exists('wp_parse_url')?wp_parse_url($url):parse_url($url);
+        if(!is_array($parts)||empty($parts['host']))return '';
+        $scheme=strtolower((string)($parts['scheme']??''));
+        if(!in_array($scheme,array('http','https'),true))return '';
+        $origin=$scheme.'://'.(string)$parts['host'];
+        if(isset($parts['port']))$origin.=':'.(int)$parts['port'];
+        return $origin;
+    }
 
     private static function rpc_result( $id, $result ): array {
         if ( '2026-07-28' === self::$response_protocol ) {

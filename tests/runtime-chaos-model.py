@@ -31,6 +31,7 @@ class Job:
     lease_epoch: int = 0
     active_child: str = ""
     duplicate_children: int = 0
+    watchdog_count: int = 0
 
     def child_key(self, step: int) -> str:
         return hashlib.sha256(f"mission\nplan\n{step}".encode()).hexdigest()
@@ -84,6 +85,14 @@ class Job:
         after = (self.state, self.step, dict(self.evidence), self.active_child)
         assert before == after
 
+    def progress_watchdog(self) -> None:
+        """Model the production watchdog that turns bounded stasis into retry."""
+        assert self.state in {"RUNNING", "WAITING_FOR_BROWSER"}
+        self.failure_count += 1
+        self.watchdog_count += 1
+        self.active_child = ""
+        self.state = "DEAD_LETTER" if self.failure_count >= MAX_FAILURES else "READY"
+
     def finish_if_done(self) -> None:
         if self.state == "RUNNING" and self.step >= self.steps:
             self.state = "COMPLETED"
@@ -133,6 +142,10 @@ def run(seed: int, steps: int) -> Job:
         if after == previous_signature == before:
             identical += 1
         else:
+            identical = 0
+        if identical >= MAX_IDENTICAL_PROGRESS_SIGNATURES - 1:
+            job.progress_watchdog()
+            after = job.progress_signature()
             identical = 0
         previous_signature = after
 

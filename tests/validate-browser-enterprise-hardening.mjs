@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { actionToSteps, canonicalBrowserAction } from '../prstudio-unified-browser-agent/lib/protocol.js';
-import { RUNTIME_CONTRACT_ACTIONS } from '../prstudio-unified-browser-agent/lib/runtime-capabilities.js';
+import { RUNTIME_CONTRACT_ACTIONS, hasRuntimeContractAction } from '../prstudio-unified-browser-agent/lib/runtime-capabilities.js';
 
 const ROOT=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read=(p)=>readFile(path.join(ROOT,p),'utf8');
@@ -37,7 +37,21 @@ for(const action of catalog.actions){const k=`${action.route}|${action.action}`;
 const capIds=new Set();
 for(const cap of caps.capabilities){assert.ok(!capIds.has(cap.id),`duplicate capability ${cap.id}`);capIds.add(cap.id);} pass(`capability registry has ${caps.capabilities.length} unique ids`);
 check(browserActions.length>50,'browser contract exposes a substantial executable surface');
-for(const action of RUNTIME_CONTRACT_ACTIONS){assert.ok(worker.includes(`"${action}"`)||worker.includes(`'${action}'`)||worker.includes(action),`runtime action missing in worker: ${action}`);} pass(`all ${RUNTIME_CONTRACT_ACTIONS.length} advanced runtime actions remain represented by the executor`);
+const executeStepBody=worker.slice(worker.indexOf('async function executeStep('),worker.indexOf('\nfunction domRuntimeArgs('));
+const executableStepTypes=new Set([...executeStepBody.matchAll(/case\s+["']([^"']+)["']\s*:/g)].map(match=>match[1]));
+const representativeArgs={tab_id:10,url:'https://example.test/path',query:'target',selector:'body',action:'start',expression:'1'};
+for(const action of RUNTIME_CONTRACT_ACTIONS){
+  const steps=actionToSteps(action,representativeArgs);
+  assert.ok(steps.length>0,`runtime action does not compile to a step: ${action}`);
+  for(const step of steps){
+    assert.ok(executableStepTypes.has(step.type),`compiled step has no worker executor: ${action} -> ${step.type}`);
+    if(step.type==='contract_action'){
+      assert.equal(step.action,action,`contract step changes the registered action identity: ${action}`);
+      assert.ok(hasRuntimeContractAction(step.action),`contract step is not present in the runtime registry: ${action}`);
+    }
+  }
+}
+pass(`all ${RUNTIME_CONTRACT_ACTIONS.length} advanced runtime actions compile to registered executable steps`);
 check(mcp.includes("'include_history'=>self::bool")&&bridge.includes('$include_history'),'browser status defaults to compact device output with opt-in history');
 check(mcp.includes("'detail'=>self::str('compact or full")&&mcp.includes("PRSTUDIO_UC_Health::snapshot(array('detail'"),'health tool supports compact-by-default execution diagnostics');
 

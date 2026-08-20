@@ -17,14 +17,11 @@ tests with a mocked $wpdb pass -- only counting the two sides catches it.
 
 What it deliberately does not do
 --------------------------------
-A call is only counted when the placeholder count is knowable: the SQL must be
-built from string literals plus expressions that cannot themselves contain a
-placeholder (a table-name helper, `$wpdb->options`). Anything else -- SQL held
-in a variable, a dynamic argument list -- is reported as SKIPPED with its
-reason, and the summary prints how many. Guessing there would produce false
-alarms, and a checker people learn to ignore is worse than no checker.
-
-The skip list is meant to be read. If it grows, coverage is shrinking.
+A call is counted statically when the placeholder count is knowable: the SQL
+must be built from string literals plus expressions that cannot themselves
+contain a placeholder (a table-name helper, `$wpdb->options`). Dynamic SQL and
+dynamic argument lists are reported as requiring runtime review; they remain in
+the inventory and are not described as excluded or passed by this static proof.
 
 Exit code 1 on any mismatch.
 """
@@ -208,9 +205,9 @@ def main() -> int:
                     f"      {snippet}"
                 )
 
-    print(f"wpdb::prepare arity: {checked} call(s) counted, {len(skipped)} not countable")
+    print(f"wpdb::prepare arity: {checked} call(s) counted, {len(skipped)} require dynamic review")
     for s in skipped:
-        print(f"  SKIP {s}")
+        print(f"  DYNAMIC_REVIEW {s}")
 
     if problems:
         print(f"\n{len(problems)} MISMATCH(ES) -- these queries silently do nothing:", file=sys.stderr)

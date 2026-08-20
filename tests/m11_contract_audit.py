@@ -74,6 +74,49 @@ def function_body(source: str, name: str) -> str:
     return brace_body(source, match.end()) if match else ""
 
 
+def balanced_calls(source: str, marker: str) -> list[str]:
+    """Return complete calls, including multiline/nested arguments."""
+    calls: list[str] = []
+    cursor = 0
+    while True:
+        start = source.find(marker, cursor)
+        if start < 0:
+            break
+        opening = source.find("(", start + len(marker))
+        if opening < 0:
+            break
+        depth = 0
+        quote = ""
+        escaped = False
+        end = -1
+        for index in range(opening, len(source)):
+            char = source[index]
+            if escaped:
+                escaped = False
+                continue
+            if quote:
+                if char == "\\":
+                    escaped = True
+                elif char == quote:
+                    quote = ""
+                continue
+            if char in {"'", '"', "`"}:
+                quote = char
+                continue
+            if char == "(":
+                depth += 1
+            elif char == ")":
+                depth -= 1
+                if depth == 0:
+                    end = index + 1
+                    break
+        if end < 0:
+            break
+        calls.append(source[start:end])
+        cursor = end
+    return calls
+
+
 def _direct_protocol_bindings(protocol: str) -> dict[str, set[str]]:
     marker = re.search(r"\bconst\s+direct\s*=\s*\{", protocol)
     body = brace_body(protocol, marker.start()) if marker else ""
@@ -210,12 +253,14 @@ def audit_annotations() -> tuple[list[str], dict[str, Any]]:
 
     mcp_source = text(MCP)
     mcp_tools_body = function_body(mcp_source, "build_tools") or function_body(mcp_source, "tools")
+    tool_calls = balanced_calls(mcp_tools_body, "self::tool")
     declared_mcp = set(re.findall(r"self::tool\(\s*['\"]([A-Za-z0-9_:-]+)['\"]", mcp_tools_body))
     mcp_annotations: dict[str, tuple[bool, bool, bool, bool]] = {}
-    for line in mcp_tools_body.splitlines():
+    for call in tool_calls:
         match = re.search(
-            r"self::tool\(\s*['\"]([A-Za-z0-9_:-]+)['\"].*self::annotations\(([^)]*)\)\s*\)\s*;",
-            line,
+            r"self::tool\(\s*['\"]([A-Za-z0-9_:-]+)['\"].*self::annotations\(([^)]*)\)",
+            call,
+            re.S,
         )
         if not match:
             continue
