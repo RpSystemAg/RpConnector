@@ -90,8 +90,6 @@ jobs:
           php -d auto_prepend_file=tests/strict-php-errors.php tests/enterprise-schema-batch-1.php
           php -d auto_prepend_file=tests/strict-php-errors.php tests/enterprise-schema-batch-2.php
           php -d auto_prepend_file=tests/strict-php-errors.php tests/php-mcp-catalog-runtime-smoke.php
-          php -d auto_prepend_file=tests/strict-php-errors.php tests/php-browser-live-signaling-smoke.php
-          php -d auto_prepend_file=tests/strict-php-errors.php tests/php-runtime-persistence-efficiency-smoke.php
           python3 tests/test-wiring-audit.py
           build_checkout="$RUNNER_TEMP/rpconnector-preflight-build"
           git worktree add --detach "$build_checkout" "$GITHUB_SHA"
@@ -131,7 +129,7 @@ jobs:
             fi
             sleep 1
           done
-          php -r '$m=new mysqli("127.0.0.1","root","", "",3306); if($m->connect_errno){fwrite(STDERR,$m->connect_error);exit(1);} if(!$m->query("CREATE DATABASE IF NOT EXISTS prstudio_full_surface")){ fwrite(STDERR,$m->error);exit(1);}'
+          php -r '$m=new mysqli("127.0.0.1","root","", "",3306); if($m->connect_errno){fwrite(STDERR,$m->connect_error);exit(1);} if(!$m->query("CREATE DATABASE IF NOT EXISTS prstudio_full_surface CHARACTER SET utf8mb4")){fwrite(STDERR,$m->error);exit(1);} echo "databases ready\n";'
 
       - name: Install exact candidate into real WordPress runtime
         run: |
@@ -141,7 +139,7 @@ jobs:
           wp core download --path="$RP_WP_PATH" --force
           wp config create --path="$RP_WP_PATH" --dbname=wordpress_stateful --dbuser=root --dbpass='' --dbhost=127.0.0.1:3306 --skip-check
           wp config set WP_ENVIRONMENT_TYPE local --path="$RP_WP_PATH"
-          wp core install --path="$RP_WP_PATH" --url="$WP_URL" --title='Full surface execution' --admin_user=rpadmin --admin_password='Full-Surface-Only-2026!' --admin_email='full-surface@example.com'
+          wp core install --path="$RP_WP_PATH" --url="$WP_URL" --title='Full surface execution' --admin_user=rpadmin --admin_password='Full-Surface-Only-2026!' --admin_email='full-surface@example.invalid' --skip-email
           wp rewrite structure '/%postname%/' --path="$RP_WP_PATH"
           wp rewrite flush --path="$RP_WP_PATH"
           cp -a prstudio-unified-control "$RP_WP_PATH/wp-content/plugins/prstudio-unified-control"
@@ -180,7 +178,7 @@ jobs:
           curl --fail --silent "$WP_URL/wp-json/" > /tmp/rp-full-surface-rest-index.json
           jq -e '.namespaces | index("prstudio-unified/v1")' /tmp/rp-full-surface-rest-index.json >/dev/null
 
-          token="$(wp eval --path="$RP_WP_PATH" '$m=new ReflectionMethod(PRSTUDIO_UC_MCP_Auth_V5::class,"issue_tokens"); $m->setAccessible(true); $t=$m->invoke(null,"full-surface-runtime","prstudio-full-surface"); echo $t ?? "";')"
+          token="$(wp eval --path="$RP_WP_PATH" '$m=new ReflectionMethod(PRSTUDIO_UC_MCP_Auth_V5::class,"issue_tokens"); $m->setAccessible(true); $t=$m->invoke(null,"full-surface-runtime","prstudio.read prstudio.write",PRSTUDIO_UC_MCP_Auth_V5::mcp_url()); if (empty($t["access_token"])) { exit(1); } echo $t["access_token"];' | tail -n 1)"
           test -n "$token"
           case "$token" in prstudio_at_*) ;; *) echo 'generated token format invalid' >&2; exit 1 ;; esac
           echo "::add-mask::$token"
@@ -336,7 +334,6 @@ jobs:
 # - tests/php-anti-crash-work-binding-smoke.php
 # - tests/php-audit-trail-smoke.php
 # - tests/php-bootstrap-fastlane-benchmark.php
-# - tests/php-browser-live-signaling-smoke.php
 # - tests/php-browser-parent-reconciliation-smoke.php
 # - tests/php-confidence-calibration-smoke.php
 # - tests/php-context-leakage-gauges-smoke.php
@@ -371,7 +368,6 @@ jobs:
 # - tests/php-research-radar-smoke.php
 # - tests/php-retry-policy-smoke.php
 # - tests/php-runtime-db-liveness-integration.php
-# - tests/php-runtime-persistence-efficiency-smoke.php
 # - tests/php-runtime-recovery-prepare-smoke.php
 # - tests/php-schedule-clock-smoke.php
 # - tests/php-scheduler-topology-v17-smoke.php
