@@ -196,7 +196,7 @@ test('all primary controls register click/change handlers', () => {
 
 test('visibilitychange pauses every panel timer and resumes each refresh loop', async () => {
   await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.equal(panelTimers.size, 3);
+  assert.equal(panelTimers.size, 2);
   documentStub.hidden = true;
   await documentStub.dispatchEvent('visibilitychange');
   assert.equal(panelTimers.size, 0);
@@ -205,7 +205,7 @@ test('visibilitychange pauses every panel timer and resumes each refresh loop', 
   await documentStub.dispatchEvent('visibilitychange');
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.ok(calls.length >= before + 2, 'local and remote refreshes did not resume');
-  assert.equal(panelTimers.size, 3);
+  assert.equal(panelTimers.size, 2);
 });
 
 test('Automation/Log tabs are interactive and pairing controls remain exposed', async () => {
@@ -247,20 +247,18 @@ test('local audit button dispatches a real local action', async () => {
 });
 
 test('guarded actions preserve controls that were already disabled', async () => {
-  const liveStart = elements.get('liveStartButton');
-  liveStart.disabled = true;
+  const refresh = elements.get('refreshButton');
+  refresh.disabled = true;
   await elements.get('healthButton').dispatch('click');
   await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.equal(liveStart.disabled, true);
+  assert.equal(refresh.disabled, true);
 });
 
-test('an action click grants exactly the newly selected tab in an already-open panel', async () => {
-  activeTab = { id: 42, title: 'Seconda scheda', url: 'https://two.example/' };
-  for (const listener of runtimeMessageListeners) {
-    listener({ target: 'prstudio-live-panel', type: 'active_tab_granted', detail: { tabId: 42 } });
-  }
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.equal(elements.get('liveStartButton').disabled, false);
+test('removed Browser LIVE controls and message routing stay absent', () => {
+  assert.equal(ids.has('liveWebRtc'), false);
+  assert.equal(ids.has('liveStartButton'), false);
+  assert.equal(ids.has('liveStopButton'), false);
+  assert.doesNotMatch(source, /prstudio-live|refreshLive|sendLive|grantedTabId/);
 });
 
 
