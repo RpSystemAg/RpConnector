@@ -1,0 +1,101 @@
+{
+  "id": "prstudio.extensions-operating-policy",
+  "version": "1.0.0",
+  "scope": "global",
+  "purpose": "Method for installing, activating, updating, editing and removing plugins and themes, where the failure mode is a site that stops rendering.",
+  "activation": {
+    "rule": "Apply when the task concerns plugins, themes, child themes, plugin or theme files, updates, activation or deactivation.",
+    "signals": [
+      "plugin",
+      "plugins",
+      "theme",
+      "themes",
+      "child theme",
+      "activate",
+      "deactivate",
+      "install",
+      "uninstall",
+      "update plugin",
+      "plugin file",
+      "theme file",
+      "functions.php",
+      "style.css",
+      "must-use plugin",
+      "drop-in",
+      "compatibility",
+      "white screen",
+      "fatal error after activation",
+      "rollback plugin",
+      "plugin conflict"
+    ],
+    "non_signals": [
+      "publish a post",
+      "product price",
+      "SEO audit",
+      "order refund",
+      "user role"
+    ]
+  },
+  "method": [
+    "INVENTORY",
+    "COMPATIBILITY",
+    "REVERSIBILITY",
+    "APPLY",
+    "VERIFY-RENDER",
+    "RECORD"
+  ],
+  "operating_rules": [
+    "Read what is actually running before changing it: WordPress version, PHP version, active theme, active plugins and their versions. An assumed environment is the most common cause of a broken activation.",
+    "Check compatibility against the WordPress and PHP the site is running, never against the newest release or against the machine the plugin was written on.",
+    "Installation is safe; activation is the risky step. Install and inspect first, and activate as a separate decision.",
+    "Know the way back before applying. Deactivation, restoring the previous version, or restoring the file must be an action you can name, not a hope.",
+    "Verify the front end renders and wp-admin still loads after every activation. A fatal error produces a blank page, and a blank page is not an error anywhere the API can see it.",
+    "Never activate or update several plugins in one step on a live site. When something breaks you have to be able to say which change did it.",
+    "Editing a vendor plugin or a parent theme file is a last resort: the next update overwrites it and the site silently regresses. Prefer a child theme, a filter, or a must-use plugin.",
+    "A plugin that fails to activate usually leaves nothing behind. A plugin that activates and then fails does: check for the options, tables and scheduled events it created.",
+    "WordPress 7.1 changed three things that break plugins and themes only after activation: the post editor is always iframed, block CSS loads conditionally on block presence, and jQuery UI moved to 1.14.2. When an admin screen or an editor integration breaks after an upgrade, look there first.",
+    "Report the version moved from and the version moved to. “Updated the plugin” is not a record anyone can act on later."
+  ],
+  "quality_gate": {
+    "decision": [
+      "PASS",
+      "ITERATE"
+    ],
+    "dimensions": [
+      "front_end_renders",
+      "admin_reachable",
+      "no_new_fatal_or_php_error",
+      "rollback_path_named",
+      "compatibility_checked_against_running_environment",
+      "single_change_isolated"
+    ],
+    "conditional_dimensions": [
+      "editor_still_functional",
+      "child_theme_used_instead_of_vendor_edit",
+      "created_options_and_events_accounted_for"
+    ],
+    "no_numeric_score": true,
+    "guiding_question": "If this turns out to be wrong five minutes from now, can the site be returned to how it was without restoring a backup?",
+    "failure_action": "ITERATE"
+  },
+  "context_partition": {
+    "global": [
+      "the method",
+      "the quality gate",
+      "the operating rules"
+    ],
+    "site_scoped": [
+      "installed versions",
+      "active theme",
+      "hosting constraints",
+      "existing data",
+      "customer records",
+      "brand"
+    ],
+    "invariant": "Never promote site-specific information into the global policy."
+  },
+  "tool_surface": {
+    "new_public_mcp_tools": 0,
+    "rule": "The policy is internal operating infrastructure and must not add, remove, hide or replace any public tool or capability."
+  }
+}

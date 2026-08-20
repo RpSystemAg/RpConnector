@@ -151,6 +151,14 @@ final class PRSTUDIO_UC_Orchestrator {
 
 		$actions = $domain->actions( $catalog, $objective, $limit, $include_schema );
 		$workflow = $domain->workflow( $objective, $arguments, $catalog );
+		// Attached here rather than inside each domain because this is the one
+		// line every plan passes through. A domain that overrides workflow()
+		// and returns early -- the SEO fast path does exactly that -- would
+		// otherwise silently skip its own method, which is the failure a policy
+		// is least able to report about itself.
+		$domain_policies = class_exists( 'PRSTUDIO_UC_Domain_Policies' )
+			? PRSTUDIO_UC_Domain_Policies::runtime_context( $objective )
+			: array( 'applicable' => false, 'policy_ids' => array(), 'policies' => array() );
 		$enterprise_plan = class_exists('PRSTUDIO_UC_Enterprise_Engine') ? PRSTUDIO_UC_Enterprise_Engine::plan($objective,$domain->id(),$arguments,$workflow) : array();
 		$elapsed = ( ( function_exists( 'hrtime' ) ? hrtime( true ) : (int) round( microtime( true ) * 1000000000 ) ) - $started ) / 1000000;
 		return array(
@@ -159,7 +167,7 @@ final class PRSTUDIO_UC_Orchestrator {
 			'knowledge' => class_exists( 'PRSTUDIO_UC_Action_Index' ) ? PRSTUDIO_UC_Action_Index::knowledge_snapshot() : array(),
 			'objective' => $objective,
 			'domain' => array( 'id' => $domain->id(), 'class' => $domain->class_name(), 'label' => $domain->label(), 'routes' => $domain->routes(), 'action_count' => count( $actions ) ),
-			'workflow' => $workflow, 'enterprise_plan'=>$enterprise_plan, 'memory'=>class_exists('PRSTUDIO_UC_Memory')?PRSTUDIO_UC_Memory::snapshot():array(), 'context'=>class_exists('PRSTUDIO_UC_Memory')?PRSTUDIO_UC_Memory::context():array(),
+			'workflow' => $workflow, 'domain_policies'=>$domain_policies, 'enterprise_plan'=>$enterprise_plan, 'memory'=>class_exists('PRSTUDIO_UC_Memory')?PRSTUDIO_UC_Memory::snapshot():array(), 'context'=>class_exists('PRSTUDIO_UC_Memory')?PRSTUDIO_UC_Memory::context():array(),
 			'available_actions' => $actions,
 			'resolution' => array( 'reason' => $resolution_reason, 'milliseconds' => round( $elapsed, 3 ), 'target_ms' => 10.0, 'passed' => $elapsed <= 10.0 ),
 			'next_call' => array( 'tool' => 'prstudio_orchestrator_execute', 'arguments' => array( 'objective' => $objective, 'domain' => $domain->id(), 'arguments' => $arguments ) ),

@@ -1,0 +1,97 @@
+{
+  "id": "prstudio.data-operating-policy",
+  "version": "1.0.0",
+  "scope": "global",
+  "purpose": "Method for database, file and backup work, where the defining property is that the mistake cannot be taken back.",
+  "activation": {
+    "rule": "Apply when the task concerns the database, SQL, tables, options, transients, backups, restores, migrations, or bulk file operations.",
+    "signals": [
+      "database",
+      "sql",
+      "query",
+      "table",
+      "tables",
+      "option",
+      "options",
+      "transient",
+      "backup",
+      "restore",
+      "migration",
+      "import data",
+      "export data",
+      "truncate",
+      "drop table",
+      "bulk delete",
+      "orphaned rows",
+      "database cleanup",
+      "optimise table"
+    ],
+    "non_signals": [
+      "publish a post",
+      "activate a plugin",
+      "screenshot",
+      "meta description",
+      "coupon"
+    ]
+  },
+  "method": [
+    "SCOPE",
+    "BACKUP",
+    "BOUND",
+    "APPLY",
+    "VERIFY",
+    "RECORD"
+  ],
+  "operating_rules": [
+    "Establish that a restorable backup exists before mutating anything. A backup nobody has restored is a belief about a file, not a recovery path.",
+    "Count before changing. Run the SELECT that matches exactly the rows the write will touch and read the number; if the number is surprising, the WHERE clause is wrong, not the expectation.",
+    "Every mutation carries a WHERE clause and a bound. An UPDATE or DELETE without one is not a large operation, it is an unscoped one.",
+    "Prefer the WordPress API over raw SQL when both reach the same rows. The API maintains caches, hooks and metadata that direct SQL silently bypasses.",
+    "Classify reversibility before acting: an option value can be written back, a dropped table cannot, and a truncated log is simply gone.",
+    "Schema changes carry a migration record including the state before. A column added without a record is indistinguishable from a column that was always there.",
+    "Exploration happens on read-only paths. Never learn the shape of the data by mutating it.",
+    "Serialized data does not survive naive search-and-replace, because string lengths are encoded inside it. Use a tool that understands serialization or the row becomes unreadable to WordPress.",
+    "Report the row count actually affected, not the one intended. Those two numbers differ exactly when something has gone wrong."
+  ],
+  "quality_gate": {
+    "decision": [
+      "PASS",
+      "ITERATE"
+    ],
+    "dimensions": [
+      "backup_verified_restorable",
+      "affected_rows_counted_before_write",
+      "mutation_is_bounded",
+      "reversibility_classified",
+      "actual_row_count_reported"
+    ],
+    "conditional_dimensions": [
+      "migration_recorded",
+      "serialization_safe_replacement",
+      "api_used_instead_of_raw_sql"
+    ],
+    "no_numeric_score": true,
+    "guiding_question": "If this statement matches ten times more rows than expected, what stops it, and what brings them back?",
+    "failure_action": "ITERATE"
+  },
+  "context_partition": {
+    "global": [
+      "the method",
+      "the quality gate",
+      "the operating rules"
+    ],
+    "site_scoped": [
+      "installed versions",
+      "active theme",
+      "hosting constraints",
+      "existing data",
+      "customer records",
+      "brand"
+    ],
+    "invariant": "Never promote site-specific information into the global policy."
+  },
+  "tool_surface": {
+    "new_public_mcp_tools": 0,
+    "rule": "The policy is internal operating infrastructure and must not add, remove, hide or replace any public tool or capability."
+  }
+}

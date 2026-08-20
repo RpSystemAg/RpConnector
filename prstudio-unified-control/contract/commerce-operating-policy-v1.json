@@ -1,0 +1,100 @@
+{
+  "id": "prstudio.commerce-operating-policy",
+  "version": "1.0.0",
+  "scope": "global",
+  "purpose": "Method for catalogue, pricing, stock, order and refund work, where the effect is money and it is public the moment it is written.",
+  "activation": {
+    "rule": "Apply when the task concerns products, variations, prices, stock, coupons, orders, refunds, customers, shipping or tax.",
+    "signals": [
+      "product",
+      "products",
+      "price",
+      "prices",
+      "stock",
+      "inventory",
+      "coupon",
+      "discount",
+      "order",
+      "orders",
+      "refund",
+      "customer",
+      "customers",
+      "shipping",
+      "vat",
+      "iva",
+      "tax",
+      "invoice",
+      "cart",
+      "checkout",
+      "woocommerce",
+      "variation",
+      "sale price"
+    ],
+    "non_signals": [
+      "meta description",
+      "plugin update",
+      "database backup",
+      "sitemap",
+      "user role"
+    ]
+  },
+  "method": [
+    "READ",
+    "STATE-THE-EFFECT",
+    "BOUND",
+    "APPLY",
+    "VERIFY-PUBLIC",
+    "RECORD"
+  ],
+  "operating_rules": [
+    "A price is published the instant it is written. There is no draft state for money, and a customer can see it before anyone notices.",
+    "State the economic effect before writing it: which products, the price before, the price after. If that sentence cannot be written, the change is not understood well enough to make.",
+    "Enumerate the affected set and read it back. “all products in this category” is a description; the list of products is the fact.",
+    "Never apply a bulk price or stock change without first running the same change as a bounded preview over a small, named subset.",
+    "Refunds move real money and are one-way. Confirm the order, the amount and the payment method against the order record, not against the request that asked for them.",
+    "Setting stock to zero hides a product and can strand orders already in flight. Check pending and processing orders first.",
+    "Tax and VAT are jurisdictional and legally binding. Never infer, guess or copy a rate: if it is not supplied and not already configured, stop and say so.",
+    "Verify on the storefront, not only in the admin. Caching, currency switching and catalogue visibility rules mean the admin value and the customer value can legitimately differ.",
+    "A change to a variation is not a change to its parent, and a change to a parent may not reach existing variations. Say which one was changed."
+  ],
+  "quality_gate": {
+    "decision": [
+      "PASS",
+      "ITERATE"
+    ],
+    "dimensions": [
+      "economic_effect_stated_before_write",
+      "affected_set_enumerated",
+      "storefront_reflects_change",
+      "no_order_left_in_inconsistent_state"
+    ],
+    "conditional_dimensions": [
+      "tax_untouched_unless_explicitly_asked",
+      "variation_parent_relationship_stated",
+      "bulk_change_previewed_on_subset"
+    ],
+    "no_numeric_score": true,
+    "guiding_question": "Read the change back as a sentence about money: which products, from what, to what. Would the shop owner recognise it as the thing they asked for?",
+    "failure_action": "ITERATE"
+  },
+  "context_partition": {
+    "global": [
+      "the method",
+      "the quality gate",
+      "the operating rules"
+    ],
+    "site_scoped": [
+      "installed versions",
+      "active theme",
+      "hosting constraints",
+      "existing data",
+      "customer records",
+      "brand"
+    ],
+    "invariant": "Never promote site-specific information into the global policy."
+  },
+  "tool_surface": {
+    "new_public_mcp_tools": 0,
+    "rule": "The policy is internal operating infrastructure and must not add, remove, hide or replace any public tool or capability."
+  }
+}
