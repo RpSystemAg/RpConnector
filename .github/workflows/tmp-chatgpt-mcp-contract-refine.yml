@@ -1,20 +1,22 @@
 name: Temporary ChatGPT MCP contract refinement
 
 on:
-  push:
+  pull_request:
     branches:
-      - chatgpt/mcp-public-schema-quality-v2-2026-08-20
+      - master
 
 permissions:
   contents: write
 
 jobs:
   patch-and-verify:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
 
       - name: Wire public contract refinement into MCP catalog
@@ -49,10 +51,12 @@ jobs:
           if [ -f tests/php-tools-list-budget.php ]; then php tests/php-tools-list-budget.php; fi
 
       - name: Commit verified source change and remove temporary workflow
+        env:
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git rm .github/workflows/tmp-chatgpt-mcp-contract-refine.yml
           git add prstudio-unified-control/includes/class-prstudio-uc-mcp-v5.php
           git commit -m "Refine public ChatGPT MCP tool schemas"
-          git push
+          git push origin "HEAD:${HEAD_BRANCH}"
