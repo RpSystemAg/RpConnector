@@ -1,6 +1,6 @@
 # PR STUDIO EXECUTION CONSTITUTION
 
-**Reference date: 19 August 2026.**
+**Reference date: 20 August 2026.**
 
 LAW 1 — ANTI-CRASH IS THE ONLY MUTATION GUARD.  
 LAW 2 — VERIFICATION IS EVIDENCE, NEVER AUTHORIZATION.  
@@ -16,6 +16,7 @@ LAW 11 — FULL TEST/EXECUTION SURFACE MUST EXECUTE AT 100 PERCENT.
 LAW 12 — BLOCKERS TRIGGER STUDY AND REMEDIATION; THEY NEVER AUTHORIZE BYPASS OR STOP.  
 LAW 13 — HUMAN INTENT MUST RESOLVE TO ACTION, NOT INTERNAL ENCYCLOPEDIA.
 LAW 14 — ENTERPRISE CAPABILITY CONTRACT MIGRATION HAS ZERO BLOCKED COMPLETION STATES.
+LAW 15 — ITALIAN/ENGLISH FUNCTIONAL PARITY IS MANDATORY.
 
 ### Law 9 in full
 
@@ -197,6 +198,70 @@ the affected capability remains current and incomplete. That condition may be
 described as an unresolved external technical constraint for evidence purposes,
 but it must not be recorded as a `BLOCKED` migration status and must not advance
 the migration cursor. There is no repository-local bypass to this law.
+
+### Law 15 in full
+
+PR STUDIO is a bilingual product for Italian and English users. Functional
+parity between equivalent Italian and English human intent is mandatory across
+the entire user-facing and agent-facing execution path. This is not a request to
+translate every technical identifier or every internal description. It is a
+requirement that the two languages reach the same behavior.
+
+For any equivalent IT/EN intent pair, the suite must preserve the same semantic
+result wherever the concept applies: the same resolved domain, canonical action,
+ordered discovery/ranking, executable typed tool, workflow sequence, route
+filtering, parameter preservation, fallback behavior, negative/no-match behavior,
+and requested real-world effect. A difference is permitted only when the human
+request itself is semantically different, never because one language has a
+stronger local regex, substring, alias table, prompt wording or scorer.
+
+Technical tool IDs, capability IDs, action names, JSON schemas, protocol fields,
+class names and canonical implementation vocabulary may remain in English. Human
+users must not need to know those identifiers. Natural-language Italian and
+English are adapters to the same canonical concepts and execution contracts.
+
+Shared semantic normalization, stop words, synonyms, accent folding and
+multi-word concepts belong in the shared action lexicon and shared routing
+machinery. Agents must extend that shared source when a concept is missing;
+they must not repair one entry point by adding a new private Italian/English
+synonym table, parallel scorer or language-specific routing branch. Local aliases
+are allowed only for genuinely technical/protocol/brand spellings that are not
+translations, and they must not make ordinary intent language-dependent.
+
+A bilingual fix is incomplete until paired tests exercise the real public
+entrypoints and their real defaults. Tests must compare the complete meaningful
+result, not merely assert that both queries returned something. Where applicable
+this includes the full ordered action/tool list, selected domain,
+`workflow[0].tool_name` and complete workflow sequence, route filtering, typed
+call payload, preserved arguments and zero-result behavior for nonsense queries.
+Accented and unaccented Italian forms must normalize consistently where the
+language permits both spellings in user input.
+
+When an audit finds a language-dependent matcher, the remediation sequence is:
+
+```text
+FIND DUPLICATED / LITERAL LANGUAGE LOGIC
+→ MAP IT TO THE SHARED CANONICAL CONCEPTS
+→ PRESERVE THE PUBLIC CONTRACT
+→ ADD IT/EN PARITY REGRESSIONS
+→ COMMIT
+→ PUSH
+→ MERGE PROMPTLY TO CURRENT MASTER
+→ VALIDATE ON THE AUTHORITATIVE GITHUB WORKFLOWS
+→ FIX ANY FAILURE WITHOUT WEAKENING THE PARITY RULE
+```
+
+Before starting a bilingual remediation block, agents must inspect current
+`master` and recent merged/pushed work so an already-landed fix is not recreated,
+overwritten or contradicted. Each bounded block starts from current `master`, is
+integrated promptly, and becomes obsolete as a branch immediately after merge.
+The authoritative validation is the GitHub workflow result for the exact merged
+candidate SHA; local experiments may diagnose behavior but never replace or
+weaken the repository gates.
+
+A one-language success is a product defect, not partial completion. No public
+surface may be declared complete while an equivalent ordinary request works in
+English but not Italian, or Italian but not English.
 
 ## Runtime invariant
 
