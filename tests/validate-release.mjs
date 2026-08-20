@@ -12,7 +12,8 @@ const SUITE_FOLDER = `PR-STUDIO-Unified-Suite-${RELEASE_VERSION}`;
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const STRICT = process.argv.includes('--strict');
 const INCLUDE_LEGACY_ZIPS = process.argv.includes('--include-legacy-zips');
-const RUN_PHP_SMOKE = process.argv.includes('--php-smoke');
+const FULL_SURFACE = process.env.PRSTUDIO_FULL_SURFACE_EXECUTION === '1';
+const RUN_PHP_SMOKE = process.argv.includes('--php-smoke') || FULL_SURFACE;
 const PHP_BINARY = process.env.PRSTUDIO_PHP || 'php';
 const PYTHON_BINARY = process.env.PRSTUDIO_PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
 

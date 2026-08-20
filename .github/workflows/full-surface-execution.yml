@@ -43,7 +43,7 @@ jobs:
         with:
           php-version: '8.1'
           extensions: mysqli, mbstring, xml
-          tools: composer, wp-cli:2.12.0
+          tools: composer, wp-cli:2.12.0, phpunit:10.5
           coverage: none
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -83,6 +83,7 @@ jobs:
           find . -path './.git' -prune -o -type f -name '*.php' -print0 \
             | xargs -0 -n1 php -l >/tmp/unified-php-lint.txt
           composer validate --strict --no-check-publish
+          phpunit --configuration phpunit.xml.dist
           php -d auto_prepend_file=tests/strict-php-errors.php tests/php-mcp-public-contracts-smoke.php
           php -d auto_prepend_file=tests/strict-php-errors.php tests/php-capability-search-relevance-smoke.php
           php -d auto_prepend_file=tests/strict-php-errors.php tests/schema-validator-single-file.php
@@ -100,6 +101,10 @@ jobs:
             python tests/build-release.py --check
           )
           git worktree remove --force "$build_checkout"
+          # Runtime tests consume the deterministic component metadata from the
+          # current checkout. Build it here as an actual test precondition; the
+          # detached pass above independently proves exact-SHA stamp parity.
+          python tests/build-release.py --build
           node --test prstudio-unified-browser-agent/tests/*.test.mjs
           if git grep -n -E '^(<<<<<<< |=======|>>>>>>> )' -- ':!composer.lock'; then
             echo 'Merge conflict marker detected.' >&2
@@ -318,6 +323,8 @@ jobs:
 # - tests/mcp-2026-07-28-conformance.py
 # - tests/mcp-http-fuzz.py
 # - tests/mutation-kernel-readiness.py
+# - tests/phpunit-kernel/bootstrap.php
+# - tests/phpunit-kernel/CriticalKernelTest.php
 # - tests/oauth-concurrency-invariants.py
 # - tests/one-guard-browser-mission-smoke.mjs
 # - tests/php-action-feasibility-smoke.php

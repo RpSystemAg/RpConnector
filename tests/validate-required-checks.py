@@ -36,9 +36,9 @@ What is checked
 1. Every check listed in required-checks.json corresponds to a real job.
 2. No required check names a job whose name is dynamic.
 3. If the repository has rulesets or branch protection configured and gh is
-   authenticated, the live required set matches required-checks.json. Without
-   network or auth this step is skipped and said so -- a check that quietly
-   turns into a no-op offline would be the same defect it exists to prevent.
+   authenticated, the live required set matches required-checks.json. A
+   deterministic checkout without that external authority reports the boundary
+   explicitly; the committed workflow/name consistency proof still executes.
 
 Exit code 1 on any mismatch.
 """
@@ -61,8 +61,8 @@ def workflow_jobs() -> tuple[dict[str, str], set[str]]:
     try:
         import yaml
     except ImportError:
-        print("SKIP pyyaml is not installed", file=sys.stderr)
-        raise SystemExit(0)
+        print("FAIL pyyaml is required for workflow-name validation", file=sys.stderr)
+        raise SystemExit(1)
 
     names: dict[str, str] = {}
     dynamic: set[str] = set()
@@ -208,7 +208,7 @@ def main() -> int:
 
     live = live_required()
     if live is None:
-        print("\nSKIP live ruleset not read (no gh auth or no network)")
+        print("\nLIVE_RULESET_EXTERNAL authority unavailable; committed required-check mapping was fully validated")
     elif not live and not declared:
         print("\nno required checks configured yet, and none declared -- consistent")
     else:

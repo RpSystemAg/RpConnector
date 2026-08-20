@@ -4,7 +4,7 @@
 This script never creates test, quality, performance, security, preflight or
 live-acceptance reports. Those files must be produced by their real test flows.
 
-Modes (exactly one is required):
+Modes (direct execution defaults to --build):
 
   python tests/build-release.py --check
       Non-mutating validation. Recomputes component file records and tree
@@ -786,7 +786,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     modes.add_argument("--check", action="store_true", help="non-mutating component/final metadata verification")
     modes.add_argument("--build", action="store_true", help="write component integrity documents and deterministic ZIPs")
     modes.add_argument("--finalize", action="store_true", help="write root release manifest and checksums after all reports exist")
-    return parser.parse_args(argv)
+    return parser.parse_args(argv or ["--build"])
 
 
 def main(argv: Sequence[str] | None = None) -> int:

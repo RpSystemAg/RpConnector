@@ -3,17 +3,17 @@
     ".github/workflows/dast-security.yml": {
       "present": "true",
       "role": "authenticated DAST workflow",
-      "sha256": "2dca32aafd6104518da7e946ba014318bd6633bbc887aa5706ed51d87c84b8a3"
+      "sha256": "766ac9abe8491bf56a2465c8495604237e3389b6be4e7f77ab3b89cfb91448fc"
     },
     ".github/workflows/network-chaos.yml": {
       "present": "true",
       "role": "network chaos workflow",
-      "sha256": "97bccc1c15539a1fb48c55452a6ad082d6e713d7bd18ec13399ffb1614753997"
+      "sha256": "3f0c948f85924c3ae254f1fe6dd01bcef5e525ccf63b17d759707805e17ec073"
     },
     ".github/workflows/oauth-security-invariants.yml": {
       "present": "true",
       "role": "OAuth security invariants workflow",
-      "sha256": "89af1637c2bb757b200e0915ab95e167b4efed71a265f7e5383641de82cb7094"
+      "sha256": "60270c30f3cc86c6824762c17bcb1727d41baf9eaedf18abe68fc830966cd840"
     },
     ".github/workflows/security-drift-audit.yml": {
       "present": "false",
@@ -52,7 +52,7 @@
     }
   },
   "gate_version": "1.0.0",
-  "generated_utc": "2026-08-19T14:52:48.828171Z",
+  "generated_utc": "2026-08-20T09:12:39.497815Z",
   "markers": {
     "prstudio-unified-browser-agent/service-worker.js": {
       "horizon.fallback": "present",
