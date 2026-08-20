@@ -9,14 +9,28 @@ final class PRSTUDIO_UC_Orchestrator {
 	private static ?array $domains = null;
 
 	public static function normalize( string $value ): string {
+		if ( class_exists( 'PRSTUDIO_UC_Action_Lexicon' ) ) {
+			return PRSTUDIO_UC_Action_Lexicon::normalize_text( $value );
+		}
 		$value = strtolower( str_replace( '_', ' ', $value ) );
 		if ( function_exists( 'remove_accents' ) ) { $value = remove_accents( $value ); }
 		$value = preg_replace( '/[^a-z0-9\s\/-]+/u', ' ', $value );
 		return trim( preg_replace( '/\s+/', ' ', (string) $value ) );
 	}
 	public static function tokens( string $value ): array {
+		if ( class_exists( 'PRSTUDIO_UC_Action_Lexicon' ) ) {
+			return PRSTUDIO_UC_Action_Lexicon::catalog_tokens_for( PRSTUDIO_UC_Action_Lexicon::query_concepts( $value ) );
+		}
 		$stop = array_fill_keys( array( 'che','con','del','della','delle','degli','per','una','uno','un','il','la','lo','le','i','gli','di','da','in','su','e','o','fare','devo','voglio','please','the','a','to','and' ), true );
 		return array_values( array_unique( array_filter( explode( ' ', self::normalize( $value ) ), static fn( $token ) => strlen( $token ) >= 2 && ! isset( $stop[ $token ] ) ) ) );
+	}
+
+	/** Whether the objective contains at least one semantic browser signal. */
+	private static function has_any_concept( string $value, string $signals ): bool {
+		if ( ! class_exists( 'PRSTUDIO_UC_Action_Lexicon' ) ) { return false; }
+		$value_keys = PRSTUDIO_UC_Action_Lexicon::concept_keys( PRSTUDIO_UC_Action_Lexicon::query_concepts( $value ) );
+		$signal_keys = PRSTUDIO_UC_Action_Lexicon::concept_keys( PRSTUDIO_UC_Action_Lexicon::query_concepts( $signals ) );
+		return array() !== array_intersect( $value_keys, $signal_keys );
 	}
 
 	public static function catalog(): array {
@@ -115,7 +129,11 @@ final class PRSTUDIO_UC_Orchestrator {
 			$resolution_reason = 'explicit_domain';
 		} else {
 			$normalized = self::normalize( $objective );
-			if ( preg_match( '/https?:\/\//i', $objective ) || preg_match( '/\b(browser|chrome|scheda|tab|screenshot|clicca|click|google trends|search console|merchant center|instagram)\b/u', $normalized ) ) {
+			if (
+				preg_match( '/https?:\/\//i', $objective )
+				|| self::has_any_concept( $objective, 'browser screenshot click console network dom' )
+				|| preg_match( '/\b(scheda|tab|google trends|search console|merchant center|instagram)\b/u', $normalized )
+			) {
 				$winner = 'browser';
 				$resolution_reason = 'browser_intent_fast_path';
 			} elseif ( class_exists( 'PRSTUDIO_UC_Action_Index' ) ) {
