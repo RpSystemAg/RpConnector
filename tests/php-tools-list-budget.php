@@ -35,7 +35,10 @@ define( 'PRSTUDIO_UC_TESTING', true );
 require dirname( __DIR__ ) . '/prstudio-unified-control/includes/class-prstudio-uc-mcp-v5.php';
 
 /** Rough token estimate. Good enough to see an order of magnitude. */
-function approx_tokens( int $bytes ): int { return (int) round( $bytes / 4 ); }
+// The same ratio the assembler uses. Two estimators with two literals disagree
+// the moment either moves; this test exists to catch a surface that is too big,
+// not to hold a second opinion about how big a token is.
+function approx_tokens( int $bytes ): int { return (int) round( $bytes / PRSTUDIO_UC_MCP_V5::TOKEN_BYTES_RATIO ); }
 
 $tools = PRSTUDIO_UC_MCP_V5::tools();
 if ( ! is_array( $tools ) || ! $tools ) {

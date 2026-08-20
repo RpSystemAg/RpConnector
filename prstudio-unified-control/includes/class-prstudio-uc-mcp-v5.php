@@ -1570,6 +1570,18 @@ HTML;
         'prstudio_tool_manual','prstudio_health','prstudio_observe','prstudio_flow','prstudio_backlog',
         'prstudio_context_open','prstudio_job_get','prstudio_job_control','prstudio_intervention_record',
         'browser_status','browser_task_control','browser_open','browser_screenshot','browser_snapshot',
+        // The interaction primitives. Without these the Browser Agent can open a
+        // tab and photograph it and nothing else: a host that only sees the
+        // tools above cannot click, type, press a key or scroll, because every
+        // one of those was falling below the budget line and being withheld.
+        //
+        // They are listed as essential rather than left to compete on size,
+        // because the fallback ordering admits smallest-first and these carry
+        // richer schemas -- so the trimming was systematically discarding the
+        // most capable tools and keeping narrow ones. Reaching a click through
+        // capability_search costs a lookup the model has no reason to make when
+        // the surface it can see appears to be observation-only.
+        'browser_click','browser_type','browser_press','browser_scroll','browser_navigate','browser_batch',
         'wordpress_content_transaction','procedural_skill_search','procedural_skill_get',
     );
 
@@ -1592,8 +1604,25 @@ HTML;
      */
     private const TOOLS_LIST_TOKEN_BUDGET = 5000;
 
+    /**
+     * Bytes per token, measured rather than guessed.
+     *
+     * One constant, because two estimators with two different ratios disagree
+     * the moment either moves -- which is exactly what happened when this was a
+     * literal 4 in the assembler and another literal 4 in the budget test.
+     *
+     * Measured 19 Aug 2026 on the surface this server emits: o200k_base and
+     * cl100k_base agree at 4.64-4.81. 4.4 keeps about a five percent margin
+     * below the lowest observed ratio, so the estimate stays conservative.
+     *
+     * tests/validate-tools-list-real-tokens.py tokenizes the emitted surface and
+     * fails if this ever starts under-counting, which is the direction that
+     * breaks LAW 9 silently.
+     */
+    public const TOKEN_BYTES_RATIO = 4.4;
+
     /** Approximate a token count from encoded bytes. Deliberately conservative. */
-    private static function approx_tokens( int $bytes ): int { return (int) ceil( $bytes / 4 ); }
+    private static function approx_tokens( int $bytes ): int { return (int) ceil( $bytes / self::TOKEN_BYTES_RATIO ); }
 
     /** Bytes this tool contributes to the surface a host ingests. */
     private static function surface_bytes( array $tool ): int {
@@ -1634,7 +1663,20 @@ HTML;
         // a ceiling and an estimate that runs under it is not an estimate.
         $selected = array();
         $bytes = 2;
-        $budget_bytes = self::TOOLS_LIST_TOKEN_BUDGET * 4;
+        // Bytes per token, measured rather than guessed. The divisor used to be
+        // a flat 4, which nobody had ever checked against a tokenizer. On the
+        // surface this server actually emits, o200k_base and cl100k_base agree
+        // at 4.64-4.81 bytes per token, so 4 overestimated the cost by about
+        // twenty percent -- and that phantom overhead was expensive: it trimmed
+        // an essential tool while the real surface sat comfortably under the
+        // ceiling.
+        //
+        // 4.4 keeps roughly a five percent margin below the lowest measured
+        // ratio, so the estimate stays conservative. It is not free to move:
+        // tests/validate-tools-list-real-tokens.py tokenizes the emitted surface
+        // and fails if this divisor ever starts UNDER-counting, which is the
+        // direction that silently breaks LAW 9.
+        $budget_bytes = (int) floor( self::TOOLS_LIST_TOKEN_BUDGET * self::TOKEN_BYTES_RATIO );
         foreach ( array_merge( $ordered, $rest ) as $tool ) {
             $cost = self::surface_bytes( $tool ) + 1;
             if ( $selected && ( $bytes + $cost ) > $budget_bytes ) { continue; }
