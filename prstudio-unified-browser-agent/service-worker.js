@@ -26,7 +26,7 @@ import {
   EXECUTOR_BUILD_TIMESTAMP,
   EXECUTOR_BUILD_ID,
 } from "./lib/executor-meta.js";
-import { adaptivePollDelay } from "./lib/enterprise-runtime.js";
+import { adaptivePollDelay, failingTaskBackoffMs } from "./lib/enterprise-runtime.js";
 import { selectOwnedTabCandidate, normalizeMetricGrid, extractMetricRowsFromPayload, dedupeMetricRows, boundedCrawlerOptions, extractSearchConsoleInspection } from "./lib/resilience.js";
 import { RUNTIME_CONTRACT_ACTIONS, hasRuntimeContractAction, isSensitiveRuntimeContractAction } from "./lib/runtime-capabilities.js";
 import { normalizeGscDimensions, unsupportedGscDimensions, gscDimensionAliases, headerMatchesGscDimension, labelMatchesGscDimension, inferGscDimensionFromHeaders, validateGscDimensionRows, shouldNavigateSearchConsole, mergeGscDimensionCollections, normalizeGscProperty, gscPropertyMatches, gscPropertyLabels } from "./lib/gsc-session.js";
@@ -179,6 +179,11 @@ let screenshotStorageCacheAt = 0;
 let remoteLogFlushTimer = null;
 let remoteLogFlushRunning = false;
 let taskAbortController = null;
+// Tasks that failed in a row. The polling loop uses this to keep a
+// deterministically-failing task from being re-claimed with no delay: see
+// failingTaskBackoffMs. Reset by a task that completes, so a healthy run keeps
+// the zero-delay fast path.
+let consecutiveTaskFailures = 0;
 let taskExecutionGeneration = 0;
 let localExecutionGeneration = 0;
 
@@ -1809,6 +1814,16 @@ async function startPolling() {
           errorCount = 0;
           idleCount = 0;
           await executeTask(payload.task);
+          // Without this the loop had no floor. executeTask reports its own
+          // failures rather than throwing, the server requeues, and
+          // adaptivePollDelay returns 0 whenever work is available -- so a task
+          // that fails deterministically was re-claimed instantly, forever.
+          // A task that succeeds leaves the counter at zero and stays fast.
+          const failureBackoff = failingTaskBackoffMs(consecutiveTaskFailures);
+          if (failureBackoff > 0) {
+            await appendLog("poll.failing_task_backoff", { consecutiveTaskFailures, backoffMs: failureBackoff }).catch(() => {});
+            await abortableSleep(failureBackoff, controller.signal);
+          }
         } else {
           idleCount += 1;
           // A held request already provided the wait. Sleeping again on top of
@@ -1982,6 +1997,7 @@ async function executeTask(serverTask) {
     await appendLog("task.completed", { taskId: state.taskId, correlationId });
     state.phase = "completed";
     await clearActiveTask();
+    consecutiveTaskFailures = 0;
     await setBadge("ON", "#176b32");
   } catch (error) {
     if (String(error?.code || "") === "FRESH_RESTART_REQUESTED" && state.leaseToken) {
@@ -2008,7 +2024,11 @@ async function executeTask(serverTask) {
       }).catch(() => {});
     }
     await appendLog(aborted ? "task.interrupted" : "task.failed", { taskId: state.taskId, correlationId, error: serializeError(error) });
-    if (!aborted) await clearActiveTask();
+    if (!aborted) {
+      await clearActiveTask();
+      // An abort is a decision, not a failing task, so it must not throttle.
+      consecutiveTaskFailures += 1;
+    }
     await setBadge(leaseInvalid || String(error?.code || "") === "LEASE_LOST" ? "LEASE" : aborted ? "STOP" : "ERR", "#a32020");
   } finally {
     stopHeartbeat();
