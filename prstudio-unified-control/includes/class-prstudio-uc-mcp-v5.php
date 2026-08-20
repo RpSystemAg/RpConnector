@@ -736,8 +736,31 @@ HTML;
     private static function compact_description(string $description): string {
         $description = trim(preg_replace('/\s+/', ' ', $description));
         if ('' === $description) { return ''; }
-        // Prefer a natural first sentence; fall back to a word-boundary cut.
-        if (preg_match('/^(.{20,180}?[.!?])(\s|$)/u', $description, $m)) { return trim($m[1]); }
+        // Keep whole sentences up to the cap, not just the first one.
+        //
+        // The rule used to stop at the first sentence, and the descriptions in
+        // this file are written with the subject in sentence one and the
+        // guidance in sentence two. So the model was shown "Capture verified
+        // visual evidence." and never "Storage is preflighted, oversized
+        // full-page captures are bounded instead of retried in loops"; it was
+        // shown "Read a durable job to completion." and never "Pass
+        // wait_seconds to have the server hold the request". The advice was
+        // being written and then discarded, and every tool looked equally
+        // uninformative from where the model sits.
+        //
+        // The 180-character cap is unchanged. What changed is that the budget
+        // is now spent rather than abandoned after the first full stop.
+        if (mb_strlen($description) <= 180) { return $description; }
+        if (preg_match_all('/.*?[.!?](?:\s|$)/u', $description, $sentences) && !empty($sentences[0])) {
+            $kept = '';
+            foreach ($sentences[0] as $sentence) {
+                $candidate = $kept . $sentence;
+                if (mb_strlen(rtrim($candidate)) > 180) { break; }
+                $kept = $candidate;
+            }
+            $kept = trim($kept);
+            if (mb_strlen($kept) >= 20) { return $kept; }
+        }
         if (mb_strlen($description) <= 180) { return $description; }
         $cut = mb_substr($description, 0, 180);
         $space = mb_strrpos($cut, ' ');
@@ -850,7 +873,7 @@ HTML;
         $tools[]=self::tool('prstudio_job_control','Control job','Use this to cancel, interrupt or request recovery of a durable job.',self::obj(array('job_id'=>self::str('Job UUID.'),'action'=>self::str('cancel, interrupt, recover or retry.',array('enum'=>array('cancel','interrupt','recover','retry'))), 'reason'=>self::str('Reason.')),array('job_id','action')),self::annotations(false,false,true));
         $tools[]=self::tool('prstudio_memory_search','Search memory','Use this before repeating expensive analysis. Returns persistent site-scoped observations and reuse evidence.',self::obj(array('query'=>self::str('Entity, URL, product or topic.'),'type'=>self::str('Optional memory type.'),'limit'=>self::integer('Maximum matches.',1,100)),array('query')),self::annotations(true));
         $tools[]=self::tool('prstudio_context_open','Open isolated work context','Call this once at the beginning of each ChatGPT conversation/workstream before mutations. It creates a lane and mission so concurrent chats cannot control each other\'s resources.',self::obj(array('label'=>self::str('Human-readable objective.'),'chat_key'=>self::str('Optional stable caller-generated per-chat key. Reusing it makes context_open idempotent after an ambiguous timeout.'),'ttl_seconds'=>self::integer('Lane lifetime.',900,43200))),self::annotations(false,false,true));
-        $tools[]=self::tool('prstudio_context_status','Context status','Inspect execution lanes owned by this MCP OAuth client.',self::obj(),self::annotations(true));
+        $tools[]=self::tool('prstudio_context_status','Context status','Check which execution lanes this client owns. Use this when a browser or job call reports a lane conflict.',self::obj(),self::annotations(true));
         $tools[]=self::tool('prstudio_context_heartbeat','Renew isolated work context','Extend a lane while a long mission is still active.',self::obj(array('lane_handle'=>self::str('Public lane handle.'),'ttl_seconds'=>self::integer('New lifetime.',900,43200),'resource_ttl_seconds'=>self::integer('Renew active resource leases for this many seconds.',60,1800)),array('lane_handle')),self::annotations(false,false,true));
         $tools[]=self::tool('prstudio_context_close','Close isolated work context','Release all entity/tab leases for one ChatGPT workstream.',self::obj(array('lane_handle'=>self::str('Public lane handle.')),array('lane_handle')),self::annotations(false,false,true));
 
@@ -885,7 +908,7 @@ HTML;
         $tools[]=self::tool('browser_live_stop','Stop Browser LIVE viewer','Close the viewer side of an attached WebRTC session and notify the Browser Agent.',self::obj(array('session_id'=>self::str('WebRTC signaling session id.'),'reason'=>self::str('Close reason.')),array('session_id')),self::annotations(true,false,true,true));
         $tools[]=self::tool('browser_live_status','Browser LIVE status','Inspect the private ephemeral WebRTC signaling service and the latest 12-gate diagnostic evidence.',self::obj(),self::annotations(true,false,true,true));
         $tools[]=self::tool('motion_animate','Animate the site with Motion','Apply a Motion (motion.dev) animation to elements on the live front end, or list/remove what is applied. The library is loaded from CDN and the animation renders on every page; re-applying the same selector replaces its animation rather than stacking. Honours prefers-reduced-motion. Verify with browser_open plus browser_screenshot.',self::obj(array('action'=>self::str('apply, list or remove. Default apply.',array('enum'=>array('apply','list','remove'))),'selector'=>self::str('CSS selector, e.g. ".hero h1" or "#pricing .card". Omit with action=remove to clear everything.'),'preset'=>self::str('Animation preset.',array('enum'=>array('fade_in','slide_up','slide_left','slide_right','scale_in','blur_in','stagger_children','parallax','hover_lift'))),'duration'=>self::number('Seconds, 0.1-4.0. Default 0.6.'),'delay'=>self::number('Seconds before it starts, 0-4. Default 0.'),'distance'=>self::integer('Travel/offset in pixels, 0-400. Default 24.',0,400),'once'=>self::bool('Animate only the first time it enters view. Default true.')),array()),self::annotations(false,false,true));
-        $tools[]=self::tool('browser_task_control','Control browser task','Cancel or requeue one browser task from the server side. Use this when a task is stuck: cancel clears it, requeue drops its lease so the next agent poll can claim it again. attempt_count is preserved so you can still tell whether the agent ever tried.',self::obj(array('task_id'=>self::str('Browser task ID.'),'action'=>self::str('cancel or requeue.',array('enum'=>array('cancel','requeue'))),'reason'=>self::str('Operator reason.')),array('task_id','action')),self::annotations(false,false,true));
+        $tools[]=self::tool('browser_task_control','Control browser task','Cancel or requeue a browser task. Use this when one is stuck: cancel clears it, requeue drops its lease so the next agent poll can claim it again. attempt_count is preserved so you can still tell whether the agent ever tried.',self::obj(array('task_id'=>self::str('Browser task ID.'),'action'=>self::str('cancel or requeue.',array('enum'=>array('cancel','requeue'))),'reason'=>self::str('Operator reason.')),array('task_id','action')),self::annotations(false,false,true));
         $tools[]=self::tool('browser_status','Browser status','Inspect the Browser Agent, or read one browser task to completion by passing task_id with wait_seconds. Defaults to compact active-device output; request history only for diagnostics.',self::obj(array('task_id'=>self::str('Optional Browser task ID.'),'wait_seconds'=>self::integer('Hold the request until the task settles.',0,25),'include_history'=>self::bool('Include revoked/offline device history. Default false. Paged: read page.has_more and pass offset.'),'limit'=>self::integer('Devices per page, 1-100. Default 25 with history, 100 without.',1,100),'offset'=>self::integer('Skip this many devices.',0),'device_status'=>self::str('Filter by status or connection status, e.g. active, revoked, online, offline, stale.'),'device_id'=>self::str('Return only this device.')),array(),false),self::annotations(true,false,true,true));
         $tools[]=self::tool('browser_tabs','List or activate browser tabs','Use this to see Agent-owned tabs before interacting, or pass activate with a tab_id to bring one to the front. Activation matters for capture: a tab that is not in the foreground has no compositor surface.',self::obj(array_merge($tab,array('activate'=>self::bool('Bring tab_id to the front instead of listing.')))),self::annotations(true,false,true,true));
         $tools[]=self::tool('browser_adopt_tabs','Adopt already-open tabs','Use this when the user explicitly asks to use tabs they already opened. Filters all matching HTTP(S) tabs, can adopt multiple tabs, and binds them to the current execution lane so another chat cannot take them.',self::obj(array('lane_token'=>self::str('Lane token from prstudio_context_open.'),'tab_ids'=>array('type'=>'array','items'=>array('type'=>'integer'),'maxItems'=>12),'origin'=>self::str('Exact origin, e.g. https://merchants.google.com.'),'url_contains'=>self::str('Optional URL substring.'),'title_contains'=>self::str('Optional title substring.'),'limit'=>self::integer('Maximum tabs to adopt.',1,12),'device_id'=>self::str(),'sync_wait_seconds'=>self::integer('',0,20)),array('lane_token')),self::annotations(false,false,true,true));
@@ -897,7 +920,7 @@ HTML;
         $tools[]=self::tool('browser_forward','Browser forward','Use this to go forward in the current/selected tab.',self::obj($tab),self::annotations(false,false,false,true));
         $tools[]=self::tool('browser_reload','Reload browser tab','Use this to reload the selected Browser tab.',self::obj($tab),self::annotations(false,false,false,true));
         $tools[]=self::tool('browser_wait','Wait in browser','Use this to wait for a selector, URL or load state without re-navigating.',self::obj(array_merge($selector,array('mode'=>self::str('selector, url or load.',array('enum'=>array('selector','url','load'))),'url'=>self::str('Expected URL/pattern.'),'state'=>self::str('Load state.'),'timeout_ms'=>self::integer('',1,120000))),array('mode')),self::annotations(true,false,true,true));
-        $tools[]=self::tool('browser_snapshot','Browser interactive snapshot','Visual-first controlled-tab observation: bounded perception screenshot plus DOM/AX targets and explicit screenshot-to-CDP coordinate context.',self::obj(array_merge($selector,array('viewer_only'=>self::bool('Render the current browser_snapshot frame without autonomous widget polling.')))),self::annotations(true,false,true,true));
+        $tools[]=self::tool('browser_snapshot','Browser interactive snapshot','Read the page before acting on it: a bounded screenshot plus element targets carrying a reusable target_ref, with screenshot-to-page coordinates. Use browser_find instead when you already know which element you want.',self::obj(array_merge($selector,array('viewer_only'=>self::bool('Render the current browser_snapshot frame without autonomous widget polling.')))),self::annotations(true,false,true,true));
         $tools[]=self::tool('browser_find','Find elements by description','Ask which elements match a plain description of what you are looking for, and get back the candidates with their roles, accessible names and a reusable target_ref. Read them, choose, then act with that target_ref. Use this before clicking on an unfamiliar page: a catalogue returns two dozen buttons whose names differ only by product, and picking from a list is reliable where a single silent guess is not.',self::obj(array_merge($tab,array('query'=>self::str('Plain description of the element, for example: add to cart button for the first product.'),'role'=>self::str('Optional ARIA role filter, for example button or link.'),'limit'=>self::number('How many candidates to return. Default 20.'))),array('query')),self::annotations(true,false,true,false));
         // Page scripting, for reading state that no other tool exposes. The
         // reference tool for this says outright that it is for debugging and
@@ -948,7 +971,7 @@ HTML;
         $tools[]=self::tool('browser_select','Browser select option','Use this to choose an option in a select/list control.',self::obj(array_merge($selector,array('value'=>self::str('Option value or visible label. Use browser_action for advanced multi-select.'))),array('value')),self::annotations(false,false,false,true));
         $tools[]=self::tool('browser_check','Browser checkbox','Use this to check or uncheck a checkbox/radio-like control.',self::obj(array_merge($selector,array('checked'=>self::bool('True to check, false to uncheck.'))),array('checked')),self::annotations(false,false,true,true));
         $tools[]=self::tool('browser_scroll','Browser scroll','Use this to scroll the selected tab like a human. Can scroll progressively to bottom.',self::obj(array_merge($selector,array('x'=>array('type'=>'number'),'y'=>array('type'=>'number'),'to'=>self::str('top, bottom or position.'),'progressive'=>self::bool('Progressive human-like scroll.'))),array(),false),self::annotations(false,false,false,true));
-        $tools[]=self::tool('browser_screenshot','Browser screenshot','Capture verified visual evidence. Storage is preflighted, oversized full-page captures are bounded instead of retried in loops, and large captures may use JPEG automatically.',self::obj(array_merge($tab,array('region'=>self::obj(array('x'=>array('type'=>'number'),'y'=>array('type'=>'number'),'width'=>array('type'=>'number'),'height'=>array('type'=>'number')),array('width','height'),false),'scale'=>self::number('Magnify the region, 0.1 to 4. Use with region to inspect fine detail.'),'full_page'=>self::bool('Capture full page when safely bounded.'),'format'=>self::str('auto, png or jpeg.',array('enum'=>array('auto','png','jpeg'))),'quality'=>self::integer('JPEG quality when used.',35,92),'max_pixels'=>self::integer('Hard output pixel budget.',1000000,28000000),'ocr'=>self::bool('Extract visible pixel text only when needed.'),'ocr_language'=>self::str('OCR languages.'))),array(),false),self::annotations(true,false,true,true));
+        $tools[]=self::tool('browser_screenshot','Browser screenshot','Photograph the tab. Storage is preflighted, oversized full-page captures are bounded instead of retried, and large ones may use JPEG.',self::obj(array_merge($tab,array('region'=>self::obj(array('x'=>array('type'=>'number'),'y'=>array('type'=>'number'),'width'=>array('type'=>'number'),'height'=>array('type'=>'number')),array('width','height'),false),'scale'=>self::number('Magnify the region, 0.1 to 4. Use with region to inspect fine detail.'),'full_page'=>self::bool('Capture full page when safely bounded.'),'format'=>self::str('auto, png or jpeg.',array('enum'=>array('auto','png','jpeg'))),'quality'=>self::integer('JPEG quality when used.',35,92),'max_pixels'=>self::integer('Hard output pixel budget.',1000000,28000000),'ocr'=>self::bool('Extract visible pixel text only when needed.'),'ocr_language'=>self::str('OCR languages.'))),array(),false),self::annotations(true,false,true,true));
         $tools[]=self::tool('browser_extract','Browser extract text','Use this to read visible/live text from body or a target selector.',self::obj($selector),self::annotations(true,false,true,true));
         $tools[]=self::tool('browser_network','Browser network','Use this to inspect live network activity for the selected tab.',self::obj($tab),self::annotations(true,false,true,true));
         $tools[]=self::tool('browser_console','Browser console','Use this to inspect console output from the live tab.',self::obj($tab),self::annotations(true,false,true,true));
@@ -1670,14 +1693,22 @@ HTML;
      * literal 4 in the assembler and another literal 4 in the budget test.
      *
      * Measured 19 Aug 2026 on the surface this server emits: o200k_base and
-     * cl100k_base agree at 4.64-4.81. 4.5 keeps about a four percent margin
-     * below the lowest observed ratio, so the estimate stays conservative.
+     * cl100k_base agree at 4.64-4.81. 4.6 sits just below the lowest of those, so the estimate
+     * stays conservative -- but the margin is now under one percent, and that
+     * is deliberate rather than comfortable. It was raised from 4.5 because the
+     * phantom overhead had started costing real things: an essential tool was
+     * being trimmed, and the operational guidance in tool descriptions was
+     * being cut, while the measured surface sat two hundred tokens under the
+     * ceiling.
+     *
+     * The margin being thin means the next surface growth has to come from
+     * removing a tool, not from moving this number again.
      *
      * tests/validate-tools-list-real-tokens.py tokenizes the emitted surface and
      * fails if this ever starts under-counting, which is the direction that
      * breaks LAW 9 silently.
      */
-    public const TOKEN_BYTES_RATIO = 4.5;
+    public const TOKEN_BYTES_RATIO = 4.6;
 
     /** Approximate a token count from encoded bytes. Deliberately conservative. */
     private static function approx_tokens( int $bytes ): int { return (int) ceil( $bytes / self::TOKEN_BYTES_RATIO ); }
@@ -1735,7 +1766,21 @@ HTML;
         // and fails if this divisor ever starts UNDER-counting, which is the
         // direction that silently breaks LAW 9.
         $budget_bytes = (int) floor( self::TOOLS_LIST_TOKEN_BUDGET * self::TOKEN_BYTES_RATIO );
-        foreach ( array_merge( $ordered, $rest ) as $tool ) {
+        // Essentials are admitted unconditionally. The loop used to treat them
+        // like everything else and `continue` past one that did not fit, which
+        // meant an essential tool was silently replaced by whichever smaller
+        // non-essential tools came after it -- the surface stayed full, the
+        // count looked healthy, and the thing the model needed was gone.
+        //
+        // If the essentials alone do not fit, that is a real problem and it
+        // belongs in the open: tests/php-tools-list-budget.php fails on exactly
+        // that, and the answer is to remove an essential deliberately rather
+        // than let an ordering rule pick one.
+        foreach ( $ordered as $tool ) {
+            $selected[] = $tool;
+            $bytes += self::surface_bytes( $tool ) + 1;
+        }
+        foreach ( $rest as $tool ) {
             $cost = self::surface_bytes( $tool ) + 1;
             if ( $selected && ( $bytes + $cost ) > $budget_bytes ) { continue; }
             $selected[] = $tool;
