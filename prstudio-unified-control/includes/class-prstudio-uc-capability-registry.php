@@ -178,17 +178,11 @@ final class PRSTUDIO_UC_Capability_Registry {
     public static function counts(): array { return (array) ( self::document()['counts'] ?? array() ); }
     public static function hash(): string { return (string) ( self::document()['registry_hash'] ?? '' ); }
     private static function normalize( string $value ): string {
-        $value = function_exists( 'mb_strtolower' ) ? mb_strtolower( $value, 'UTF-8' ) : strtolower( $value );
-        if ( function_exists( 'remove_accents' ) ) {
-            $value = remove_accents( $value );
-        } elseif ( function_exists( 'iconv' ) ) {
-            $ascii = @iconv( 'UTF-8', 'ASCII//TRANSLIT//IGNORE', $value );
-            if ( false !== $ascii ) { $value = $ascii; }
-        }
-        $value = preg_replace( '/[^a-z0-9.]+/', ' ', $value );
-        return trim( (string) preg_replace( '/\s+/', ' ', (string) $value ) );
+        return PRSTUDIO_UC_Action_Lexicon::normalize_text( $value );
     }
-    private static function tokens( string $value ): array {
+
+    /** Raw catalog words used only while building field posting lists. */
+    private static function index_tokens( string $value ): array {
         $tokens = array_values( array_unique( array_filter( explode( ' ', str_replace( '.', ' ', self::normalize( $value ) ) ), static fn( $x ) => strlen( (string) $x ) >= 2 ) ) );
         return array_slice( $tokens, 0, 32 );
     }
@@ -205,7 +199,7 @@ final class PRSTUDIO_UC_Capability_Registry {
      * @return array<int,array<int,string>>
      */
     private static function query_concepts( string $value ): array {
-        return array_slice( PRSTUDIO_UC_Action_Lexicon::concepts( self::tokens( $value ) ), 0, 32 );
+        return array_slice( PRSTUDIO_UC_Action_Lexicon::query_concepts( $value ), 0, 32 );
     }
     /**
      * Whether one unit of intent is satisfied by one field of a capability.
@@ -251,11 +245,11 @@ final class PRSTUDIO_UC_Capability_Registry {
             $id=self::normalize((string)($cap['id']??'')); $desc=self::normalize((string)($cap['description']??'')); $source=self::normalize((string)($cap['source']['tool_name']??'')); $text=$id.' '.$source.' '.$desc;
             $rows[$i]=array(
                 'cap'=>$cap, 'id'=>$id, 'desc'=>$desc, 'source'=>$source, 'text'=>$text,
-                'id_tokens'=>array_fill_keys(self::tokens($id),true),
-                'desc_tokens'=>array_fill_keys(self::tokens($desc),true),
-                'source_tokens'=>array_fill_keys(self::tokens($source),true),
+                'id_tokens'=>array_fill_keys(self::index_tokens($id),true),
+                'desc_tokens'=>array_fill_keys(self::index_tokens($desc),true),
+                'source_tokens'=>array_fill_keys(self::index_tokens($source),true),
             );
-            foreach(self::tokens($text) as $token){$postings[$token][$i]=true;}
+            foreach(self::index_tokens($text) as $token){$postings[$token][$i]=true;}
         }
         self::$search_index=array('rows'=>$rows,'postings'=>$postings); return self::$search_index;
     }
@@ -265,7 +259,7 @@ final class PRSTUDIO_UC_Capability_Registry {
         $domain = strtolower( trim( (string) ( $filters['domain'] ?? '' ) ) );
         $include_legacy = array_key_exists( 'include_legacy', $filters ) ? (bool) $filters['include_legacy'] : true;
         $index=self::search_index(); $candidate_ids=array();
-        if(''===$q){$candidate_ids=array_fill_keys(array_keys($index['rows']),true);}else{foreach(PRSTUDIO_UC_Action_Lexicon::catalog_tokens($concepts) as $token){if(isset($index['postings'][$token])){$candidate_ids += $index['postings'][$token];}}}
+        if(''===$q){$candidate_ids=array_fill_keys(array_keys($index['rows']),true);}else{foreach(PRSTUDIO_UC_Action_Lexicon::catalog_tokens_for($concepts) as $token){if(isset($index['postings'][$token])){$candidate_ids += $index['postings'][$token];}}}
         $scored = array();
         foreach ( array_keys($candidate_ids) as $idx ) { $row=$index['rows'][$idx]??null; if(!$row)continue; $cap=$row['cap'];
             if ( ! $include_legacy && 'native' !== (string) ( $cap['source']['kind'] ?? '' ) ) { continue; }
