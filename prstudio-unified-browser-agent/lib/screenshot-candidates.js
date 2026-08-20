@@ -3,23 +3,15 @@
  *
  * WHY THIS IS ITS OWN MODULE
  * --------------------------
- * The chain used to be built inline, and every variant in it captured from the
- * compositor surface. `fromSurface` defaults to true when omitted, so the two
- * entries that left it out were surface captures as well: the fallback degraded
- * format, then quality, then clip, and never once changed where the pixels came
- * from.
+ * Surface capture is preferred when a tab is active because it preserves the
+ * compositor result. Inactive tabs have no reliable compositor surface, so the
+ * runtime passes preferRenderer=true and starts with fromSurface:false instead.
  *
- * That matters because the Browser Agent creates its tabs with active:false. A
- * tab that is not in the foreground has no compositor surface, and a surface
- * capture of one returns a blank or stale frame. Chrome states the condition
- * outright when it happens -- the page is not compositing frames -- and no
- * amount of retrying with a different image format changes it.
- *
- * `fromSurface:false` reads the renderer instead, which is the documented way to
- * capture a target that is not in the foreground. A background tab must try
- * that path first: a compositor request can return a syntactically valid but
- * blank/stale PNG, and a non-empty payload is not proof that it photographed
- * the requested page. Foreground tabs still prefer the compositor surface.
+ * Keeping the two chains state-aware matters for failure latency too. A generic
+ * CDP transport failure on an active tab is not a parameter compatibility
+ * signal, so cycling into a renderer variant only burns another CDP attempt
+ * before the visible-tab fallback. Active tabs therefore stay surface-only;
+ * inactive tabs explicitly opt into the renderer-capable chain.
  *
  * captureBeyondViewport is deliberately absent from the renderer variant. The
  * two are not reliably supported together, and a full-page capture that fails
@@ -63,7 +55,7 @@ export function buildScreenshotCandidates({ format = "png", quality = 82, fullPa
   const renderer = { format: "png", fromSurface: false };
   if (clip) renderer.clip = { ...clip };
 
-  return preferRenderer ? [renderer, ...surface] : [...surface, renderer];
+  return preferRenderer ? [renderer, ...surface] : surface;
 }
 
 /**
