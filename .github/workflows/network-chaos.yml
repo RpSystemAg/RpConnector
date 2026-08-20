@@ -66,7 +66,7 @@ jobs:
             --data '{"name":"mysql","listen":"127.0.0.1:13306","upstream":"127.0.0.1:3306"}' >/tmp/toxi-mysql.json
 
           rm -rf "$WP_PATH" && mkdir -p "$WP_PATH"
-          wp core download --path="$WP_PATH" --force
+          wp core download --path="$WP_PATH" --version="${RP_WP_VERSION:-7.1}" --force
           wp config create --path="$WP_PATH" --dbname=wordpress_chaos --dbuser=root --dbpass='' --dbhost=127.0.0.1:13306 --skip-check
           wp core install --path="$WP_PATH" --url=http://127.0.0.1:8080 --title='Network chaos' --admin_user=rpadmin --admin_password='Chaos-Only-2026!' --admin_email='chaos@example.invalid' --skip-email
           cp -a prstudio-unified-control "$WP_PATH/wp-content/plugins/prstudio-unified-control"

@@ -51,7 +51,7 @@ jobs:
         run: |
           rm -rf "$WP_PATH"
           mkdir -p "$WP_PATH"
-          wp core download --path="$WP_PATH" --force
+          wp core download --path="$WP_PATH" --version="${RP_WP_VERSION:-7.1}" --force
           wp config create --path="$WP_PATH" --dbname=wordpress_test --dbuser=root --dbpass='' --dbhost=127.0.0.1:3306 --skip-check
           wp config set WP_ENVIRONMENT_TYPE local --path="$WP_PATH"
           wp core install --path="$WP_PATH" --url="$WP_URL" --title='MCP conformance' --admin_user=rpadmin --admin_password='Conformance-Only-2026!' --admin_email='conformance@example.invalid' --skip-email

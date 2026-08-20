@@ -81,7 +81,7 @@ jobs:
           set -euo pipefail
           rm -rf "$WP_MAIN" /tmp/rp-previous-tree
           mkdir -p "$WP_MAIN" /tmp/rp-previous-tree
-          wp core download --path="$WP_MAIN" --force
+          wp core download --path="$WP_MAIN" --version="${RP_WP_VERSION:-7.1}" --force
           wp config create --path="$WP_MAIN" --dbname=rp_lifecycle_main --dbuser=root --dbpass='' --dbhost=127.0.0.1:3306 --skip-check
           wp core install --path="$WP_MAIN" --url=http://127.0.0.1:8091 --title='RP lifecycle main' --admin_user=rpadmin --admin_password='Production-Lifecycle-Only-2026!' --admin_email='lifecycle@example.invalid' --skip-email
           git archive "$PREVIOUS_REF" prstudio-unified-control | tar -x -C /tmp/rp-previous-tree
@@ -123,7 +123,7 @@ jobs:
           set -euo pipefail
           rm -rf "$WP_FAIL"
           mkdir -p "$WP_FAIL"
-          wp core download --path="$WP_FAIL" --force
+          wp core download --path="$WP_FAIL" --version="${RP_WP_VERSION:-7.1}" --force
           wp config create --path="$WP_FAIL" --dbname=rp_lifecycle_failure --dbuser=root --dbpass='' --dbhost=127.0.0.1:3306 --skip-check
           wp core install --path="$WP_FAIL" --url=http://127.0.0.1:8092 --title='RP lifecycle failure' --admin_user=rpadmin --admin_password='Production-Lifecycle-Only-2026!' --admin_email='failure@example.invalid' --skip-email
           cp -a prstudio-unified-control "$WP_FAIL/wp-content/plugins/prstudio-unified-control"
@@ -177,7 +177,7 @@ jobs:
           restore_start=$(date +%s)
           rm -rf "$WP_RESTORE"
           mkdir -p "$WP_RESTORE"
-          wp core download --path="$WP_RESTORE" --force
+          wp core download --path="$WP_RESTORE" --version="${RP_WP_VERSION:-7.1}" --force
           wp config create --path="$WP_RESTORE" --dbname=rp_lifecycle_restore --dbuser=root --dbpass='' --dbhost=127.0.0.1:3306 --skip-check
           cp -a prstudio-unified-control "$WP_RESTORE/wp-content/plugins/prstudio-unified-control"
           wp db import /tmp/rp-production-backup.sql --path="$WP_RESTORE"

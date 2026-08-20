@@ -57,7 +57,7 @@ jobs:
         run: |
           rm -rf "$RP_WP_PATH"
           mkdir -p "$RP_WP_PATH"
-          wp core download --path="$RP_WP_PATH" --force
+          wp core download --path="$RP_WP_PATH" --version="${RP_WP_VERSION:-7.1}" --force
           wp config create --path="$RP_WP_PATH" --dbname=wordpress_stateful --dbuser=root --dbpass='' --dbhost=127.0.0.1:3306 --skip-check
           wp core install --path="$RP_WP_PATH" --url=http://127.0.0.1:8080 --title='Stateful property test' --admin_user=rpadmin --admin_password='Stateful-Only-2026!' --admin_email='stateful@example.invalid' --skip-email
           cp -a prstudio-unified-control "$RP_WP_PATH/wp-content/plugins/prstudio-unified-control"

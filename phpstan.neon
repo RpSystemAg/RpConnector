@@ -5,8 +5,23 @@
 # shims. That setup problem is now removed with a reproducible dev-only toolchain
 # pinned by composer.json/composer.lock:
 #   - phpstan/phpstan 2.2.7
-#   - php-stubs/wordpress-stubs 7.0.1
+#   - php-stubs/wordpress-stubs 6.9.4
 #   - szepeviktor/phpstan-wordpress 2.0.3
+#
+# That stub line said 7.0.1 while composer.json and composer.lock both pinned
+# 6.9.4. Nothing enforced agreement between them, so the comment drifted to
+# whatever someone believed was installed -- and a comment about which WordPress
+# API is being type-checked is worth nothing if it is not the one being loaded.
+# It now states the pinned version, and Dependabot proposes the bumps with a
+# regenerated lock rather than anyone editing this by hand.
+#
+# Worth knowing while reading PHPStan output: WordPress 7.1 shipped on 19 Aug
+# 2026 and php-stubs/wordpress-stubs has no 7.1 release yet -- 7.0.1, published
+# 10 Jul 2026, is the newest that exists. Anything this plugin does with a
+# 7.1-only API (the Abilities API filters, wp_register_icon(), wp_get_tooltip())
+# is therefore invisible to static analysis until the stubs catch up, and will
+# be reported as an unknown function rather than checked. That is a gap in the
+# tooling, not permission to skip the check.
 #
 # There is deliberately no PHPStan baseline. Findings that remain after loading
 # the official WordPress stubs and extension are defects or modelling gaps that

@@ -136,7 +136,7 @@ jobs:
           set -euo pipefail
           rm -rf "$RP_WP_PATH"
           mkdir -p "$RP_WP_PATH"
-          wp core download --path="$RP_WP_PATH" --force
+          wp core download --path="$RP_WP_PATH" --version="${RP_WP_VERSION:-7.1}" --force
           wp config create --path="$RP_WP_PATH" --dbname=wordpress_stateful --dbuser=root --dbpass='' --dbhost=127.0.0.1:3306 --skip-check
           wp config set WP_ENVIRONMENT_TYPE local --path="$RP_WP_PATH"
           wp core install --path="$RP_WP_PATH" --url="$WP_URL" --title='Full surface execution' --admin_user=rpadmin --admin_password='Full-Surface-Only-2026!' --admin_email='full-surface@example.invalid' --skip-email

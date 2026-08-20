@@ -86,7 +86,7 @@ jobs:
           rm -rf "$RP_WP_PATH"
           mkdir -p "$RP_WP_PATH"
 
-          wp core download --path="$RP_WP_PATH" --force
+          wp core download --path="$RP_WP_PATH" --version="${RP_WP_VERSION:-7.1}" --force
           wp config create \
             --path="$RP_WP_PATH" \
             --dbname="$PRSTUDIO_TEST_DB_NAME" \
