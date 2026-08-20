@@ -49,6 +49,8 @@ jobs:
       - name: Core deterministic PHP smokes
         run: |
           php -d auto_prepend_file=tests/strict-php-errors.php tests/php-agent-model-constitution.php
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/enterprise-schema-batch-1.php
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/enterprise-schema-batch-2.php
           php -d auto_prepend_file=tests/strict-php-errors.php tests/php-mcp-catalog-runtime-smoke.php
           php -d auto_prepend_file=tests/strict-php-errors.php tests/php-new-capabilities-smoke.php
           php -d auto_prepend_file=tests/strict-php-errors.php tests/php-tools-list-budget.php

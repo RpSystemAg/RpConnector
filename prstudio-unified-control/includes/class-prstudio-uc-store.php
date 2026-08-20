@@ -11,6 +11,17 @@ final class PRSTUDIO_UC_Store {
 	private const TASK_TTL = DAY_IN_SECONDS;
 	private const JOB_TTL = 30 * DAY_IN_SECONDS;
 	private const SCHEMA_VERSION = '4.0.0';
+	private const JOB_TRANSITIONS = array(
+		'PLANNED'=>array('PLANNED','READY','CANCELLED'),
+		'READY'=>array('READY','RUNNING','COMPLETED','TECHNICAL_ERROR','INTERRUPTED','CANCELLED'),
+		'RUNNING'=>array('RUNNING','READY','WAITING_FOR_BROWSER','COMPLETED','TECHNICAL_ERROR','INTERRUPTED','CANCELLED','DEAD_LETTER'),
+		'WAITING_FOR_BROWSER'=>array('WAITING_FOR_BROWSER','READY','TECHNICAL_ERROR','INTERRUPTED','CANCELLED'),
+		'INTERRUPTED'=>array('INTERRUPTED','READY','RUNNING','TECHNICAL_ERROR','CANCELLED','DEAD_LETTER'),
+		'TECHNICAL_ERROR'=>array('TECHNICAL_ERROR','READY','INTERRUPTED','COMPLETED','CANCELLED'),
+		'COMPLETED'=>array('COMPLETED'),
+		'CANCELLED'=>array('CANCELLED'),
+		'DEAD_LETTER'=>array('DEAD_LETTER','READY','INTERRUPTED','CANCELLED'),
+	);
 
 	public static function devices_table(): string {
 		global $wpdb;
@@ -821,6 +832,11 @@ final class PRSTUDIO_UC_Store {
 		return in_array( self::canonical_job_state( $state ), array( 'COMPLETED','TECHNICAL_ERROR','CANCELLED','DEAD_LETTER' ), true );
 	}
 
+	private static function job_transition_allowed( string $from, string $to ): bool {
+		$from=self::canonical_job_state($from);$to=self::canonical_job_state($to);
+		return isset(self::JOB_TRANSITIONS[$from])&&in_array($to,self::JOB_TRANSITIONS[$from],true);
+	}
+
 	private static function replayable_job( array $job ): bool {
 		$state = self::canonical_job_state( (string) ( $job['status'] ?? '' ) );
 		$expires = ! empty( $job['expires_gmt'] ) ? strtotime( (string) $job['expires_gmt'] . ' UTC' ) : 0;
@@ -872,7 +888,7 @@ final class PRSTUDIO_UC_Store {
 		}
 		if ( false === $inserted ) { return array(); }
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
-		self::event( 'job:' . $uuid, 'job.created', array( 'domain'=>$domain, 'plan_hash'=>$plan_hash, 'idempotent'=>'' !== $idempotency_key, 'status'=>$status ) );
+		self::append_journal_event( $uuid, 'job.created', array( 'mission_id'=>(string)($options['mission_id']??''), 'state_from'=>'', 'state_to'=>$status, 'domain'=>$domain, 'plan_hash'=>$plan_hash, 'idempotent'=>'' !== $idempotency_key, 'status'=>$status, 'input_hash'=>hash('sha256',self::encode($arguments)), 'output_hash'=>hash('sha256',self::encode($plan)) ) );
 		return self::get_job( $uuid ) ?? array();
 	}
 
@@ -1040,6 +1056,25 @@ final class PRSTUDIO_UC_Store {
 		return $recovered;
 	}
 
+	public static function recover_expired_browser_waits( int $limit = 200 ): int {
+		global $wpdb;$limit=max(1,min(500,$limit));
+		// The deadline is intentionally stored in the parent checkpoint so it is
+		// visible to operators and survives worker/browser process restarts.
+		// phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.NotPrepared -- fixed table identifier and bounded integer limit.
+		$rows=$wpdb->get_results("SELECT * FROM ".self::jobs_table()." WHERE status='WAITING_FOR_BROWSER' ORDER BY updated_gmt ASC LIMIT ".$limit,ARRAY_A);
+		$recovered=0;
+		foreach(is_array($rows)?$rows:array() as $row){
+			$job=self::hydrate_job($row);$checkpoint=(array)($job['checkpoint']??array());$deadline=(string)($checkpoint['browser_deadline_gmt']??'');$deadline_epoch=''!==$deadline?strtotime($deadline):false;
+			if(false===$deadline_epoch||$deadline_epoch>time())continue;
+			$attempts=(int)($job['attempts']??0)+1;$max=max(1,(int)($job['max_attempts']??1));$checkpoint['browser_wait_expired_gmt']=gmdate('c');$checkpoint['no_progress_watchdog']='browser_deadline_expired';
+			$error=array('code'=>'browser_wait_deadline_expired','message'=>'Browser step exceeded its durable parent deadline.','retryable'=>$attempts<$max,'class'=>'browser_deadline');
+			$target=$attempts<$max?'READY':'TECHNICAL_ERROR';$patch=array('checkpoint'=>$checkpoint,'attempts'=>$attempts,'error'=>$error,'failure_class'=>'browser_deadline');
+			if('READY'===$target)$patch['available_gmt']=gmdate('Y-m-d H:i:s');
+			if(is_array(self::set_job_state((string)$job['job_uuid'],$target,$patch)))$recovered++;
+		}
+		return$recovered;
+	}
+
 	public static function set_job_context( string $job_uuid, array $context ): ?array {
 		global $wpdb; $job=self::get_job($job_uuid); if(!$job){return null;}
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
@@ -1058,7 +1093,7 @@ final class PRSTUDIO_UC_Store {
 	public static function set_job_state( string $job_uuid, string $state, array $patch = array() ): ?array {
 		global $wpdb; $job=self::get_job($job_uuid); if(!$job){return null;}
 		$allowed=array('PLANNED','READY','RUNNING','COMPLETED','TECHNICAL_ERROR','INTERRUPTED','WAITING_FOR_BROWSER','CANCELLED','DEAD_LETTER');
-		$state=self::canonical_job_state($state); if(!in_array($state,$allowed,true)){return null;}
+		$from=self::canonical_job_state((string)$job['status']);$state=self::canonical_job_state($state); if(!in_array($state,$allowed,true)||!self::job_transition_allowed($from,$state)){return null;}
 		$data=array('status'=>$state,'updated_gmt'=>self::now());$formats=array('%s','%s');
 		if(isset($patch['progress'])){$data['progress']=max(0,min(100,(int)$patch['progress']));$formats[]='%d';}
 		if(isset($patch['attempts'])){$data['attempts']=max(0,(int)$patch['attempts']);$formats[]='%d';}
@@ -1069,7 +1104,16 @@ final class PRSTUDIO_UC_Store {
 		if(self::terminal_job_state($state)){$data['completed_gmt']=self::now();$formats[]='%s';}else{$data['completed_gmt']=null;$formats[]='%s';}
 		$updated=$wpdb->update(self::jobs_table(),$data,array('job_uuid'=>$job_uuid,'status'=>(string)$job['status']),$formats,array('%s','%s'));
 		if(1!==(int)$updated)return null;
-		self::event('job:'.$job_uuid,'job.v4.'.strtolower($state),array('progress'=>$data['progress']??null));return self::get_job($job_uuid);
+		$checkpoint=is_array($patch['checkpoint']??null)?$patch['checkpoint']:(array)($job['checkpoint']??array());
+		self::append_journal_event($job_uuid,'job.v4.'.strtolower($state),array(
+			'mission_id'=>(string)($job['mission_id']??''),
+			'step_id'=>(string)($checkpoint['current_step_id']??''),
+			'logical_attempt'=>(int)($job['attempts']??0),
+			'state_from'=>$from,
+			'state_to'=>$state,
+			'progress'=>$data['progress']??(int)($job['progress']??0),
+			'progress_signature'=>(string)($checkpoint['progress_signature']??''),
+		));return self::get_job($job_uuid);
 	}
 
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
@@ -1093,7 +1137,7 @@ final class PRSTUDIO_UC_Store {
 			if(1!==(int)$updated){$wpdb->query('ROLLBACK');return null;}$wpdb->query('COMMIT');
 		}catch(Throwable $e){$wpdb->query('ROLLBACK');throw $e;}
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
-		self::event('job:'.$row['job_uuid'],'job.claimed',array('worker_id'=>$worker_id)); $job=self::get_job((string)$row['job_uuid']); if($job)$job['lease_token']=$lease; return $job;
+		self::append_journal_event((string)$row['job_uuid'],'job.claimed',array('mission_id'=>(string)($row['mission_id']??''),'logical_attempt'=>(int)($row['attempts']??0),'state_from'=>self::canonical_job_state((string)$row['status']),'state_to'=>'RUNNING','worker_id'=>$worker_id)); $job=self::get_job((string)$row['job_uuid']); if($job)$job['lease_token']=$lease; return $job;
 	}
 
 	public static function claim_next_job( string $worker_id ): ?array { return self::claim_job_internal($worker_id); }
@@ -1120,15 +1164,16 @@ final class PRSTUDIO_UC_Store {
 		$current=(int)$job['step_index'];if($current>$step_index)return $job;$checkpoint['last_completed_step']=$step_index;$checkpoint['updated_gmt']=gmdate('c');
 		$updated=$wpdb->update(self::jobs_table(),array('step_index'=>$step_index+1,'checkpoint'=>self::encode($checkpoint),'progress'=>max(0,min(99,$progress)),'heartbeat_gmt'=>self::now(),'lease_expires_gmt'=>gmdate('Y-m-d H:i:s',time()+self::JOB_LEASE_SECONDS),'updated_gmt'=>self::now()),array('job_uuid'=>$job_uuid,'lease_token'=>$lease_token,'status'=>'RUNNING','step_index'=>$current),array('%d','%s','%d','%s','%s','%s'),array('%s','%s','%s','%d'));
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
-		if(1!==(int)$updated)return null;self::event('job:'.$job_uuid,'job.checkpoint',array('step_index'=>$step_index,'progress'=>$progress));return self::get_job($job_uuid);
+		if(1!==(int)$updated)return null;self::append_journal_event($job_uuid,'job.checkpoint',array('mission_id'=>(string)($job['mission_id']??''),'step_id'=>(string)($checkpoint['current_step_id']??''),'logical_attempt'=>(int)($job['attempts']??0),'state_from'=>'RUNNING','state_to'=>'RUNNING','step_index'=>$step_index,'progress'=>$progress,'progress_signature'=>(string)($checkpoint['progress_signature']??''),'output_hash'=>hash('sha256',self::encode($checkpoint))));return self::get_job($job_uuid);
 	}
 
 // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
 
 	public static function wait_leased_job( string $job_uuid, string $lease_token, string $state, array $checkpoint ): ?array {
 		global $wpdb;$state=self::canonical_job_state($state);if('WAITING_FOR_BROWSER'!==$state)return null;
+		if(empty($checkpoint['browser_deadline_gmt']))$checkpoint['browser_deadline_gmt']=gmdate('c',time()+self::JOB_LEASE_SECONDS);
 		$updated=$wpdb->update(self::jobs_table(),array('status'=>$state,'checkpoint'=>self::encode($checkpoint),'lease_token'=>null,'lease_expires_gmt'=>null,'worker_id'=>null,'heartbeat_gmt'=>null,'updated_gmt'=>self::now()),array('job_uuid'=>$job_uuid,'lease_token'=>$lease_token,'status'=>'RUNNING'),array('%s','%s','%s','%s','%s','%s','%s'),array('%s','%s','%s'));
-		if(1!==(int)$updated)return null;self::event('job:'.$job_uuid,'job.'.strtolower($state));return self::get_job($job_uuid);
+		if(1!==(int)$updated)return null;self::append_journal_event($job_uuid,'job.'.strtolower($state),array('step_id'=>(string)($checkpoint['current_step_id']??''),'state_from'=>'RUNNING','state_to'=>$state,'progress_signature'=>(string)($checkpoint['progress_signature']??''),'browser_deadline_gmt'=>(string)$checkpoint['browser_deadline_gmt']));return self::get_job($job_uuid);
 	}
 
 // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
@@ -1137,14 +1182,14 @@ final class PRSTUDIO_UC_Store {
 	public static function release_leased_job( string $job_uuid, string $lease_token, array $checkpoint, int $step_index, int $progress, int $delay_seconds = 0 ): ?array {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
 		global $wpdb;$updated=$wpdb->update(self::jobs_table(),array('status'=>'READY','step_index'=>max(0,$step_index),'checkpoint'=>self::encode($checkpoint),'progress'=>max(0,min(99,$progress)),'available_gmt'=>gmdate('Y-m-d H:i:s',time()+max(0,$delay_seconds)),'lease_token'=>null,'lease_expires_gmt'=>null,'worker_id'=>null,'heartbeat_gmt'=>null,'updated_gmt'=>self::now()),array('job_uuid'=>$job_uuid,'lease_token'=>$lease_token,'status'=>'RUNNING'),array('%s','%d','%s','%d','%s','%s','%s','%s','%s','%s'),array('%s','%s','%s'));
-		if(1!==(int)$updated)return null;self::event('job:'.$job_uuid,'job.released',array('step_index'=>$step_index,'progress'=>$progress,'delay_seconds'=>$delay_seconds));return self::get_job($job_uuid);
+		if(1!==(int)$updated)return null;self::append_journal_event($job_uuid,'job.released',array('step_id'=>(string)($checkpoint['current_step_id']??''),'state_from'=>'RUNNING','state_to'=>'READY','step_index'=>$step_index,'progress'=>$progress,'delay_seconds'=>$delay_seconds,'progress_signature'=>(string)($checkpoint['progress_signature']??'')));return self::get_job($job_uuid);
 	}
 
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
 	public static function complete_leased_job( string $job_uuid, string $lease_token, array $result, array $verification ): ?array {
 		global $wpdb;$now=self::now();
 		$updated=$wpdb->update(self::jobs_table(),array('status'=>'COMPLETED','progress'=>100,'result'=>self::encode($result),'verification'=>self::encode($verification),'lease_token'=>null,'lease_expires_gmt'=>null,'worker_id'=>null,'heartbeat_gmt'=>null,'updated_gmt'=>$now,'completed_gmt'=>$now),array('job_uuid'=>$job_uuid,'lease_token'=>$lease_token,'status'=>'RUNNING'),array('%s','%d','%s','%s','%s','%s','%s','%s','%s','%s'),array('%s','%s','%s'));
-		if(1!==(int)$updated)return null;self::event('job:'.$job_uuid,'job.completed',array('verification'=>$verification));return self::get_job($job_uuid);
+		if(1!==(int)$updated)return null;self::append_journal_event($job_uuid,'job.completed',array('state_from'=>'RUNNING','state_to'=>'COMPLETED','output_hash'=>hash('sha256',self::encode($result)),'evidence_id'=>(string)($verification['evidence_hash']??''),'verified'=>(bool)($verification['ok']??false),'strength'=>(string)($verification['strength']??$verification['verifier']??''),'final_verdict'=>!empty($verification['ok'])?'verified':'unverified'));return self::get_job($job_uuid);
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
 	}
 
@@ -1329,6 +1374,41 @@ final class PRSTUDIO_UC_Store {
 		// phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.NotPrepared -- table/column identifier only, from a fixed helper or the identifier() allowlist + SHOW TABLES check -- never external input; values are parameterized via $wpdb->prepare()
 		$rows = $wpdb->get_results( 'SELECT * FROM ' . self::tasks_table() . ' ORDER BY id DESC LIMIT ' . $limit, ARRAY_A );
 		return array_map( array( __CLASS__, 'hydrate_task' ), is_array( $rows ) ? $rows : array() );
+	}
+
+	/** Append one causally complete event to the SQL-backed event journal. */
+	public static function append_journal_event( string $job_uuid, string $event_type, array $payload = array() ): void {
+		$timestamp=self::now();
+		$event=array_merge(array(
+			'event_id'=>'evt_'.substr(hash('sha256',$job_uuid.'|'.$event_type.'|'.$timestamp.'|'.random_bytes(16)),0,32),
+			'event_type'=>$event_type,
+			'job_uuid'=>$job_uuid,
+			'step_id'=>'',
+			'logical_attempt'=>0,
+			'state_from'=>'',
+			'state_to'=>'',
+			'input_hash'=>'',
+			'output_hash'=>'',
+			'timestamp'=>$timestamp,
+			'effect_id'=>'',
+			'idempotency_key'=>'',
+			'executed'=>false,
+			'evidence_id'=>'',
+			'verified'=>null,
+			'strength'=>'',
+			'source'=>'runtime',
+			'observation_hash'=>'',
+			'recorded_payload_or_artifact_hash'=>'',
+		),$payload);
+		self::event('job:'.$job_uuid,$event_type,$event);
+	}
+
+	/** Read the append-only journal with the auto-increment row id as sequence. */
+	public static function journal_events( string $job_uuid, int $limit = 1000 ): array {
+		global $wpdb;$limit=max(1,min(5000,$limit));
+		// phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.NotPrepared -- fixed table identifier and parameterized job key.
+		$rows=$wpdb->get_results($wpdb->prepare('SELECT id,event_type,payload,created_gmt FROM '.self::events_table().' WHERE task_uuid=%s ORDER BY id ASC LIMIT '.$limit,'job:'.$job_uuid),ARRAY_A);
+		$out=array();foreach(is_array($rows)?$rows:array() as $row){$payload=self::decode($row['payload']??'',array());$payload=is_array($payload)?$payload:array();$payload['sequence']=(int)$row['id'];$payload['event_type']=(string)($payload['event_type']??$row['event_type']);$payload['job_uuid']=(string)($payload['job_uuid']??$job_uuid);$payload['timestamp']=(string)($payload['timestamp']??$row['created_gmt']);$out[]=$payload;}return$out;
 	}
 
 	public static function event( string $task_uuid, string $event_type, array $payload = array() ): void {

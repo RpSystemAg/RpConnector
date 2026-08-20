@@ -12,6 +12,7 @@ final class PRSTUDIO_UC_Agency_Runtime {
 	private const GROUP='prstudio-unified-control';
 	private const SCHEDULER_TOPOLOGY_OPTION='prstudio_uc_scheduler_topology';
 	private const SCHEDULER_TOPOLOGY_VERSION='1.0.0-single-runner-v1';
+	private const NO_PROGRESS_SECONDS=120;
 	private static bool $registered=false;
 
 	private static function uuid(): string {
@@ -121,7 +122,7 @@ final class PRSTUDIO_UC_Agency_Runtime {
 	}
 
 	public static function cli_run( array $args, array $assoc_args ): void {
-		PRSTUDIO_UC_Site_Sentinel::record_external_heartbeat('wp_cli');if(class_exists('PRSTUDIO_UC_Procedural_Skills')){try{PRSTUDIO_UC_Procedural_Skills::curate(array('apply'=>true));}catch(Throwable $ignored){}}$limit=max(1,min(100,(int)($assoc_args['limit']??20)));$job=(string)($assoc_args['job']??'');$result=''!==$job?self::run_one($job,'wp-cli',30.0):self::run_batch($limit,'wp-cli',30.0);
+		PRSTUDIO_UC_Site_Sentinel::record_external_heartbeat('wp_cli');if(class_exists('PRSTUDIO_UC_Procedural_Skills')){try{PRSTUDIO_UC_Procedural_Skills::curate(array('apply'=>true));}catch(Throwable $ignored){PRSTUDIO_UC_Store::event('runtime:procedural-skills','runtime.procedural_skills_error',array('source'=>'wp_cli','exception_class'=>get_class($ignored)));}}$limit=max(1,min(100,(int)($assoc_args['limit']??20)));$job=(string)($assoc_args['job']??'');$result=''!==$job?self::run_one($job,'wp-cli',30.0):self::run_batch($limit,'wp-cli',30.0);
 		if(class_exists('WP_CLI'))WP_CLI::log((string)wp_json_encode($result,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE));
 	}
 
@@ -132,7 +133,8 @@ final class PRSTUDIO_UC_Agency_Runtime {
 		$mission_id=substr(sanitize_text_field((string)($options['mission_id']??'')),0,120);if(''===$mission_id)$mission_id='mission:'.self::uuid();
 		$occurrence=substr(sanitize_text_field((string)($options['occurrence_key']??'')),0,190);if(''===$occurrence)$occurrence='manual:'.self::uuid();
 		$owner=substr(sanitize_text_field((string)($options['owner_client_id']??'')),0,190);$idempotency=hash('sha256','agency|'.PRSTUDIO_UC_Memory::site_identity()['key'].'|'.$owner.'|'.$playbook.'|'.$occurrence);
-		$checkpoint=array('playbook'=>$playbook,'playbook_version'=>PRSTUDIO_UC_Playbook_Engine::VERSION,'next_step'=>0,'results'=>array());
+		$trace_id='trace_'.substr(hash('sha256','mission|'.$mission_id),0,32);$root_span_id='span_'.substr(hash('sha256','mission-root|'.$mission_id),0,20);
+		$checkpoint=array('playbook'=>$playbook,'playbook_version'=>PRSTUDIO_UC_Playbook_Engine::VERSION,'next_step'=>0,'results'=>array(),'trace_id'=>$trace_id,'root_span_id'=>$root_span_id);
 		$job=PRSTUDIO_UC_Store::create_job((string)($options['objective']??str_replace('_',' ',$playbook)),'agency',array('playbook'=>$playbook,'context'=>$context),$plan,$idempotency,(string)$plan['hash'],array('status'=>'READY','priority'=>(int)($options['priority']??100),'mission_id'=>$mission_id,'capability'=>'agency.playbook','occurrence_key'=>$occurrence,'max_attempts'=>(int)($options['max_attempts']??5),'backoff_seconds'=>(int)($options['backoff_seconds']??30),'checkpoint'=>$checkpoint,'request_id'=>(string)($options['request_id']??''),'owner_client_id'=>$owner));
 		$accepted=!empty($job['job_uuid']);$started=null;
 		$start_now=array_key_exists('start_now',$options)?(bool)$options['start_now']:true;
@@ -154,6 +156,23 @@ final class PRSTUDIO_UC_Agency_Runtime {
 		return array('code'=>'playbook_step_failed','message'=>'Playbook step failed safely.','retryable'=>true,'class'=>'playbook_step');
 	}
 
+	private static function progress_watchdog( array $checkpoint, array $job, string $step_id, int $index ): array {
+		$logical=array(
+			'plan_hash'=>(string)($job['plan_hash']??''),
+			'next_step'=>$index,
+			'step_id'=>$step_id,
+			'browser_task_id'=>(string)($checkpoint['browser_task_id']??''),
+			'browser_result_hash'=>isset($checkpoint['browser_result'])?hash('sha256',(string)json_encode($checkpoint['browser_result'],JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE)):'',
+			'results_hash'=>hash('sha256',class_exists('PRSTUDIO_UC_Idempotency')?PRSTUDIO_UC_Idempotency::canonical_json((array)($checkpoint['results']??array())):(string)json_encode((array)($checkpoint['results']??array()))),
+		);
+		$signature=hash('sha256',(string)json_encode($logical,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE));$now=time();$previous=(string)($checkpoint['progress_signature']??'');
+		if(''!==$previous&&hash_equals($previous,$signature)){$since=strtotime((string)($checkpoint['no_progress_since_gmt']??''));if(false===$since)$since=$now;$checkpoint['no_progress_repeats']=max(0,(int)($checkpoint['no_progress_repeats']??0))+1;}
+		else{$since=$now;$checkpoint['no_progress_repeats']=0;}
+		$checkpoint['current_step_id']=$step_id;$checkpoint['progress_signature']=$signature;$checkpoint['no_progress_since_gmt']=gmdate('c',$since);$checkpoint['no_progress_watchdog_seconds']=self::NO_PROGRESS_SECONDS;
+		$checkpoint['no_progress_watchdog_exceeded']=($now-$since)>=self::NO_PROGRESS_SECONDS;
+		return$checkpoint;
+	}
+
 	private static function execute_step( array $step, array $job ) {
 		$handler=(string)($step['handler']??'');$args=is_array($step['arguments']??null)?$step['arguments']:array();
 		switch($handler){
@@ -162,7 +181,7 @@ final class PRSTUDIO_UC_Agency_Runtime {
 			case 'social.insights':return PRSTUDIO_UC_Social_Intelligence::insights($args);
 			case 'opportunity.rank':return PRSTUDIO_UC_Opportunity_Engine::rank($args);
 			case 'browser.action':
-				$action=sanitize_key((string)($args['action']??''));$browser=is_array($args['arguments']??null)?$args['arguments']:array();$browser['browser_target']='live';$browser['sync_wait_seconds']=0;$browser['_prstudio_job_uuid']=(string)$job['job_uuid'];
+				$action=sanitize_key((string)($args['action']??''));$browser=is_array($args['arguments']??null)?$args['arguments']:array();$browser['browser_target']='live';$browser['sync_wait_seconds']=0;$browser['_prstudio_job_uuid']=(string)$job['job_uuid'];$browser['_idempotency_key']=hash('sha256',(string)$job['job_uuid'].'|'.(string)($job['plan_hash']??'').'|'.(string)($step['id']??''));
 				return PRSTUDIO_UC_Bridge::dispatch(null,$browser,array('action'=>$action));
 		}
 		return new WP_Error('playbook_handler_unknown','Playbook handler is unavailable.',array('status'=>500,'retryable'=>false,'handler'=>$handler));
@@ -174,19 +193,35 @@ final class PRSTUDIO_UC_Agency_Runtime {
 		try{
 			$plan=is_array($job['plan']??null)?$job['plan']:array();$steps=is_array($plan['steps']??null)?$plan['steps']:array();$checkpoint=(array)($job['checkpoint']??array());$index=max((int)($job['step_index']??0),(int)($checkpoint['next_step']??0));
 			while($index<count($steps)&&(microtime(true)-$started)<$budget_seconds){
-				$step=$steps[$index];$step_id=(string)($step['id']??('step_'.$index));
-				if(isset($checkpoint['browser_result'])&&(int)($checkpoint['browser_step_index']??-1)===$index){$checkpoint['results'][$step_id]=$checkpoint['browser_result'];unset($checkpoint['browser_result'],$checkpoint['browser_error'],$checkpoint['browser_task_id'],$checkpoint['browser_step_index']);$checkpoint['next_step']=$index+1;$saved=PRSTUDIO_UC_Store::checkpoint_leased_job((string)$job['job_uuid'],$lease,$index,$checkpoint,(int)floor((($index+1)/max(1,count($steps)))*90));if(!$saved)return array('ok'=>false,'claimed'=>true,'conflict'=>true,'job_id'=>$job['job_uuid']);$job=$saved;$index++;$processed++;continue;}
-				$result=self::execute_step($step,$job);if(is_wp_error($result)){$error=self::error_payload($result);$updated=!empty($error['retryable'])?PRSTUDIO_UC_Store::retry_leased_job((string)$job['job_uuid'],$lease,$error):(PRSTUDIO_UC_Store::dead_letter_job((string)$job['job_uuid'],$error,'non_retryable',$lease)?PRSTUDIO_UC_Store::get_job((string)$job['job_uuid']):null);return array('ok'=>false,'claimed'=>true,'job'=>$updated,'error'=>$error);}
+				$step=$steps[$index];$step_id=(string)($step['id']??('step_'.$index));$timeout_seconds=max(5,min(300,(int)($step['timeout_seconds']??60)));
+				$checkpoint=self::progress_watchdog($checkpoint,$job,$step_id,$index);
+				if(!empty($checkpoint['no_progress_watchdog_exceeded'])){
+					$error=array('code'=>'no_progress_watchdog_exceeded','message'=>'Mission made no logical progress within the durable watchdog deadline.','retryable'=>true,'class'=>'no_progress_watchdog','progress_signature'=>(string)$checkpoint['progress_signature']);
+					$updated=PRSTUDIO_UC_Store::retry_leased_job((string)$job['job_uuid'],$lease,$error);return array('ok'=>false,'claimed'=>true,'job'=>$updated,'error'=>$error);
+				}
+				if(isset($checkpoint['browser_result'])&&(int)($checkpoint['browser_step_index']??-1)===$index){
+					$checkpoint['results'][$step_id]=$checkpoint['browser_result'];unset($checkpoint['browser_result'],$checkpoint['browser_error'],$checkpoint['browser_task_id'],$checkpoint['browser_step_index'],$checkpoint['browser_deadline_gmt']);$checkpoint['next_step']=$index+1;
+					$next_id=(string)($steps[$index+1]['id']??'mission_complete');$checkpoint=self::progress_watchdog($checkpoint,$job,$next_id,$index+1);
+					$saved=PRSTUDIO_UC_Store::checkpoint_leased_job((string)$job['job_uuid'],$lease,$index,$checkpoint,(int)floor((($index+1)/max(1,count($steps)))*90));if(!$saved)return array('ok'=>false,'claimed'=>true,'conflict'=>true,'job_id'=>$job['job_uuid']);$job=$saved;$index++;$processed++;continue;
+				}
+				$step_started=microtime(true);$span=class_exists('PRSTUDIO_UC_Observability')?PRSTUDIO_UC_Observability::start('agency.step',array('trace_id'=>(string)($checkpoint['trace_id']??''),'parent_span_id'=>(string)($checkpoint['root_span_id']??''),'job_uuid'=>(string)$job['job_uuid'],'mission_id'=>(string)($job['mission_id']??''),'step_id'=>$step_id,'state_from'=>'RUNNING','state_to'=>'RUNNING','progress_signature'=>(string)$checkpoint['progress_signature'])):array();
+				$result=self::execute_step($step,$job);$elapsed=microtime(true)-$step_started;
+				if(is_wp_error($result)){
+					if($span)PRSTUDIO_UC_Observability::finish($span,'error',array('state_to'=>'READY','error'=>$result->get_error_code()));$error=self::error_payload($result);$updated=!empty($error['retryable'])?PRSTUDIO_UC_Store::retry_leased_job((string)$job['job_uuid'],$lease,$error):(PRSTUDIO_UC_Store::dead_letter_job((string)$job['job_uuid'],$error,'non_retryable',$lease)?PRSTUDIO_UC_Store::get_job((string)$job['job_uuid']):null);return array('ok'=>false,'claimed'=>true,'job'=>$updated,'error'=>$error);
+				}
+				if($elapsed>$timeout_seconds){
+					if($span)PRSTUDIO_UC_Observability::finish($span,'timeout',array('state_to'=>'READY','timeout_seconds'=>$timeout_seconds));$error=array('code'=>'playbook_step_timeout','message'=>'Playbook step exceeded its declared timeout.','retryable'=>true,'class'=>'step_timeout','step_id'=>$step_id,'timeout_seconds'=>$timeout_seconds);$updated=PRSTUDIO_UC_Store::retry_leased_job((string)$job['job_uuid'],$lease,$error);return array('ok'=>false,'claimed'=>true,'job'=>$updated,'error'=>$error);
+				}
 				$status=is_array($result)?strtolower((string)($result['status']??'')):'';$task_id=is_array($result)?(string)($result['task_id']??''):'';
 				if(!empty($step['requires_browser'])){
-					if(''===$task_id){$error=array('code'=>'browser_task_not_created','message'=>'The browser step was not durably queued.','retryable'=>true,'class'=>'browser_task');$updated=PRSTUDIO_UC_Store::retry_leased_job((string)$job['job_uuid'],$lease,$error);return array('ok'=>false,'claimed'=>true,'job'=>$updated,'error'=>$error);}
-					if(in_array($status,array('failed','cancelled','expired'),true)){$payload=is_array($result['error']??null)?$result['error']:array();$retryable='cancelled'!==$status&&(bool)($payload['retryable']??true);$error=array_merge($payload,array('code'=>(string)($payload['code']??('browser_task_'.$status)),'message'=>(string)($payload['message']??('Browser task ended as '.$status.'.')),'retryable'=>$retryable,'class'=>'browser_task'));$updated=$retryable?PRSTUDIO_UC_Store::retry_leased_job((string)$job['job_uuid'],$lease,$error):(PRSTUDIO_UC_Store::dead_letter_job((string)$job['job_uuid'],$error,'browser_terminal',$lease)?PRSTUDIO_UC_Store::get_job((string)$job['job_uuid']):null);return array('ok'=>false,'claimed'=>true,'job'=>$updated,'error'=>$error);}
-					if('completed'!==$status){$checkpoint['browser_task_id']=$task_id;$checkpoint['browser_step_index']=$index;$checkpoint['next_step']=$index;$waiting=PRSTUDIO_UC_Store::wait_leased_job((string)$job['job_uuid'],$lease,'WAITING_FOR_BROWSER',$checkpoint);return array('ok'=>true,'claimed'=>true,'waiting_for_browser'=>true,'job'=>$waiting,'task_id'=>$task_id);}
+					if(''===$task_id){if($span)PRSTUDIO_UC_Observability::finish($span,'error',array('state_to'=>'READY','error'=>'browser_task_not_created'));$error=array('code'=>'browser_task_not_created','message'=>'The browser step was not durably queued.','retryable'=>true,'class'=>'browser_task');$updated=PRSTUDIO_UC_Store::retry_leased_job((string)$job['job_uuid'],$lease,$error);return array('ok'=>false,'claimed'=>true,'job'=>$updated,'error'=>$error);}
+					if(in_array($status,array('failed','cancelled','expired'),true)){$payload=is_array($result['error']??null)?$result['error']:array();$retryable='cancelled'!==$status&&(bool)($payload['retryable']??true);$error=array_merge($payload,array('code'=>(string)($payload['code']??('browser_task_'.$status)),'message'=>(string)($payload['message']??('Browser task ended as '.$status.'.')),'retryable'=>$retryable,'class'=>'browser_task'));if($span)PRSTUDIO_UC_Observability::finish($span,'error',array('state_to'=>$retryable?'READY':'DEAD_LETTER','error'=>$error['code']));$updated=$retryable?PRSTUDIO_UC_Store::retry_leased_job((string)$job['job_uuid'],$lease,$error):(PRSTUDIO_UC_Store::dead_letter_job((string)$job['job_uuid'],$error,'browser_terminal',$lease)?PRSTUDIO_UC_Store::get_job((string)$job['job_uuid']):null);return array('ok'=>false,'claimed'=>true,'job'=>$updated,'error'=>$error);}
+					if('completed'!==$status){$checkpoint['browser_task_id']=$task_id;$checkpoint['browser_step_index']=$index;$checkpoint['next_step']=$index;$checkpoint['browser_deadline_gmt']=gmdate('c',time()+$timeout_seconds);$checkpoint=self::progress_watchdog($checkpoint,$job,$step_id,$index);if($span)PRSTUDIO_UC_Observability::finish($span,'waiting',array('state_to'=>'WAITING_FOR_BROWSER','task_uuid'=>$task_id,'browser_deadline_gmt'=>$checkpoint['browser_deadline_gmt'],'progress_signature'=>$checkpoint['progress_signature']));$waiting=PRSTUDIO_UC_Store::wait_leased_job((string)$job['job_uuid'],$lease,'WAITING_FOR_BROWSER',$checkpoint);return array('ok'=>true,'claimed'=>true,'waiting_for_browser'=>true,'job'=>$waiting,'task_id'=>$task_id);}
 				}
-				$checkpoint['results'][$step_id]=class_exists('PRSTUDIO_UC_Memory')?PRSTUDIO_UC_Memory::redact($result):$result;$checkpoint['next_step']=$index+1;$progress=(int)floor((($index+1)/max(1,count($steps)))*90);$saved=PRSTUDIO_UC_Store::checkpoint_leased_job((string)$job['job_uuid'],$lease,$index,$checkpoint,$progress);if(!$saved)return array('ok'=>false,'claimed'=>true,'conflict'=>true,'job_id'=>$job['job_uuid']);$job=$saved;$index++;$processed++;
+				$checkpoint['results'][$step_id]=class_exists('PRSTUDIO_UC_Memory')?PRSTUDIO_UC_Memory::redact($result):$result;$checkpoint['next_step']=$index+1;$progress=(int)floor((($index+1)/max(1,count($steps)))*90);$next_id=(string)($steps[$index+1]['id']??'mission_complete');$checkpoint=self::progress_watchdog($checkpoint,$job,$next_id,$index+1);if($span)PRSTUDIO_UC_Observability::finish($span,'ok',array('state_to'=>'RUNNING','progress_signature'=>$checkpoint['progress_signature']));$saved=PRSTUDIO_UC_Store::checkpoint_leased_job((string)$job['job_uuid'],$lease,$index,$checkpoint,$progress);if(!$saved)return array('ok'=>false,'claimed'=>true,'conflict'=>true,'job_id'=>$job['job_uuid']);$job=$saved;$index++;$processed++;
 			}
 			if($index>=count($steps)){$verification=self::mission_verification($checkpoint,$plan);$done=PRSTUDIO_UC_Store::complete_leased_job((string)$job['job_uuid'],$lease,array('playbook'=>$checkpoint['playbook']??'','results'=>$checkpoint['results']??array()),$verification);return array('ok'=>true,'claimed'=>true,'completed'=>(bool)$done,'job'=>$done);}
-			$released=PRSTUDIO_UC_Store::release_leased_job((string)$job['job_uuid'],$lease,$checkpoint,$index,(int)($job['progress']??0),0);return array('ok'=>true,'claimed'=>true,'bounded_yield'=>true,'processed_steps'=>$processed,'job'=>$released);
+			$current_id=(string)($steps[$index]['id']??('step_'.$index));$checkpoint=self::progress_watchdog($checkpoint,$job,$current_id,$index);$released=PRSTUDIO_UC_Store::release_leased_job((string)$job['job_uuid'],$lease,$checkpoint,$index,(int)($job['progress']??0),0);return array('ok'=>true,'claimed'=>true,'bounded_yield'=>true,'processed_steps'=>$processed,'job'=>$released);
 		}catch(Throwable $e){$error=array('code'=>'agency_worker_exception','message'=>'Agency worker failed safely.','exception_class'=>get_class($e),'retryable'=>true,'class'=>'worker_exception');$updated=PRSTUDIO_UC_Store::retry_leased_job((string)$job['job_uuid'],$lease,$error);return array('ok'=>false,'claimed'=>true,'job'=>$updated,'error'=>$error);}
 	}
 
@@ -284,7 +319,7 @@ final class PRSTUDIO_UC_Agency_Runtime {
 		// wrong signal: "no external runner configured" and "nothing is executing"
 		// are different conditions and only the second is an outage.
 		if(class_exists('PRSTUDIO_UC_Site_Sentinel'))PRSTUDIO_UC_Site_Sentinel::record_execution_heartbeat(self::scheduler_mode());
-		self::process_schedules(10);if(class_exists('PRSTUDIO_UC_Procedural_Skills')){try{PRSTUDIO_UC_Procedural_Skills::curate(array('apply'=>true));}catch(Throwable $ignored){}}self::run_batch(5,'scheduler',4.0); }
+		self::process_schedules(10);if(class_exists('PRSTUDIO_UC_Procedural_Skills')){try{PRSTUDIO_UC_Procedural_Skills::curate(array('apply'=>true));}catch(Throwable $ignored){PRSTUDIO_UC_Store::event('runtime:procedural-skills','runtime.procedural_skills_error',array('source'=>'scheduler','exception_class'=>get_class($ignored)));}}self::run_batch(5,'scheduler',4.0); }
 
 	public static function control( string $job_uuid, string $action, array $args = array() ) {
 		$job=PRSTUDIO_UC_Store::get_job($job_uuid);if(!$job)return new WP_Error('agency_job_missing','Mission job not found.',array('status'=>404));$action=sanitize_key($action);$checkpoint=(array)($job['checkpoint']??array());

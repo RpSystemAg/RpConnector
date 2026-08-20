@@ -16,7 +16,7 @@ const rest = await read('prstudio-unified-control/includes/class-prstudio-uc-res
 const bridge = await read('prstudio-unified-control/includes/class-wpaib-rest.php');
 const browserBridge = await read('prstudio-unified-control/includes/class-prstudio-uc-bridge.php');
 
-const expectedPermissions = ['tabs','scripting','storage','debugger','sidePanel','notifications','alarms','windows','system.display','activeTab','tabCapture','offscreen','contextMenus'];
+const expectedPermissions = ['tabs','tabGroups','scripting','storage','debugger','sidePanel','notifications','alarms','windows','system.display','activeTab','tabCapture','offscreen','contextMenus'];
 assert.equal(manifest.version, '1.0.0', 'Chrome extension version must stay 1.0.0');
 assert.equal(manifest.manifest_version, 3, 'Manifest V3 must remain unchanged');
 assert.deepEqual(manifest.permissions, expectedPermissions, 'Local Studio permissions include system.display for explicit screenshot/CSS/screen transforms');

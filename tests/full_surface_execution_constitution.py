@@ -174,9 +174,10 @@ def main() -> int:
             fail(f"full-surface workflow missing blocking assertion {fragment!r}")
 
     enterprise_requirements = (
-        "push:",
-        "pull_request:",
+        "workflow_dispatch:",
         "python3 tests/full_surface_execution_constitution.py",
+        "tests/enterprise-schema-batch-1.php",
+        "tests/enterprise-schema-batch-2.php",
     )
     for fragment in enterprise_requirements:
         if fragment not in enterprise:

@@ -16,7 +16,7 @@ const manifest = JSON.parse(await read('prstudio-unified-browser-agent/manifest.
 
 assert.match(toolchain, /public const VERSION = '1\.0\.0'/);
 assert.equal(manifest.version, '1.0.0');
-assert.deepEqual(manifest.permissions, ['tabs','scripting','storage','debugger','sidePanel','notifications','alarms','windows','system.display','activeTab','tabCapture','offscreen','contextMenus']);
+assert.deepEqual(manifest.permissions, ['tabs','tabGroups','scripting','storage','debugger','sidePanel','notifications','alarms','windows','system.display','activeTab','tabCapture','offscreen','contextMenus']);
 
 const requiredCaps = [
   'toolchain.status', 'toolchain.filesystem.inspect', 'toolchain.filesystem.write', 'toolchain.git.inspect',

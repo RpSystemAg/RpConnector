@@ -2,7 +2,8 @@
 /** WordPress Playground forward-compatibility oracle. */
 declare(strict_types=1);
 
-$root = '/wordpress/';
+$configuredRoot = rtrim((string) getenv('RP_WP_PATH'), "/\\");
+$root = $configuredRoot !== '' ? $configuredRoot . '/' : '/wordpress/';
 if (!is_file($root . 'wp-load.php')) {
     fwrite(STDERR, "FAIL Playground WordPress root missing\n");
     exit(1);

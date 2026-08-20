@@ -92,7 +92,7 @@ $check((PRSTUDIO_UC_Store::$jobs['job-1']['status']??'')==='CANCELLED','REST can
 foreach(['FAILED','CANCELLED','EXPIRED','COMPLETED'] as $status){
     seed($status);
     PRSTUDIO_UC_Job_Engine::recover();
-    $check((PRSTUDIO_UC_Store::$jobs['job-1']['status']??'')!=='WAITING_FOR_BROWSER',"recovery reconciles stranded terminal child $status");
+    $check((PRSTUDIO_UC_Store::$jobs['job-1']['status']??'')!=='WAITING_FOR_BROWSER',"recovery reconciles stranded terminal child ".strtolower($status));
 }
 
 if($fails){fwrite(STDERR,"SUMMARY ".count($passes)." passed, ".count($fails)." failed\n");exit(1);} echo "SUMMARY ".count($passes)." passed, 0 failed\n";

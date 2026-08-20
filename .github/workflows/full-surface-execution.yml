@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: unified-full-suite-${{ github.ref }}
@@ -31,6 +32,7 @@ jobs:
       WP_ADMIN_USER: rpadmin
       WP_ADMIN_PASSWORD: Full-Surface-Only-2026!
       CHROME_BIN: /usr/bin/chromium
+      GITHUB_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -61,7 +63,7 @@ jobs:
           # instead of the assembler's four-bytes-per-token divisor. Pinned like
           # the others: a tokenizer that changes under us would move the number
           # the law is enforced against.
-          python -m pip install --disable-pip-version-check --no-input PyYAML "hypothesis==6.164.0" "tiktoken==0.14.0"
+          python -m pip install --disable-pip-version-check --no-input PyYAML "hypothesis==6.164.0" "tiktoken==0.14.0" sqlglot
           python - <<'PY'
           import hypothesis, yaml
           assert hypothesis.__version__ == '6.164.0', hypothesis.__version__
@@ -88,10 +90,16 @@ jobs:
           php -d auto_prepend_file=tests/strict-php-errors.php tests/enterprise-schema-batch-2.php
           php -d auto_prepend_file=tests/strict-php-errors.php tests/php-mcp-catalog-runtime-smoke.php
           python3 tests/test-wiring-audit.py
-          python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA"
-          python tests/build-release.py --build
-          python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA" --verify
-          python tests/build-release.py --check
+          build_checkout="$RUNNER_TEMP/rpconnector-preflight-build"
+          git worktree add --detach "$build_checkout" "$GITHUB_SHA"
+          (
+            cd "$build_checkout"
+            python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA"
+            python tests/build-release.py --build
+            python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA" --verify
+            python tests/build-release.py --check
+          )
+          git worktree remove --force "$build_checkout"
           node --test prstudio-unified-browser-agent/tests/*.test.mjs
           if git grep -n -E '^(<<<<<<< |=======|>>>>>>> )' -- ':!composer.lock'; then
             echo 'Merge conflict marker detected.' >&2

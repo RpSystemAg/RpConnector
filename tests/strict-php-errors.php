@@ -68,7 +68,10 @@ set_error_handler(
 	}
 );
 
-if ( ! function_exists( '_doing_it_wrong' ) ) {
+$rp_main_script = (string) ( $_SERVER['SCRIPT_FILENAME'] ?? ( $_SERVER['argv'][0] ?? '' ) );
+$rp_main_source = is_file( $rp_main_script ) ? (string) file_get_contents( $rp_main_script, false, null, 0, 16384 ) : '';
+$rp_bootstraps_real_wordpress = str_contains( $rp_main_source, 'wp-load.php' );
+if ( ! function_exists( '_doing_it_wrong' ) && ! $rp_bootstraps_real_wordpress ) {
 	/**
 	 * WordPress's API-misuse channel.
 	 *

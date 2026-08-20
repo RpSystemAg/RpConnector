@@ -32,9 +32,10 @@ final class PRSTUDIO_UC_Job_Engine {
 		$checkpoint['browser_task_id'] = (string) $task['task_uuid'];
 		$checkpoint['browser_completed_gmt'] = gmdate( 'c' );
 		$checkpoint['browser_terminal_status'] = $status;
-		if ( $ok || PRSTUDIO_UC_State_Machine::COMPLETED === $status ) {
+		if ( PRSTUDIO_UC_State_Machine::COMPLETED === $status ) {
 			$checkpoint['browser_result'] = self::persistent_browser_payload( $payload );
 			$checkpoint['browser_error'] = null;
+			$checkpoint['browser_verification_ok'] = $ok;
 			return is_array( PRSTUDIO_UC_Store::set_job_state( $job_uuid, 'READY', array( 'checkpoint'=>$checkpoint, 'available_gmt'=>gmdate('Y-m-d H:i:s') ) ) );
 		}
 		if ( PRSTUDIO_UC_State_Machine::CANCELLED === $status ) {
@@ -60,7 +61,8 @@ final class PRSTUDIO_UC_Job_Engine {
 	private static function reconcile_terminal_browser_task( array $task ): bool {
 		$status = (string) ( $task['status'] ?? '' );
 		if ( PRSTUDIO_UC_State_Machine::COMPLETED === $status ) {
-			return self::reconcile_browser_parent( $task, true, array( 'result'=>(array)($task['result']??array()), 'verification'=>(array)($task['verification']??array()) ) );
+			$verification=(array)($task['verification']??array());
+			return self::reconcile_browser_parent( $task, !empty($verification['ok']), array( 'result'=>(array)($task['result']??array()), 'verification'=>$verification ) );
 		}
 		if ( PRSTUDIO_UC_State_Machine::FAILED === $status ) {
 			return self::reconcile_browser_parent( $task, false, (array)($task['error']??array()) );
@@ -89,12 +91,12 @@ final class PRSTUDIO_UC_Job_Engine {
 			$result['verification']=$verification; $result['degraded']=true; $result['blocking']=false;
 		}
 		$completed=PRSTUDIO_UC_Store::complete( $task_uuid, $lease_token, $result );
-		if(is_array($completed)){if(class_exists('PRSTUDIO_UC_Procedural_Skills')){try{PRSTUDIO_UC_Procedural_Skills::learn_verified_browser_task($task,$result,$verification);}catch(Throwable $ignored){}}self::reconcile_browser_parent($completed,true,array('result'=>$result,'verification'=>$verification));}
+		if(is_array($completed)){if(!empty($verification['ok'])&&class_exists('PRSTUDIO_UC_Procedural_Skills')){try{PRSTUDIO_UC_Procedural_Skills::learn_verified_browser_task($task,$result,$verification);}catch(Throwable $ignored){PRSTUDIO_UC_Store::event($task_uuid,'task.procedural_learning_error',array('exception_class'=>get_class($ignored)));}}self::reconcile_browser_parent($completed,!empty($verification['ok']),array('result'=>$result,'verification'=>$verification));}
 		return $completed;
 	}
 
 	public static function fail_browser_task( string $task_uuid, string $lease_token, array $error ) {
-		$task=PRSTUDIO_UC_Store::get_task($task_uuid);if(is_array($task)&&class_exists('PRSTUDIO_UC_Procedural_Skills')){try{PRSTUDIO_UC_Procedural_Skills::observe_failure('browser',(string)($task['action']??''),(array)($task['arguments']??array()),$error);}catch(Throwable $ignored){}}
+		$task=PRSTUDIO_UC_Store::get_task($task_uuid);if(is_array($task)&&class_exists('PRSTUDIO_UC_Procedural_Skills')){try{PRSTUDIO_UC_Procedural_Skills::observe_failure('browser',(string)($task['action']??''),(array)($task['arguments']??array()),$error);}catch(Throwable $ignored){PRSTUDIO_UC_Store::event($task_uuid,'task.procedural_failure_observation_error',array('exception_class'=>get_class($ignored)));}}
 		$failed=PRSTUDIO_UC_Store::fail($task_uuid,$lease_token,$error);
 		if(is_array($failed))self::reconcile_browser_parent($failed,false,$error);
 		return $failed;
@@ -151,10 +153,11 @@ final class PRSTUDIO_UC_Job_Engine {
 	public static function recover(): array {
 		$tasks = PRSTUDIO_UC_Store::recover_stale_tasks();
 		$jobs = PRSTUDIO_UC_Store::recover_stale_jobs();
+		$waits = method_exists('PRSTUDIO_UC_Store','recover_expired_browser_waits') ? PRSTUDIO_UC_Store::recover_expired_browser_waits() : 0;
 		$parents = 0;
 		foreach ( PRSTUDIO_UC_Store::terminal_browser_tasks_with_waiting_parents( 200 ) as $task ) {
 			if ( is_array( $task ) && self::reconcile_terminal_browser_task( $task ) ) { $parents++; }
 		}
-		return array( 'ok'=>true, 'recovered_tasks'=>$tasks, 'interrupted_jobs'=>$jobs, 'reconciled_browser_parents'=>$parents, 'version'=>self::VERSION );
+		return array( 'ok'=>true, 'recovered_tasks'=>$tasks, 'interrupted_jobs'=>$jobs, 'expired_browser_waits'=>$waits, 'reconciled_browser_parents'=>$parents, 'version'=>self::VERSION );
 	}
 }

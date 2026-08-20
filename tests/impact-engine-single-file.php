@@ -1,5 +1,5 @@
 <?php
-define('PRSTUDIO_UC_TESTING',true); require $argv[1];
+define('PRSTUDIO_UC_TESTING',true); require $argv[1] ?? __DIR__ . '/../prstudio-unified-control/includes/class-prstudio-uc-impact-engine.php';
 function ok($c,$m){if(!$c){fwrite(STDERR,"FAIL $m\n");exit(1);}}
 set_error_handler(function($s,$m){throw new ErrorException($m,0,$s);});
 $r=PRSTUDIO_UC_Impact_Engine::analyze(['domain'=>'content','write'=>false,'read_only'=>true,'risk_level'=>'low'],['id'=>7]);

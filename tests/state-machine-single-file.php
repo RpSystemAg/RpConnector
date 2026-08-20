@@ -1,5 +1,5 @@
 <?php
-define('PRSTUDIO_UC_TESTING',true);require $argv[1];
+define('PRSTUDIO_UC_TESTING',true);require $argv[1] ?? __DIR__ . '/../prstudio-unified-control/includes/class-prstudio-uc-state-machine.php';
 function ok($c,$m){if(!$c){fwrite(STDERR,"FAIL $m\n");exit(1);}}
 $S='PRSTUDIO_UC_State_Machine';
 ok($S::can_transition($S::QUEUED,$S::LEASED),'queue can lease');

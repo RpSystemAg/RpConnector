@@ -32,7 +32,7 @@ ARTIFACTS = [
 # Keep .git in each independent copy because both the exact browser identity
 # stamper and SBOM deliberately bind themselves to the exact source commit.
 # Generated/dependency state is excluded.
-EXCLUDE = {"vendor", "node_modules", "dist", "megalinter-reports", "__pycache__", ".hypothesis"}
+EXCLUDE = {"vendor", "node_modules", "dist", "artifacts", "megalinter-reports", "__pycache__", ".hypothesis"}
 
 
 def copy_source(dst: Path) -> None:

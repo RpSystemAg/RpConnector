@@ -2,7 +2,7 @@
 define('PRSTUDIO_UC_TESTING', true);
 function sanitize_key($v){ return preg_replace('/[^a-z0-9_\-]/','',strtolower((string)$v)); }
 function wp_json_encode($v,$flags=0){ return json_encode($v,$flags); }
-require $argv[1];
+require $argv[1] ?? __DIR__ . '/../prstudio-unified-control/includes/class-prstudio-uc-idempotency.php';
 function ok($cond,$msg){ if(!$cond){fwrite(STDERR,"FAIL $msg\n"); exit(1);} }
 set_error_handler(function($severity,$message){throw new ErrorException($message,0,$severity);});
 ok(PRSTUDIO_UC_Idempotency::explicit_key(['request_id'=>'  req-123  '])==='req-123','valid explicit string preserved');

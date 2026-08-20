@@ -1,6 +1,6 @@
 <?php
 define('PRSTUDIO_UC_TESTING',true);
-require $argv[1];
+require $argv[1] ?? __DIR__ . '/../prstudio-unified-control/includes/class-prstudio-uc-risk-engine-v3.php';
 function ok($c,$m){if(!$c){fwrite(STDERR,"FAIL $m\n");exit(1);}}
 $r=PRSTUDIO_UC_Risk_Engine_V3::evaluate(['risk_level'=>'critical'],['confirm'=>false],['write'=>true],false,[]);
 ok(($r['risk_level']??'')==='critical','risk classification preserved as telemetry');
