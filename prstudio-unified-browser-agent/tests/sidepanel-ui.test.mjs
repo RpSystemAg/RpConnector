@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile, writeFile, readdir, mkdtemp, rm } from 'node:fs/promises';
+import { readFile, writeFile, readdir, mkdtemp, rm, mkdir } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
@@ -55,6 +55,7 @@ class FakeElement {
 
 const ids = new Set([...html.matchAll(/\bid=["']([^"']+)["']/gu)].map((match) => match[1]));
 const elements = new Map([...ids].map((id) => [id, new FakeElement(id)]));
+const buttonIds = new Set([...html.matchAll(/<button\b[^>]*\bid=["']([^"']+)["']/gu)].map((match) => match[1]));
 const tabNames = [...html.matchAll(/class=["'][^"']*tabButton[^"']*["'][^>]*data-tab=["']([^"']+)["']/gu)].map((match) => match[1]);
 const tabButtons = tabNames.map((name) => {
   const el = new FakeElement(`tab-button-${name}`);
@@ -67,12 +68,23 @@ const tabPanes = tabNames.map((name) => {
   el.className = name === 'local' ? 'tabPane active' : 'tabPane';
   return el;
 });
+const documentListeners = new Map();
 
 const documentStub = {
+  hidden: false,
   getElementById(id) { return elements.get(id) || null; },
+  addEventListener(type, handler) {
+    const listeners = documentListeners.get(type) || [];
+    listeners.push(handler);
+    documentListeners.set(type, listeners);
+  },
+  async dispatchEvent(type) {
+    for (const handler of documentListeners.get(type) || []) await handler({ type });
+  },
   querySelectorAll(selector) {
     if (selector === '.tabButton') return tabButtons;
     if (selector === '.tabPane') return tabPanes;
+    if (selector === 'button') return [...buttonIds].map((id) => elements.get(id)).filter(Boolean);
     return [];
   },
   createElement(tag) {
@@ -86,18 +98,37 @@ const documentStub = {
 globalThis.document = documentStub;
 globalThis.setInterval = () => 1;
 globalThis.clearInterval = () => {};
+const nativeSetTimeout = globalThis.setTimeout;
+const nativeClearTimeout = globalThis.clearTimeout;
+const panelTimers = new Set();
+globalThis.setTimeout = (fn, ms, ...args) => {
+  if (Number(ms) < 1_000) return nativeSetTimeout(fn, ms, ...args);
+  const timer = { panelTestTimer: true, fn, ms: Number(ms) };
+  panelTimers.add(timer);
+  return timer;
+};
+globalThis.clearTimeout = (timer) => {
+  if (timer?.panelTestTimer) panelTimers.delete(timer);
+  else nativeClearTimeout(timer);
+};
 
 const calls = [];
+const runtimeMessageListeners = [];
+let activeTab = { id: 41, title: 'Prima scheda', url: 'https://one.example/' };
 globalThis.chrome = {
   runtime: {
+    onMessage: { addListener(listener) { runtimeMessageListeners.push(listener); } },
     async sendMessage(message) {
       calls.push(message);
       if (message.type === 'local_status') return { ok: true, version: '1.0.0', tab: {}, workflows: [], workspaces: [], schedules: [], scheduledResults: [], baselines: [], flight: [] };
       if (message.type === 'status') return { paired: false, logs: [] };
-      if (message.type === 'local_page_health') return { ok: true, result: { score: 100, h1Count: 1, imagesMissingAlt: 0, unlabeledControls: 0, duplicateIdCount: 0, badLinkCount: 0, schemaParseErrors: 0, resourceCount: 1, mixedContentCount: 0, navigation: {} } };
+      if (message.type === 'local_page_health') return { ok: true, result: { score: 100, h1Count: 1, imagesMissingAlt: 0, unlabeledControls: 0, duplicateIdCount: 0, badLinkCount: 0, schemaParseErrors: 0, resourceCount: 1, mixedContentCount: 0, navigation: { loadMs: 500 }, url: 'https://example.com/' } };
       if (message.type === 'pair') return { ok: true };
       return { ok: true, results: [], result: {}, report: {}, workflow: { name: 'x', steps: [] }, workspace: { tabs: [] } };
     },
+  },
+  tabs: {
+    async query() { return [activeTab]; },
   },
 };
 
@@ -107,9 +138,11 @@ globalThis.chrome = {
 const scratchDir = await mkdtemp(join(tmpdir(), 'prstudio-sidepanel-'));
 const modulePath = join(scratchDir, 'module.mjs');
 await writeFile(modulePath, source, 'utf8');
+await mkdir(join(scratchDir, 'lib'));
+await writeFile(join(scratchDir, 'lib', 'panel-refresh.js'), await readFile(join(ROOT, 'lib', 'panel-refresh.js'), 'utf8'), 'utf8');
 try {
   await import(`${pathToFileURL(modulePath).href}?v=${Date.now()}`);
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await new Promise((resolve) => setTimeout(resolve, 50));
 } finally {
   await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
 }
@@ -161,6 +194,20 @@ test('all primary controls register click/change handlers', () => {
   for (const button of tabButtons) assert.ok((button.listeners.get('click') || []).length > 0, `tab ${button.dataset.tab} has no click handler`);
 });
 
+test('visibilitychange pauses every panel timer and resumes each refresh loop', async () => {
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  assert.equal(panelTimers.size, 3, 'should have 3 scheduled timers at start');
+  documentStub.hidden = true;
+  await documentStub.dispatchEvent('visibilitychange');
+  assert.equal(panelTimers.size, 0, 'all timers should be cleared when hidden');
+  const before = calls.length;
+  documentStub.hidden = false;
+  await documentStub.dispatchEvent('visibilitychange');
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  assert.ok(calls.length > before, 'local and remote refreshes did not resume');
+  assert.equal(panelTimers.size, 3, 'should have 3 timers rearmed after resume');
+});
+
 test('Automation/Log tabs are interactive and pairing controls remain exposed', async () => {
   const logs = tabButtons.find((button) => button.dataset.tab === 'logs');
   await logs.dispatch('click');
@@ -197,6 +244,23 @@ test('local audit button dispatches a real local action', async () => {
   await elements.get('healthButton').dispatch('click');
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.ok(calls.slice(before).some((entry) => entry.type === 'local_page_health'));
+});
+
+test('guarded actions preserve controls that were already disabled', async () => {
+  const liveStart = elements.get('liveStartButton');
+  liveStart.disabled = true;
+  await elements.get('healthButton').dispatch('click');
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(liveStart.disabled, true);
+});
+
+test('an action click grants exactly the newly selected tab in an already-open panel', async () => {
+  activeTab = { id: 42, title: 'Seconda scheda', url: 'https://two.example/' };
+  for (const listener of runtimeMessageListeners) {
+    listener({ target: 'prstudio-live-panel', type: 'active_tab_granted', detail: { tabId: 42 } });
+  }
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(elements.get('liveStartButton').disabled, false);
 });
 
 
