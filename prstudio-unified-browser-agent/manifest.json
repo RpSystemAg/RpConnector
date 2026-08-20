@@ -2,6 +2,7 @@
   "manifest_version": 3,
   "name": "PR STUDIO Unified Browser Agent",
   "version": "1.0.0",
+  "minimum_chrome_version": "120",
   "description": "Browser Agent e Local Studio per PR STUDIO.",
   "permissions": [
     "storage",
@@ -29,10 +30,15 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["page-runtime.js"],
+      "js": [
+        "lib/reconnect-backoff.js",
+        "lib/runtime-dirty-notifier.js",
+        "page-runtime.js"
+      ],
       "run_at": "document_start",
       "all_frames": true,
-      "match_about_blank": true
+      "match_about_blank": true,
+      "world": "ISOLATED"
     }
   ]
 }
