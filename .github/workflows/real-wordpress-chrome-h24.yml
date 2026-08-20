@@ -163,6 +163,11 @@ jobs:
           curl --fail --silent "$WP_URL/wp-json/" > /tmp/rpconnector-h24-rest-index.json
           jq -e '.namespaces | index("prstudio-unified/v1")' /tmp/rpconnector-h24-rest-index.json >/dev/null
 
+      - name: Probe Chrome scripting page-health injection
+        run: |
+          set -euo pipefail
+          node .github/scripts/chrome-scripting-health-probe.mjs
+
       - name: Select real-browser cycle count
         run: |
           set -euo pipefail
