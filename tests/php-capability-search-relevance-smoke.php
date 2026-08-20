@@ -241,6 +241,35 @@ if (!empty($detailed_unknown['items']) || 0 !== (int)($detailed_unknown['total_m
 ++ $passed;
 fwrite(STDOUT, "PASS shared action index rejects nonsense\n");
 
+/* -- Specialist SEO workflows use the same route-scoped semantic ranking -- */
+
+function seo_specialist_actions(string $query): array {
+    $allowed = array_fill_keys(array(
+        'build_keyword_map', 'audit_product_seo', 'audit_orphan_pages', 'build_internal_link_graph',
+        'audit_http_statuses', 'audit_broken_internal_links', 'audit_sitemap_coverage',
+        'set_canonical', 'set_description', 'set_title',
+    ), true);
+    $ranked = PRSTUDIO_UC_Action_Index::search_detailed($query, 50, 'content_seo', '/seo-manage');
+    return array_values(array_map(
+        static fn(array $item): string => (string)($item['action'] ?? ''),
+        array_filter((array)($ranked['items'] ?? array()), static fn(array $item): bool => isset($allowed[(string)($item['action'] ?? '')]))
+    ));
+}
+
+foreach (array(
+    array('imposta canonical', 'set canonical', 'set_canonical'),
+    array('imposta descrizione seo', 'set SEO description', 'set_description'),
+    array('imposta titolo seo', 'set SEO title', 'set_title'),
+) as [$italian_query, $english_query, $expected_action]) {
+    $it_actions = seo_specialist_actions($italian_query);
+    $en_actions = seo_specialist_actions($english_query);
+    if (!$it_actions || $it_actions !== $en_actions || $expected_action !== $it_actions[0]) {
+        fail_relevance("SEO specialist ranking differs for '{$italian_query}'/'{$english_query}'");
+    }
+    ++$passed;
+    fwrite(STDOUT, "PASS SEO specialist {$italian_query} == {$english_query} -> {$expected_action}\n");
+}
+
 /* -- The legacy public discovery tool delegates to the shared index -------- */
 
 function wpaib_match_result(string $query, bool $includeSchema = false): array {
