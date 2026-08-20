@@ -131,7 +131,29 @@ async function domExecutor(action, args) {
     .replace(/[^\p{L}\p{N}]+/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
-  const tokenSet = (value) => [...new Set(normalize(value).split(" ").filter((part) => part.length > 1))];
+  // Keep this serialisable page-runtime mirror aligned with the browser-side
+  // semantic ranker: visible controls may be in the other supported language.
+  const controlConcepts = {
+    save:["save","salva","salvare"], cancel:["cancel","annulla","annullare"],
+    add:["add","aggiungi","aggiungere","inserisci","inserire"], cart:["cart","basket","carrello"],
+    buy:["buy","purchase","acquista","acquistare","compra","comprare"], checkout:["checkout","cassa"],
+    submit:["submit","send","invia","inviare","manda","mandare"], continue:["continue","continua","continuare","prosegui","proseguire"],
+    confirm:["confirm","conferma","confermare"], next:["next","avanti","successivo","successiva"], back:["back","previous","indietro","precedente"],
+    close:["close","chiudi","chiudere"], open:["open","apri","aprire"], login:["login","signin","accedi","accedere","entra","entrare"],
+    logout:["logout","signout","esci","uscire","disconnetti"], search:["search","find","cerca","cercare","trova","trovare"],
+    select:["select","choose","seleziona","selezionare","scegli","scegliere"], check:["check","tick","spunta","spuntare"],
+    fill:["fill","enter","compila","compilare","riempi","riempire"], write:["type","write","digita","digitare","scrivi","scrivere"],
+    click:["click","press","clicca","cliccare","premi","premere"], upload:["upload","carica","caricare"], download:["download","scarica","scaricare"],
+    remove:["remove","delete","rimuovi","rimuovere","elimina","eliminare"], edit:["edit","modify","modifica","modificare"],
+    apply:["apply","applica","applicare"], coupon:["coupon","voucher","buono","sconto"], filter:["filter","filtra","filtrare"],
+    sort:["sort","ordina","ordinare"], details:["details","detail","dettagli","dettaglio"], more:["more","altro","altri","piu"],
+    name:["name","nome"], address:["address","indirizzo"], phone:["phone","telephone","telefono"], company:["company","business","azienda","societa"],
+    quantity:["quantity","qty","quantita"], payment:["payment","pagamento"], shipping:["shipping","delivery","spedizione","consegna"],
+  };
+  const conceptByWord = new Map();
+  for (const [concept, forms] of Object.entries(controlConcepts)) for (const form of [concept, ...forms]) conceptByWord.set(normalize(form), concept);
+  const stopWords = new Set(["a","an","the","to","of","for","in","on","and","or","your","al","allo","alla","ai","agli","alle","il","lo","la","i","gli","le","un","uno","una","di","del","della","dei","delle","per","nel","nella","e","o"]);
+  const tokenSet = (value) => [...new Set(normalize(value).split(" ").filter((part) => part.length > 1 && !stopWords.has(part)).map((part) => conceptByWord.get(part) || `raw:${part}`))];
   const similarity = (actual, expected) => {
     const a = normalize(actual), b = normalize(expected);
     if (!a || !b) return 0;
@@ -386,11 +408,12 @@ async function domExecutor(action, args) {
     }
     if (args.label) score += labelStrength * 270;
     const intended = normalize(args.intendedAction || action);
+    const intendedConcepts = tokenSet(intended);
     const editable = ["input", "textarea", "select"].includes(descriptor.tag)
       || ["textbox", "combobox", "searchbox", "spinbutton"].includes(descriptor.role)
       || descriptor.contentEditable;
-    if (["fill", "type text", "type_text", "select", "check"].includes(intended)) score += editable ? 80 : -140;
-    else if (["click", "double click", "double_click", "hover"].includes(intended)) score += descriptor.clickable ? 55 : (editable ? 8 : -20);
+    if (["fill", "write", "select", "check"].some((name) => intendedConcepts.includes(name)) || ["fill", "type text", "type_text", "select", "check"].includes(intended)) score += editable ? 80 : -140;
+    else if (intendedConcepts.includes("click") || ["click", "double click", "double_click", "hover"].includes(intended)) score += descriptor.clickable ? 55 : (editable ? 8 : -20);
     else if (intended === "press") score += (descriptor.focusable || descriptor.clickable || editable) ? 30 : 0;
     if (descriptor.disabled) score -= 500;
     if (descriptor.ariaHidden) score -= 300;
