@@ -122,7 +122,7 @@ globalThis.chrome = {
       calls.push(message);
       if (message.type === 'local_status') return { ok: true, version: '1.0.0', tab: {}, workflows: [], workspaces: [], schedules: [], scheduledResults: [], baselines: [], flight: [] };
       if (message.type === 'status') return { paired: false, logs: [] };
-      if (message.type === 'local_page_health') return { ok: true, result: { score: 100, h1Count: 1, imagesMissingAlt: 0, unlabeledControls: 0, duplicateIdCount: 0, badLinkCount: 0, schemaParseErrors: 0, resourceCount: 1, mixedContentCount: 0, navigation: {} } };
+      if (message.type === 'local_page_health') return { ok: true, result: { score: 100, h1Count: 1, imagesMissingAlt: 0, unlabeledControls: 0, duplicateIdCount: 0, badLinkCount: 0, schemaParseErrors: 0, resourceCount: 1, mixedContentCount: 0, navigation: { loadMs: 500 }, url: 'https://example.com/' } };
       if (message.type === 'pair') return { ok: true };
       return { ok: true, results: [], result: {}, report: {}, workflow: { name: 'x', steps: [] }, workspace: { tabs: [] } };
     },
@@ -142,7 +142,7 @@ await mkdir(join(scratchDir, 'lib'));
 await writeFile(join(scratchDir, 'lib', 'panel-refresh.js'), await readFile(join(ROOT, 'lib', 'panel-refresh.js'), 'utf8'), 'utf8');
 try {
   await import(`${pathToFileURL(modulePath).href}?v=${Date.now()}`);
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await new Promise((resolve) => setTimeout(resolve, 50));
 } finally {
   await rm(scratchDir, { recursive: true, force: true }).catch(() => {});
 }
