@@ -6,7 +6,84 @@ const clean = (value = "") => String(value || "")
   .replace(/\s+/g, " ")
   .trim();
 
+// The server-side routers use PRSTUDIO_UC_Action_Lexicon. The extension cannot
+// load PHP, so this bounded browser vocabulary mirrors only concepts that can
+// occur in visible control labels. It lets an Italian instruction ground an
+// English page (and vice versa) without translating technical selectors, roles
+// or target refs.
+const CONTROL_CONCEPTS = Object.freeze({
+  save: ["save", "salva", "salvare"],
+  cancel: ["cancel", "annulla", "annullare"],
+  add: ["add", "aggiungi", "aggiungere", "inserisci", "inserire"],
+  cart: ["cart", "basket", "carrello"],
+  buy: ["buy", "purchase", "acquista", "acquistare", "compra", "comprare"],
+  checkout: ["checkout", "cassa"],
+  submit: ["submit", "send", "invia", "inviare", "manda", "mandare"],
+  continue: ["continue", "continua", "continuare", "prosegui", "proseguire"],
+  confirm: ["confirm", "conferma", "confermare"],
+  next: ["next", "avanti", "successivo", "successiva"],
+  back: ["back", "previous", "indietro", "precedente"],
+  close: ["close", "chiudi", "chiudere"],
+  open: ["open", "apri", "aprire"],
+  login: ["login", "signin", "accedi", "accedere", "entra", "entrare"],
+  logout: ["logout", "signout", "esci", "uscire", "disconnetti"],
+  search: ["search", "find", "cerca", "cercare", "trova", "trovare"],
+  select: ["select", "choose", "seleziona", "selezionare", "scegli", "scegliere"],
+  check: ["check", "tick", "spunta", "spuntare", "seleziona"],
+  fill: ["fill", "enter", "compila", "compilare", "riempi", "riempire"],
+  write: ["type", "write", "digita", "digitare", "scrivi", "scrivere"],
+  click: ["click", "press", "clicca", "cliccare", "premi", "premere"],
+  upload: ["upload", "carica", "caricare"],
+  download: ["download", "scarica", "scaricare"],
+  remove: ["remove", "delete", "rimuovi", "rimuovere", "elimina", "eliminare"],
+  edit: ["edit", "modify", "modifica", "modificare"],
+  apply: ["apply", "applica", "applicare"],
+  coupon: ["coupon", "voucher", "buono", "sconto"],
+  filter: ["filter", "filtra", "filtrare"],
+  sort: ["sort", "ordina", "ordinare"],
+  menu: ["menu"],
+  details: ["details", "detail", "dettagli", "dettaglio"],
+  more: ["more", "altro", "altri", "piu"],
+  name: ["name", "nome"],
+  address: ["address", "indirizzo"],
+  phone: ["phone", "telephone", "telefono"],
+  company: ["company", "business", "azienda", "societa"],
+  quantity: ["quantity", "qty", "quantita"],
+  payment: ["payment", "pagamento"],
+  shipping: ["shipping", "delivery", "spedizione", "consegna"],
+});
+
+const CONTROL_WORD_TO_CONCEPT = (() => {
+  const out = new Map();
+  for (const [concept, forms] of Object.entries(CONTROL_CONCEPTS)) {
+    out.set(concept, concept);
+    for (const form of forms) out.set(clean(form).replace(/\s+/g, ""), concept);
+  }
+  return out;
+})();
+
+const CONTROL_STOP_WORDS = new Set([
+  "a", "an", "the", "to", "of", "for", "in", "on", "and", "or", "your",
+  "al", "allo", "alla", "ai", "agli", "alle", "il", "lo", "la", "i", "gli", "le",
+  "un", "uno", "una", "di", "del", "della", "dei", "delle", "per", "nel", "nella", "e", "o",
+]);
+
 const tokens = (value = "") => [...new Set(clean(value).split(" ").filter((part) => part.length > 1))];
+
+const conceptTokens = (value = "") => [...new Set(tokens(value)
+  .filter((token) => !CONTROL_STOP_WORDS.has(token))
+  .map((token) => CONTROL_WORD_TO_CONCEPT.get(token) || `raw:${token}`))];
+
+const tokenSimilarity = (actual = "", expected = "") => {
+  const at = conceptTokens(actual);
+  const bt = conceptTokens(expected);
+  if (!at.length || !bt.length) return 0;
+  const intersection = bt.filter((token) => at.includes(token)).length;
+  if (!intersection) return 0;
+  const precision = intersection / at.length;
+  const recall = intersection / bt.length;
+  return (2 * precision * recall) / Math.max(0.0001, precision + recall);
+};
 
 function similarity(actual = "", expected = "") {
   const a = clean(actual);
@@ -15,17 +92,11 @@ function similarity(actual = "", expected = "") {
   if (a === b) return 1;
   if (a.startsWith(b) || b.startsWith(a)) return 0.9;
   if (a.includes(b) || b.includes(a)) return 0.82;
-  const at = tokens(a);
-  const bt = tokens(b);
-  if (!at.length || !bt.length) return 0;
-  const intersection = bt.filter((token) => at.includes(token)).length;
-  if (!intersection) return 0;
-  const precision = intersection / at.length;
-  const recall = intersection / bt.length;
-  return (2 * precision * recall) / Math.max(0.0001, precision + recall);
+  return tokenSimilarity(a, b);
 }
 
 function actionCompatibility(target = {}, intendedAction = "") {
+  const actionConcepts = conceptTokens(intendedAction);
   const action = clean(intendedAction);
   const tag = clean(target.tag);
   const role = clean(target.role);
@@ -38,10 +109,11 @@ function actionCompatibility(target = {}, intendedAction = "") {
     || (tag === "input" && ["button", "submit", "reset", "checkbox", "radio", "image"].includes(type))
     || Boolean(target.clickable);
 
-  if (["fill", "type text", "type_text", "select", "check"].includes(action)) {
+  if (["fill", "write", "select", "check"].some((intent) => actionConcepts.includes(intent))
+    || ["fill", "type text", "type_text", "select", "check"].includes(action)) {
     return editable ? 80 : -140;
   }
-  if (["click", "double click", "double_click", "hover"].includes(action)) {
+  if (actionConcepts.includes("click") || ["click", "double click", "double_click", "hover"].includes(action)) {
     return clickable ? 55 : (editable ? 8 : -20);
   }
   if (action === "press") return (editable || clickable || target.focusable) ? 30 : 0;
@@ -113,4 +185,4 @@ export function bestSemanticTarget(targets = [], query = {}) {
   return rankSemanticTargets(targets, query, { limit: 1 })[0] || null;
 }
 
-export const __semanticRankingTest = Object.freeze({ clean, similarity, actionCompatibility, scoreTarget });
+export const __semanticRankingTest = Object.freeze({ clean, tokens, conceptTokens, similarity, actionCompatibility, scoreTarget });
