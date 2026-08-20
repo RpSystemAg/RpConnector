@@ -58,6 +58,7 @@ foreach (array(
 }
 
 require PRSTUDIO_UC_DIR . 'includes/class-prstudio-uc-capability-registry.php';
+require PRSTUDIO_UC_DIR . 'includes/class-prstudio-uc-do.php';
 
 $passed = 0;
 
@@ -166,6 +167,36 @@ $equivalent = array(
 );
 
 foreach ($equivalent as $pair) { expect_identical_results($pair[0], $pair[1]); }
+
+/* -- The public command front door has equivalent IT/EN fast paths -------- */
+
+$direct_intents = array(
+    array('apri', 'open', 'browser_open'),
+    array('clicca', 'click', 'browser_click'),
+    array('compila', 'fill', 'browser_fill'),
+    array('leggi', 'read', 'prstudio_observe'),
+    array('modifica contenuto', 'edit content', 'wordpress_content_transaction'),
+    array('salute', 'health', 'prstudio_health'),
+);
+foreach ($direct_intents as $case) {
+    [$italian_intent, $english_intent, $expected_tool] = $case;
+    $it = PRSTUDIO_UC_Do::resolve(array('intent' => $italian_intent));
+    $en = PRSTUDIO_UC_Do::resolve(array('intent' => $english_intent));
+    $it_tool = is_array($it) ? (string)($it['tool'] ?? '') : '';
+    $en_tool = is_array($en) ? (string)($en['tool'] ?? '') : '';
+    if ($expected_tool !== $it_tool || $it_tool !== $en_tool) {
+        fail_relevance("prstudio_do parity failed for '{$italian_intent}'/'{$english_intent}': IT={$it_tool}, EN={$en_tool}, expected={$expected_tool}");
+    }
+    ++$passed;
+    fwrite(STDOUT, "PASS direct intent {$italian_intent} == {$english_intent} -> {$expected_tool}\n");
+}
+
+$fallback = PRSTUDIO_UC_Do::resolve(array('intent' => 'quantum banana frobnicate'));
+if (true !== ($fallback['arguments']['include_legacy'] ?? null)) {
+    fail_relevance('prstudio_do fallback does not search the complete compatibility catalog');
+}
+++ $passed;
+fwrite(STDOUT, "PASS command fallback includes the complete compatibility catalog\n");
 
 /* -- Nonsense still finds nothing ------------------------------------------ */
 

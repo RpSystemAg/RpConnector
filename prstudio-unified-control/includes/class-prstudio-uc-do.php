@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
  * pick, because a wrong guess that writes is far more expensive than a question.
  */
 final class PRSTUDIO_UC_Do {
-    public const VERSION = '1.0.0';
+    public const VERSION = '1.1.0';
 
     /**
      * Direct intent synonyms. Order matters only for readability; matching is
@@ -105,6 +105,80 @@ final class PRSTUDIO_UC_Do {
         );
     }
 
+    /** Italian aliases for every public fast-path family. */
+    private static function italian_aliases(): array {
+        return array(
+            'apri' => 'open',
+            'apri_scheda' => 'open_tab',
+            'nuova_scheda' => 'open_tab',
+            'naviga' => 'navigate',
+            'vai' => 'goto',
+            'visita' => 'visit',
+            'ricarica' => 'reload',
+            'indietro' => 'back',
+            'avanti' => 'forward',
+            'chiudi_scheda' => 'close_tab',
+            'clicca' => 'click',
+            'doppio_clic' => 'double_click',
+            'passa_sopra' => 'hover',
+            'metti_a_fuoco' => 'focus',
+            'compila' => 'fill',
+            'digita' => 'type',
+            'premi' => 'press',
+            'seleziona' => 'select',
+            'spunta' => 'check',
+            'scorri' => 'scroll',
+            'schermata' => 'screenshot',
+            'istantanea' => 'snapshot',
+            'estrai' => 'extract',
+            'attendi' => 'wait',
+            'schede' => 'tabs',
+            'adotta_schede' => 'adopt_tabs',
+            'rete' => 'network',
+            'errori_pagina' => 'page_errors',
+            'controlla_pagina' => 'audit_page',
+            'metriche_vitali' => 'vitals',
+            'accessibilita' => 'accessibility',
+            'scansiona_sito' => 'crawl',
+            'scansiona_sitemap' => 'crawl_sitemap',
+            'riferimento' => 'baseline',
+            'confronta_riferimento' => 'compare_baseline',
+            'leggi' => 'read',
+            'osserva' => 'observe',
+            'ispeziona' => 'inspect',
+            'modifica_contenuto' => 'edit_content',
+            'sostituisci_testo' => 'replace_text',
+            'aggiungi_testo' => 'append_text',
+            'inserisci_prima' => 'insert_before',
+            'inserisci_dopo' => 'insert_after',
+            'prestazioni_gsc' => 'gsc_performance',
+            'ispeziona_gsc' => 'gsc_inspect',
+            'richiedi_indicizzazione' => 'request_indexing',
+            'sitemap_gsc' => 'gsc_sitemaps',
+            'analizza_prodotto' => 'product_audit',
+            'attivita' => 'backlog',
+            'cose_da_fare' => 'todo',
+            'salute' => 'health',
+            'stato' => 'status',
+            'lavoro' => 'job',
+            'memoria' => 'memory',
+            'mappa_repo' => 'repo_map',
+            'valida_codice' => 'validate_code',
+            'missione' => 'mission',
+        );
+    }
+
+    /** Complete bilingual routing surface, preserving canonical tool targets. */
+    private static function bilingual_intent_map(): array {
+        $map = self::intent_map();
+        foreach ( self::italian_aliases() as $alias => $canonical ) {
+            if ( isset( $map[ $canonical ] ) ) {
+                $map[ $alias ] = $map[ $canonical ];
+            }
+        }
+        return $map;
+    }
+
     /** Words that carry no routing information and only add noise to matching. */
     private static function noise(): array {
         return array(
@@ -116,7 +190,15 @@ final class PRSTUDIO_UC_Do {
 
     private static function normalize( string $value ): string {
         $value = strtolower( trim( $value ) );
-        if ( function_exists( 'remove_accents' ) ) { $value = remove_accents( $value ); }
+        if ( function_exists( 'remove_accents' ) ) {
+            $value = remove_accents( $value );
+        } else {
+            $value = strtr( $value, array(
+                'à' => 'a', 'è' => 'e', 'é' => 'e', 'ì' => 'i',
+                'ò' => 'o', 'ù' => 'u', 'À' => 'a', 'È' => 'e',
+                'É' => 'e', 'Ì' => 'i', 'Ò' => 'o', 'Ù' => 'u',
+            ) );
+        }
         $value = preg_replace( '/[^a-z0-9\s_]+/', ' ', $value );
         $value = preg_replace( '/\s+/', ' ', (string) $value );
         return trim( (string) $value );
@@ -135,7 +217,7 @@ final class PRSTUDIO_UC_Do {
             // the manual and turned the cheapest discovery path in the suite into
             // a dead end -- the model would fall back to a capability search that
             // costs a round trip and often lands somewhere less direct.
-            $map = self::intent_map();
+            $map = self::bilingual_intent_map();
             $intents = array();
             foreach ( $map as $key => $spec ) {
                 $intents[ (string) $key ] = (string) ( $spec['tool'] ?? '' );
@@ -154,7 +236,7 @@ final class PRSTUDIO_UC_Do {
             );
         }
 
-        $map = self::intent_map();
+        $map = self::bilingual_intent_map();
         $normalized = self::normalize( $raw_intent );
         $underscored = str_replace( ' ', '_', $normalized );
 
@@ -189,7 +271,7 @@ final class PRSTUDIO_UC_Do {
             // capability registry knows about operations this map does not.
             return array(
                 'tool'      => 'prstudio_capability_search',
-                'arguments' => array( 'query' => $raw_intent, 'limit' => 10 ),
+                'arguments' => array( 'query' => $raw_intent, 'limit' => 10, 'include_legacy' => true ),
                 'routing'   => array(
                     'confidence' => 'fallback',
                     'note'       => 'No direct intent match. Searching the capability registry; run prstudio_execute with the chosen capability.',
@@ -249,7 +331,7 @@ final class PRSTUDIO_UC_Do {
 
     /** Machine-readable catalogue of what `prstudio_do` understands. */
     public static function catalogue(): array {
-        $map = self::intent_map();
+        $map = self::bilingual_intent_map();
         $by_tool = array();
         foreach ( $map as $intent => $spec ) {
             $tool = (string) $spec['tool'];
