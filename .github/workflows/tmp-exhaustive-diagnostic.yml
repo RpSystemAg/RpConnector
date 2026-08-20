@@ -1,0 +1,39 @@
+name: Temporary exhaustive diagnostic
+
+on:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Run checkpoint and print hard-failure evidence
+        shell: bash
+        run: |
+          set +e
+          python3 tests/exhaustive-checkpoint.py --write
+          rc=$?
+          set -e
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          summary=json.loads(Path('EXHAUSTIVE-CHECKPOINT-1.0.0.json').read_text(encoding='utf-8'))
+          hard=set(summary.get('hard_failures',[]))
+          print('HARD_FAILURE_COUNT',len(hard))
+          for raw in Path('EXHAUSTIVE-CHECKPOINT-DETAIL-1.0.0.ndjson').read_text(encoding='utf-8').splitlines():
+              item=json.loads(raw)
+              if item.get('id') in hard:
+                  print(json.dumps({
+                      'id':item.get('id'),
+                      'kind':item.get('kind'),
+                      'implementation_status':item.get('implementation_status'),
+                      'evidence':item.get('evidence'),
+                  },ensure_ascii=False,sort_keys=True))
+          print('NON_ITEM_HARD_FAILURES',json.dumps(sorted(hard-{json.loads(x).get('id') for x in Path('EXHAUSTIVE-CHECKPOINT-DETAIL-1.0.0.ndjson').read_text(encoding='utf-8').splitlines()}),ensure_ascii=False))
+          PY
+          exit "$rc"
