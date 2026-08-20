@@ -247,10 +247,12 @@ $needSearch = PRSTUDIO_UC_Content_Transaction::patch(array('id' => 501, 'operati
 check(is_wp_error($needSearch) && 'prstudio_content_search_required' === $needSearch->get_error_code(), 'replace_exact without search is typed error');
 $mismatch = PRSTUDIO_UC_Content_Transaction::patch(array('id' => 501, 'operation' => 'replace_exact', 'search' => 'absent', 'replacement' => 'Hi'));
 check(is_wp_error($mismatch) && 'prstudio_content_anchor_count_mismatch' === $mismatch->get_error_code(), 'anchor count mismatch is typed 409');
-$patched = PRSTUDIO_UC_Content_Transaction::patch(array('id' => 501, 'operation' => 'replace_exact', 'search' => 'Hello', 'replacement' => 'Hi', 'idempotency_marker' => '<!--p2-->'));
-check(!is_wp_error($patched) && true === ($patched['changed'] ?? null) && true === ($patched['db_verified'] ?? null), 'patch replace_exact mutates and readbacks');
+$patched = PRSTUDIO_UC_Content_Transaction::patch(array('id' => 501, 'operation' => 'replace_exact', 'search' => 'Hello', 'replacement' => 'Hi<!--p2-->', 'idempotency_marker' => '<!--p2-->'));
+$patched_diag = is_wp_error($patched) ? array('error' => $patched->get_error_code(), 'message' => $patched->get_error_message(), 'data' => $patched->get_error_data()) : $patched;
+check(!is_wp_error($patched) && true === ($patched['changed'] ?? null) && true === ($patched['db_verified'] ?? null), 'patch replace_exact mutates and readbacks :: ' . json_encode($patched_diag));
+check(str_contains((string) get_post(501)->post_content, 'Hi<!--p2--> world'), 'patch persists replacement and caller-owned idempotency marker');
 schema_ok($patched, $patchCap['output_schema'], 'patch success output conforms');
-$replayPatch = PRSTUDIO_UC_Content_Transaction::patch(array('id' => 501, 'operation' => 'replace_exact', 'search' => 'Hello', 'replacement' => 'Hi', 'idempotency_marker' => '<!--p2-->'));
+$replayPatch = PRSTUDIO_UC_Content_Transaction::patch(array('id' => 501, 'operation' => 'replace_exact', 'search' => 'Hello', 'replacement' => 'Hi<!--p2-->', 'idempotency_marker' => '<!--p2-->'));
 check(!is_wp_error($replayPatch) && false === $replayPatch['changed'] && 'marker_already_present' === ($replayPatch['reason'] ?? ''), 'patch marker replay is no-change');
 schema_ok($replayPatch, $patchCap['output_schema'], 'patch replay output conforms');
 $urlPatch = PRSTUDIO_UC_Content_Transaction::patch(array('url' => get_permalink(501), 'operation' => 'append_once', 'replacement' => 'END'));
