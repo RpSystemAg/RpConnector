@@ -921,7 +921,7 @@ HTML;
         $tools[]=self::tool('browser_reload','Reload browser tab','Use this to reload the selected Browser tab.',self::obj($tab),self::annotations(false,false,false,true));
         $tools[]=self::tool('browser_wait','Wait in browser','Use this to wait for a selector, URL or load state without re-navigating.',self::obj(array_merge($selector,array('mode'=>self::str('selector, url or load.',array('enum'=>array('selector','url','load'))),'url'=>self::str('Expected URL/pattern.'),'state'=>self::str('Load state.'),'timeout_ms'=>self::integer('',1,120000))),array('mode')),self::annotations(true,false,true,true));
         $tools[]=self::tool('browser_snapshot','Browser interactive snapshot','Read the page before acting on it: a bounded screenshot plus element targets carrying a reusable target_ref, with screenshot-to-page coordinates. Use browser_find instead when you already know which element you want.',self::obj(array_merge($selector,array('viewer_only'=>self::bool('Render the current browser_snapshot frame without autonomous widget polling.')))),self::annotations(true,false,true,true));
-        $tools[]=self::tool('browser_find','Find elements by description','Ask which elements match a plain description of what you are looking for, and get back the candidates with their roles, accessible names and a reusable target_ref. Read them, choose, then act with that target_ref. Use this before clicking on an unfamiliar page: a catalogue returns two dozen buttons whose names differ only by product, and picking from a list is reliable where a single silent guess is not.',self::obj(array_merge($tab,array('query'=>self::str('Plain description of the element, for example: add to cart button for the first product.'),'role'=>self::str('Optional ARIA role filter, for example button or link.'),'limit'=>self::number('How many candidates to return. Default 20.'))),array('query')),self::annotations(true,false,true,false));
+        $tools[]=self::tool('browser_find','Find elements by description','Ask which elements match a plain description, and get back candidates with their roles, accessible names and a reusable target_ref. Read them, choose, then act with that target_ref. Use this before clicking on an unfamiliar page: a catalogue returns two dozen buttons whose names differ only by product, and picking from a list is reliable where a single silent guess is not.',self::obj(array_merge($tab,array('query'=>self::str('Plain description of the element, for example: add to cart button for the first product.'),'role'=>self::str('Optional ARIA role filter, for example button or link.'),'limit'=>self::number('How many candidates to return. Default 20.'))),array('query')),self::annotations(true,false,true,false));
         // Page scripting, for reading state that no other tool exposes. The
         // reference tool for this says outright that it is for debugging and
         // inspection, not for implementing behaviour: anything you would script
@@ -1708,7 +1708,7 @@ HTML;
      * fails if this ever starts under-counting, which is the direction that
      * breaks LAW 9 silently.
      */
-    public const TOKEN_BYTES_RATIO = 4.6;
+    public const TOKEN_BYTES_RATIO = 4.59;
 
     /** Approximate a token count from encoded bytes. Deliberately conservative. */
     private static function approx_tokens( int $bytes ): int { return (int) ceil( $bytes / self::TOKEN_BYTES_RATIO ); }
