@@ -973,9 +973,9 @@ HTML;
         $tools[]=self::tool('engineering_validate','Engineering validation','Run fixed validation profiles (matrix, php_lint, json_validate, no_stub_scan) without accepting arbitrary commands.',self::obj(array('profile'=>self::str('matrix, php_lint, json_validate or no_stub_scan.',array('enum'=>array('matrix','php_lint','json_validate','no_stub_scan'))),'path'=>self::str('Relative path inside the plugin root.')),array(),false),self::annotations(true));
         $tools[]=self::tool('engineering_terminal','Bounded engineering terminal','Run one fixed operation or a set-based batch_flow. In-process inventory/search/SHA/JSON/PHP parse are preferred; arbitrary Bash strings are rejected.',self::obj(array('operation'=>self::str('Fixed operation.',array('enum'=>array('php_version','php_lint','json_validate','test_matrix','repo_map','inventory','sha256','search','archive_inspect','batch_flow'))),'path'=>self::str('Relative path inside the plugin root.'),'query'=>self::str('Literal search query for search.'),'limit'=>self::integer('Maximum files/results.',1,5000),'operations'=>array('type'=>'array','minItems'=>1,'maxItems'=>32,'items'=>self::any_object('Fixed batch operation object.'))),array('operation'),false),self::annotations(true));
 
-        $tools[]=self::tool('browser_live_attach','Attach Browser LIVE','Attach the WebRTC viewer to an existing Browser Agent MediaStream session for one controlled tab. The media path is peer-to-peer; WordPress carries SDP/ICE signaling only.',self::obj(array('tab_id'=>self::integer('Target controlled tab id.',1),'device_id'=>self::str('Optional Browser Agent device id.'),'lane_handle'=>self::str('Lane handle.')),array('tab_id')),self::annotations(true,false,true,true));
-        $tools[]=self::tool('browser_live_signal','Browser LIVE signaling','Widget signaling exchange for the attached WebRTC viewer. Carries bounded SDP/ICE/state metadata only, never media frames.',self::obj(array('session_id'=>self::str('WebRTC signaling session id.'),'after'=>self::integer('Last consumed signaling sequence.',0),'events'=>array('type'=>'array','maxItems'=>32,'items'=>self::any_object('SDP/ICE/state signaling event.'))),array('session_id')),self::annotations(true,false,true,true));
-        $tools[]=self::tool('browser_live_stop','Stop Browser LIVE viewer','Close the viewer side of an attached WebRTC session and notify the Browser Agent.',self::obj(array('session_id'=>self::str('WebRTC signaling session id.'),'reason'=>self::str('Close reason.')),array('session_id')),self::annotations(true,false,true,true));
+        $tools[]=self::tool('browser_live_attach','Attach Browser LIVE','Open the WebRTC viewer for one active Browser Agent tab stream.',self::obj(array('tab_id'=>self::integer('Controlled tab id.',1),'device_id'=>self::str(),'lane_handle'=>self::str()),array('tab_id')),self::annotations(true,false,true,true));
+        $tools[]=self::tool('browser_live_signal','Browser LIVE signaling','App-only bounded SDP/ICE exchange; never media.',self::obj(array('session_id'=>self::str(),'after'=>self::integer('',0),'events'=>array('type'=>'array','maxItems'=>32,'items'=>self::any_object())),array('session_id')),self::annotations(true,false,true,true));
+        $tools[]=self::tool('browser_live_stop','Stop Browser LIVE viewer','Close one viewer session.',self::obj(array('session_id'=>self::str(),'reason'=>self::str()),array('session_id')),self::annotations(true,false,true,true));
         $tools[]=self::tool('browser_live_status','Browser LIVE status','Inspect the private ephemeral WebRTC signaling service and the latest 12-gate diagnostic evidence.',self::obj(),self::annotations(true,false,true,true));
         $tools[]=self::tool('motion_animate','Animate the site with Motion','Apply a Motion (motion.dev) animation to elements on the live front end, or list/remove what is applied. The library is loaded from CDN and the animation renders on every page; re-applying the same selector replaces its animation rather than stacking. Honours prefers-reduced-motion. Verify with browser_open plus browser_screenshot.',self::obj(array('action'=>self::str('apply, list or remove. Default apply.',array('enum'=>array('apply','list','remove'))),'selector'=>self::str('CSS selector, e.g. ".hero h1" or "#pricing .card". Omit with action=remove to clear everything.'),'preset'=>self::str('Animation preset.',array('enum'=>array('fade_in','slide_up','slide_left','slide_right','scale_in','blur_in','stagger_children','parallax','hover_lift'))),'duration'=>self::number('Seconds, 0.1-4.0. Default 0.6.'),'delay'=>self::number('Seconds before it starts, 0-4. Default 0.'),'distance'=>self::integer('Travel/offset in pixels, 0-400. Default 24.',0,400),'once'=>self::bool('Animate only the first time it enters view. Default true.')),array()),self::annotations(false,false,true));
         $tools[]=self::tool('browser_task_control','Control browser task','Cancel or requeue a browser task. Use this when one is stuck: cancel clears it, requeue drops its lease so the next agent poll can claim it again. attempt_count is preserved so you can still tell whether the agent ever tried.',self::obj(array('task_id'=>self::str('Browser task ID.'),'action'=>self::str('cancel or requeue.',array('enum'=>array('cancel','requeue'))),'reason'=>self::str('Operator reason.')),array('task_id','action')),self::annotations(false,false,true));
@@ -1717,7 +1717,10 @@ HTML;
         // prstudio_research_radar, which a test now requires to be advertised.
         // Listing outstanding work is reporting; the surface is for acting, and
         // it stays reachable through capability_search.
-        'prstudio_tool_manual','prstudio_health','prstudio_observe','prstudio_flow',
+        // prstudio_flow remains reachable through capability search; the three
+        // Browser LIVE tools must be listed because the attached Apps widget
+        // cannot discover/call tools withheld from tools/list.
+        'prstudio_tool_manual','prstudio_health','prstudio_observe',
         // prstudio_intervention_record is out of the essential set: it is the
         // largest of the non-core entries and recording an intervention is
         // secondary to performing one. Reachable through capability_search.
@@ -1742,11 +1745,13 @@ HTML;
         // most capable tools and keeping narrow ones. Reaching a click through
         // capability_search costs a lookup the model has no reason to make when
         // the surface it can see appears to be observation-only.
-        'browser_click','browser_type','browser_press','browser_scroll','browser_navigate','browser_batch',
+        // browser_batch remains searchable. LIVE attach/signaling/stop are not
+        // replaceable because the widget needs all three in its WebRTC loop.
+        'browser_click','browser_type','browser_press','browser_scroll','browser_navigate',
         // Discovery before action. Ranking candidates and letting the caller pick
         // is what makes a click on an unfamiliar page reliable; a single silent
         // guess is not correctable because nothing else is ever shown.
-        'browser_find',
+        'browser_find','browser_live_attach','browser_live_signal','browser_live_stop',
         // procedural_skill_get is reachable through capability_search and is a
         // secondary feature: a recipe now needs four confirmations before it is
         // offered at all. Browsing is the primary surface, so when the ceiling
@@ -1900,7 +1905,7 @@ HTML;
      */
     private const INTENT_PROFILES = array(
         'content' => array( 'prstudio_observe', 'prstudio_do', 'wordpress_content_transaction', 'prstudio_intervention_record', 'prstudio_backlog' ),
-        'browser' => array( 'browser_open', 'browser_navigate', 'browser_snapshot', 'browser_click', 'browser_fill', 'browser_screenshot', 'browser_tabs' ),
+        'browser' => array( 'browser_open', 'browser_navigate', 'browser_snapshot', 'browser_click', 'browser_fill', 'browser_screenshot', 'browser_tabs', 'browser_live_attach', 'browser_live_status' ),
         'commerce' => array( 'commerce_product_audit', 'prstudio_observe', 'twin_query', 'prstudio_backlog' ),
         'research' => array( 'prstudio_research_radar', 'prstudio_memory_search', 'prstudio_capability_search', 'prstudio_tool_manual' ),
         'diagnostics' => array( 'prstudio_health', 'agency_status', 'browser_status', 'twin_query', 'prstudio_context_status' ),

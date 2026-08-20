@@ -9,11 +9,13 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
  * frames, blobs, recordings and data URLs are rejected by construction.
  */
 final class PRSTUDIO_UC_Browser_Live {
-    public const VERSION = '1.1.0';
+    public const VERSION = '1.2.0';
     private const TTL = 28800; // 8 hours while active.
     private const STOP_TTL = 120;
     private const MAX_EVENTS = 160;
     private const MAX_EVENT_BYTES = 131072;
+    private const MAX_SIGNALING_BYTES = 1048576;
+    private const TOUCH_INTERVAL = 30;
     private const ALLOWED_TYPES = array( 'offer', 'answer', 'ice', 'state', 'diagnostic', 'restart', 'stop', 'error' );
 
     private static function dir(): string {
@@ -68,13 +70,23 @@ final class PRSTUDIO_UC_Browser_Live {
                 @unlink( self::path( $id ) );
                 return new WP_Error( 'browser_live_session_expired', 'Sessione WebRTC scaduta.', array( 'status'=>410 ) );
             }
+            $before = wp_json_encode( $data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
             $result = $callback( $data );
             if ( is_wp_error( $result ) ) { return $result; }
-            if ( ! self::write_file( $id, $data ) ) { return new WP_Error( 'browser_live_write_failed', 'Persistenza signaling WebRTC fallita.', array( 'status'=>503, 'retryable'=>true ) ); }
+            $after = wp_json_encode( $data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+            // Polls with no new event are reads. Rewriting the entire signaling
+            // document on every 450 ms exchange created pure write amplification
+            // without changing the session. Persist only an actual mutation.
+            if ( ! is_string( $before ) || ! is_string( $after ) || $before !== $after ) {
+                if ( ! self::write_file( $id, $data ) ) { return new WP_Error( 'browser_live_write_failed', 'Persistenza signaling WebRTC fallita.', array( 'status'=>503, 'retryable'=>true ) ); }
+            }
             return $result;
         } finally {
             @flock( $lock, LOCK_UN );
             @fclose( $lock );
+            // mutate() can discover an expired/missing document after opening
+            // its lock. Do not leave one lock file behind for every dead session.
+            if ( ! is_file( self::path( $id ) ) ) { @unlink( self::lock_path( $id ) ); }
         }
     }
 
@@ -91,6 +103,8 @@ final class PRSTUDIO_UC_Browser_Live {
 
     private static function append_events( array &$data, string $from, array $events ) {
         $events = array_slice( $events, 0, 32 );
+        $added = 0;
+        if ( ! isset( $data['events'] ) || ! is_array( $data['events'] ) ) { $data['events'] = array(); }
         foreach ( $events as $event ) {
             if ( ! is_array( $event ) ) { continue; }
             $type = sanitize_key( (string) ( $event['type'] ?? '' ) );
@@ -99,6 +113,7 @@ final class PRSTUDIO_UC_Browser_Live {
             $data['seq'] = (int) ( $data['seq'] ?? 0 ) + 1;
             $row = array( 'seq'=>$data['seq'], 'from'=>$from, 'type'=>$type, 'payload'=>$payload, 'at'=>gmdate( 'c' ) );
             $data['events'][] = $row;
+            $added++;
             if ( 'diagnostic' === $type ) {
                 $gate = sanitize_key( (string) ( $payload['gate'] ?? '' ) );
                 if ( '' !== $gate ) {
@@ -111,6 +126,34 @@ final class PRSTUDIO_UC_Browser_Live {
             if ( 'error' === $type ) { $data['state'] = 'error'; }
         }
         if ( count( $data['events'] ) > self::MAX_EVENTS ) { $data['events'] = array_slice( $data['events'], -self::MAX_EVENTS ); }
+        $encoded = wp_json_encode( $data['events'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+        if ( ! is_string( $encoded ) || strlen( $encoded ) > self::MAX_SIGNALING_BYTES ) {
+            return new WP_Error( 'browser_live_signaling_too_large', 'Sessione signaling WebRTC oltre il limite complessivo.', array( 'status'=>413 ) );
+        }
+        return $added;
+    }
+
+    /** Record what each peer consumed and discard only events delivered to their destination. */
+    private static function acknowledge( array &$data, string $peer, int $after ): bool {
+        if ( ! isset( $data['acks'] ) || ! is_array( $data['acks'] ) ) { $data['acks'] = array( 'agent'=>0, 'viewer'=>0 ); }
+        $current = max( 0, (int) ( $data['acks'][ $peer ] ?? 0 ) );
+        $next = max( $current, min( max( 0, $after ), (int) ( $data['seq'] ?? 0 ) ) );
+        if ( $next === $current ) { return false; }
+        $data['acks'][ $peer ] = $next;
+        $data['events'] = array_values( array_filter( (array) ( $data['events'] ?? array() ), static function( array $event ) use ( $data ): bool {
+            $destination = 'agent' === (string) ( $event['from'] ?? '' ) ? 'viewer' : 'agent';
+            return (int) ( $event['seq'] ?? 0 ) > (int) ( $data['acks'][ $destination ] ?? 0 );
+        } ) );
+        return true;
+    }
+
+    /** Coalesce the active-session lease refresh; polling itself must stay read-only. */
+    private static function touch_active( array &$data, bool $force = false ): bool {
+        if ( in_array( (string) ( $data['state'] ?? '' ), array( 'stopped', 'error', 'closed' ), true ) ) { return false; }
+        $last = strtotime( (string) ( $data['updated_at'] ?? '' ) );
+        if ( ! $force && $last && ( time() - $last ) < self::TOUCH_INTERVAL ) { return false; }
+        $data['updated_at'] = gmdate( 'c' );
+        $data['expires_at'] = time() + self::TTL;
         return true;
     }
 
@@ -159,7 +202,7 @@ final class PRSTUDIO_UC_Browser_Live {
         $data = array(
             'schema_version'=>'1.1.0', 'session_id'=>$id, 'device_id'=>$device_id, 'tab_id'=>$tab_id,
             'created_at'=>gmdate('c',$now), 'updated_at'=>gmdate('c',$now), 'expires_at'=>$now+self::TTL,
-            'state'=>'created', 'viewer_owner'=>'', 'seq'=>0, 'events'=>array(), 'diagnostic'=>array(),
+            'state'=>'created', 'viewer_owner'=>'', 'seq'=>0, 'events'=>array(), 'acks'=>array('agent'=>0,'viewer'=>0), 'diagnostic'=>array(),
             'meta'=>array(
                 'source'=>sanitize_text_field((string)($meta['source']??'')),
                 'title'=>sanitize_text_field((string)($meta['title']??'')),
@@ -198,8 +241,9 @@ final class PRSTUDIO_UC_Browser_Live {
     public static function agent_exchange( string $id, string $device_id, int $after, array $events ) {
         return self::mutate( $id, static function( array &$data ) use ( $device_id, $after, $events ) {
             if ( ! hash_equals( (string)($data['device_id']??''), $device_id ) ) { return new WP_Error('browser_live_device_mismatch','Sessione LIVE non appartiene al dispositivo.',array('status'=>403)); }
-            $ok=self::append_events($data,'agent',$events); if(is_wp_error($ok))return $ok;
-            $data['updated_at']=gmdate('c'); if(!in_array((string)($data['state']??''),array('stopped','error'),true))$data['expires_at']=time()+self::TTL;
+            $acked=self::acknowledge($data,'agent',max(0,$after));
+            $added=self::append_events($data,'agent',$events); if(is_wp_error($added))return $added;
+            self::touch_active($data,$acked||$added>0);
             return self::public_session($data,max(0,$after),'agent');
         } );
     }
@@ -207,8 +251,9 @@ final class PRSTUDIO_UC_Browser_Live {
     public static function viewer_exchange( string $id, string $owner, int $after, array $events ) {
         return self::mutate( $id, static function( array &$data ) use ( $owner, $after, $events ) {
             if ( ''===(string)($data['viewer_owner']??'') || !hash_equals((string)$data['viewer_owner'],$owner) ) { return new WP_Error('browser_live_viewer_mismatch','Viewer LIVE non autorizzato per questa sessione.',array('status'=>403)); }
-            $ok=self::append_events($data,'viewer',$events); if(is_wp_error($ok))return $ok;
-            $data['updated_at']=gmdate('c'); if(!in_array((string)($data['state']??''),array('stopped','error'),true))$data['expires_at']=time()+self::TTL;
+            $acked=self::acknowledge($data,'viewer',max(0,$after));
+            $added=self::append_events($data,'viewer',$events); if(is_wp_error($added))return $added;
+            self::touch_active($data,$acked||$added>0);
             return self::public_session($data,max(0,$after),'viewer');
         } );
     }
