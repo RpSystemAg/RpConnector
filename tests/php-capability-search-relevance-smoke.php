@@ -72,6 +72,8 @@ require PRSTUDIO_UC_DIR . 'includes/class-prstudio-uc-action-index.php';
 require PRSTUDIO_UC_DIR . 'includes/class-prstudio-uc-do.php';
 require PRSTUDIO_UC_DIR . 'includes/class-prstudio-agency.php';
 require PRSTUDIO_UC_DIR . 'includes/class-wpaib-mcp.php';
+require_once PRSTUDIO_UC_DIR . 'includes/orchestrator/class-prstudio-uc-domain-abstract.php';
+require_once PRSTUDIO_UC_DIR . 'includes/orchestrator/class-prstudio-uc-orchestrator.php';
 
 $passed = 0;
 
@@ -317,6 +319,62 @@ if (true !== ($fallback['arguments']['include_legacy'] ?? null)) {
 }
 ++ $passed;
 fwrite(STDOUT, "PASS command fallback includes the complete compatibility catalog\n");
+
+/* -- Orchestrator and domain routing share the same semantic vocabulary ---- */
+
+final class PRSTUDIO_UC_Test_Semantic_Domain extends PRSTUDIO_UC_Domain_Abstract {
+    public function id(): string { return 'orders_customers'; }
+    public function label(): string { return 'Orders and customers'; }
+    public function routes(): array { return array('/orders-manage', '/customers-manage'); }
+    public function keywords(): array { return array('refund', 'order', 'customer'); }
+}
+
+$normalized = PRSTUDIO_UC_Orchestrator::normalize('Velocità del sito');
+if ($normalized !== PRSTUDIO_UC_Action_Lexicon::normalize_text('Velocità del sito')) {
+    fail_relevance('orchestrator normalization no longer delegates to the shared lexicon');
+}
+$it_tokens = PRSTUDIO_UC_Orchestrator::tokens('rimborsa un ordine');
+$en_tokens = PRSTUDIO_UC_Orchestrator::tokens('refund an order');
+if (!$it_tokens || $it_tokens !== $en_tokens) {
+    fail_relevance('orchestrator tokens differ for equivalent Italian and English intent');
+}
+++ $passed;
+fwrite(STDOUT, "PASS orchestrator normalization and tokens use shared concepts\n");
+
+$browser_signal = new ReflectionMethod('PRSTUDIO_UC_Orchestrator', 'has_any_concept');
+$browser_signal->setAccessible(true);
+if (!$browser_signal->invoke(null, 'fai uno screenshot della pagina', 'browser screenshot click console network dom')) {
+    fail_relevance('Italian screenshot intent no longer reaches the semantic browser fast path');
+}
+if ($browser_signal->invoke(null, 'pubblica un articolo', 'browser screenshot click console network dom')) {
+    fail_relevance('content-only intent incorrectly reaches the semantic browser fast path');
+}
+++ $passed;
+fwrite(STDOUT, "PASS semantic browser fast path is bilingual and bounded\n");
+
+$semantic_domain = new PRSTUDIO_UC_Test_Semantic_Domain();
+$it_actions = $semantic_domain->actions(array(), 'rimborsa un ordine', 8, false);
+$en_actions = $semantic_domain->actions(array(), 'refund an order', 8, false);
+$it_action_tools = array_column($it_actions, 'tool_name');
+$en_action_tools = array_column($en_actions, 'tool_name');
+if (!$it_action_tools || $it_action_tools !== $en_action_tools) {
+    fail_relevance('domain action ranking differs for equivalent Italian and English intent');
+}
+foreach (array('tool_name', 'route', 'action', 'parameters', 'index_score') as $field) {
+    if (!array_key_exists($field, $it_actions[0])) {
+        fail_relevance("domain action adapter no longer preserves '{$field}'");
+    }
+}
+if (isset($it_actions[0]['input_schema'])) {
+    fail_relevance('domain action adapter returned input_schema when include_schema=false');
+}
+$it_domain_score = $semantic_domain->score('rimborsa un ordine', array());
+$en_domain_score = $semantic_domain->score('refund an order', array());
+if ($it_domain_score < 1 || $it_domain_score !== $en_domain_score) {
+    fail_relevance('domain keyword scoring is not semantically equivalent in Italian and English');
+}
+++ $passed;
+fwrite(STDOUT, "PASS domain actions and scoring preserve bilingual ranking and shape\n");
 
 /* -- Nonsense still finds nothing ------------------------------------------ */
 
