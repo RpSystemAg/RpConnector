@@ -99,8 +99,27 @@ check( 'browser availability is not hardcoded',
     && ! preg_match( '/browser_agents_online.{0,20}=>\s*[1-9]/', $source ) );
 
 // --- 6. The prompt stays compact; the registry is never serialized in it. --
+//
+// What this actually catches is the handshake growing by construction rather
+// than by decision -- a loop over the 1295 capabilities, a tool list, a schema
+// dump. Any of those lands in the tens of thousands of characters, so the
+// exact ceiling matters far less than having one.
+//
+// It moved from 6000 to 6400 when the global SEO operating policy was added.
+// That is a deliberate product decision, not drift: SEO is the domain this
+// suite is largely bought for, and the handshake carries a ~300 character
+// pointer saying the policy exists and what triggers it. The full method is
+// attached to SEO-domain plans instead, which is why the pointer is a pointer.
+// Before it, the text sat at 5985 against a 6000 ceiling -- fifteen characters
+// of headroom, which is not a budget, it is a coincidence waiting to break the
+// next person who adds a sentence.
+//
+// If this fails, read the diff before raising it again. A few hundred
+// characters of considered prose is a choice someone made; a jump of thousands
+// is the failure mode described above, and the fix for that is never a bigger
+// number.
 check( 'instructions do not serialize the capability registry',
-    strlen( $instructions ) < 6000,
+    strlen( $instructions ) < 6400,
     'length=' . strlen( $instructions ) . ' -- keep the handshake compact' );
 check( 'instructions contain no JSON blob dump',
     ! str_contains( $instructions, '{"' ) && ! str_contains( $instructions, '":[' ) );
