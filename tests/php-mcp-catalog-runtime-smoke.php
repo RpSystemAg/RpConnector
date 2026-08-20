@@ -12,10 +12,10 @@ try {
     fail('MCP tools() must execute without Throwable: ' . get_class($e) . ': ' . $e->getMessage());
 }
 if (!is_array($tools)) fail('tools() must return array');
-// Current master exposed 123 unique tools. PR #8 intentionally adds exactly
-// one public tool, prstudio_research_radar, so the consolidated catalogue is
-// 124. Keep this exact invariant coupled to the runtime uniqueness checks below.
-if (count($tools) !== 124) fail('expected 124 tools, got ' . count($tools));
+// PR31 intentionally removed the four Browser LIVE/WebRTC tools from the
+// 124-tool catalogue. The public runtime therefore has exactly 120 tools.
+// Keep this exact invariant coupled to the uniqueness and removal checks below.
+if (count($tools) !== 120) fail('expected 120 tools, got ' . count($tools));
 $names = [];
 foreach ($tools as $index => $tool) {
     if (!is_array($tool)) fail("tool {$index} is not array");
@@ -33,9 +33,13 @@ foreach ($tools as $index => $tool) {
         if (!is_bool($tool['annotations'][$hint])) fail("{$name} annotation {$hint} must be boolean");
     }
 }
+foreach (['browser_live_attach','browser_live_signal','browser_live_stop','browser_live_status'] as $removed) {
+    if (isset($names[$removed])) fail("removed Browser LIVE tool still advertised: {$removed}");
+}
 $json = json_encode(['jsonrpc'=>'2.0','id'=>1,'result'=>['tools'=>$tools]], JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
 if ($json === false) fail('catalog JSON encoding failed: ' . json_last_error_msg());
 if (strlen($json) > 1024*1024) fail('catalog exceeds 1 MiB response budget: ' . strlen($json));
 pass('MCP tools() executes and returns ' . count($tools) . ' unique tools');
+pass('Removed Browser LIVE tools remain absent from the runtime catalogue');
 pass('Every tool has valid object schemas and boolean annotations');
 pass('Catalog JSON encodes successfully (' . strlen($json) . ' bytes)');
