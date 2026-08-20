@@ -1,4 +1,4 @@
-name: One-time backlog consolidation trigger
+name: One-time backlog consolidation trigger v2
 
 on:
   pull_request:
@@ -56,38 +56,23 @@ jobs:
           set -euo pipefail
           git config user.name "RpConnector integration bot"
           git config user.email "actions@users.noreply.github.com"
-
           merge_pr() {
             local n="$1"
-            if git merge-base --is-ancestor "origin/pr$n" HEAD; then
-              echo "PR #$n already present"
-              return 0
-            fi
+            if git merge-base --is-ancestor "origin/pr$n" HEAD; then echo "PR #$n already present"; return 0; fi
             echo "Integrating PR #$n"
-            if git merge --no-ff --no-edit -X ours "origin/pr$n" -m "Integrate PR #$n into installation candidate"; then
-              return 0
-            fi
+            if git merge --no-ff --no-edit -X ours "origin/pr$n" -m "Integrate PR #$n into installation candidate"; then return 0; fi
             mapfile -t conflicts < <(git diff --name-only --diff-filter=U)
             for path in "${conflicts[@]}"; do
-              if git cat-file -e ":2:$path" 2>/dev/null; then
-                git checkout --ours -- "$path"
-                git add -- "$path"
-              elif git cat-file -e ":3:$path" 2>/dev/null; then
-                git checkout --theirs -- "$path"
-                git add -- "$path"
-              else
-                git rm -f --ignore-unmatch -- "$path" || true
-              fi
+              if git cat-file -e ":2:$path" 2>/dev/null; then git checkout --ours -- "$path"; git add -- "$path";
+              elif git cat-file -e ":3:$path" 2>/dev/null; then git checkout --theirs -- "$path"; git add -- "$path";
+              else git rm -f --ignore-unmatch -- "$path" || true; fi
             done
             test -z "$(git diff --name-only --diff-filter=U)"
             git commit --no-edit
           }
+          for n in 8 9 5 13 12 14 6 4; do merge_pr "$n"; done
 
-          for n in 8 9 5 13 12 14 6 4; do
-            merge_pr "$n"
-          done
-
-      - name: Reconcile the two enterprise schema batches without dropping either
+      - name: Reconcile enterprise batches and Composer maintenance
         shell: bash
         run: |
           set -euo pipefail
@@ -96,69 +81,54 @@ jobs:
           git show origin/pr12:tests/schema-validator-single-file.php > tests/schema-validator-single-file.php
           git show origin/pr13:tests/enterprise-schema-batch-1.php > tests/enterprise-schema-batch-1.php
           git show origin/pr12:tests/enterprise-schema-batch-2.php > tests/enterprise-schema-batch-2.php
-
           git show origin/pr13:prstudio-unified-control/capabilities/enterprise-capability-contracts.json > /tmp/enterprise-batch-1.json
           git show origin/pr12:prstudio-unified-control/capabilities/enterprise-capability-contracts.json > /tmp/enterprise-batch-2.json
           python3 - <<'PY'
           import json
           from pathlib import Path
-          one=json.loads(Path('/tmp/enterprise-batch-1.json').read_text())
-          two=json.loads(Path('/tmp/enterprise-batch-2.json').read_text())
+          one=json.loads(Path('/tmp/enterprise-batch-1.json').read_text()); two=json.loads(Path('/tmp/enterprise-batch-2.json').read_text())
           dialect=(one.get('json_schema_dialect') or one.get('dialect') or two.get('json_schema_dialect') or two.get('dialect') or 'https://json-schema.org/draft/2020-12/schema')
-          contracts={}
-          contracts.update(one.get('contracts') or {})
-          contracts.update(two.get('contracts') or {})
+          contracts={}; contracts.update(one.get('contracts') or {}); contracts.update(two.get('contracts') or {})
           out={'schema_version':'1.0.0','json_schema_dialect':dialect,'dialect':dialect,'batch':'1+2','note':'Unified enterprise capability contracts from PR #13 batch 1 and PR #12 batch 2.','contracts':contracts}
           Path('prstudio-unified-control/capabilities/enterprise-capability-contracts.json').write_text(json.dumps(out,indent=2,ensure_ascii=False)+'\n')
-          p=Path('tests/enterprise-schema-batch-1.php')
-          text=p.read_text()
-          text=text.replace("ok($ids===array_keys((array)$doc['contracts']),'contract source contains exactly current batch in canonical order');","ok(array_values(array_intersect($ids,array_keys((array)$doc['contracts'])))===$ids,'contract source contains the complete batch-1 contract set');")
-          p.write_text(text)
+          p=Path('tests/enterprise-schema-batch-1.php'); s=p.read_text(); s=s.replace("ok($ids===array_keys((array)$doc['contracts']),'contract source contains exactly current batch in canonical order');","ok(array_values(array_intersect($ids,array_keys((array)$doc['contracts'])))===$ids,'contract source contains the complete batch-1 contract set');"); p.write_text(s)
+          c=Path('composer.json'); doc=json.loads(c.read_text()); doc['license']='GPL-2.0-or-later'; doc.setdefault('require-dev',{})['php-stubs/wordpress-stubs']='6.9.4'; c.write_text(json.dumps(doc,indent=2,ensure_ascii=False)+'\n')
           PY
-
           git show origin/pr13:.github/ENTERPRISE-SCHEMA-MIGRATION.md > /tmp/enterprise-track-1.md
           git show origin/pr12:.github/ENTERPRISE-SCHEMA-MIGRATION.md > /tmp/enterprise-track-2.md
           python3 - <<'PY'
           from pathlib import Path
-          a=Path('/tmp/enterprise-track-1.md').read_text().rstrip()
-          b=Path('/tmp/enterprise-track-2.md').read_text().rstrip()
-          Path('.github/ENTERPRISE-SCHEMA-MIGRATION.md').write_text(a+'\n\n---\n\n## Integrated batch 2 record\n\n'+b+'\n')
-          PY
-
-      - name: Preserve both Composer maintenance changes
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-          p=Path('composer.json')
-          doc=json.loads(p.read_text())
-          doc['license']='GPL-2.0-or-later'
-          doc.setdefault('require-dev',{})['php-stubs/wordpress-stubs']='6.9.4'
-          p.write_text(json.dumps(doc,indent=2,ensure_ascii=False)+'\n')
+          a=Path('/tmp/enterprise-track-1.md').read_text().rstrip(); b=Path('/tmp/enterprise-track-2.md').read_text().rstrip(); Path('.github/ENTERPRISE-SCHEMA-MIGRATION.md').write_text(a+'\n\n---\n\n## Integrated batch 2 record\n\n'+b+'\n')
           PY
           composer update --lock --no-install --no-interaction --no-progress
 
-      - name: Wire the researched public MCP contracts into the live catalogue
+      - name: Wire and align public MCP contracts with current Browser URL semantics
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
-          mcp=Path('prstudio-unified-control/includes/class-prstudio-uc-mcp-v5.php')
-          text=mcp.read_text()
-          needle="    private static function tool(string $name,string $title,string $description,array $input,array $annotations): array {\n"
-          block=needle+"        if ( class_exists( 'PRSTUDIO_UC_Public_Tool_Contracts' ) ) {\n            [ $description, $input, $annotations ] = PRSTUDIO_UC_Public_Tool_Contracts::refine( $name, $description, $input, $annotations );\n        }\n"
+          mcp=Path('prstudio-unified-control/includes/class-prstudio-uc-mcp-v5.php'); text=mcp.read_text(); needle="    private static function tool(string $name,string $title,string $description,array $input,array $annotations): array {\n"; block=needle+"        if ( class_exists( 'PRSTUDIO_UC_Public_Tool_Contracts' ) ) {\n            [ $description, $input, $annotations ] = PRSTUDIO_UC_Public_Tool_Contracts::refine( $name, $description, $input, $annotations );\n        }\n"
           if 'PRSTUDIO_UC_Public_Tool_Contracts::refine' not in text:
               if needle not in text: raise SystemExit('MCP tool() signature not found')
               mcp.write_text(text.replace(needle,block,1))
-          autoload=Path('prstudio-unified-control/includes/class-prstudio-uc-autoload.php')
-          a=autoload.read_text()
+          autoload=Path('prstudio-unified-control/includes/class-prstudio-uc-autoload.php'); a=autoload.read_text()
           if "'PRSTUDIO_UC_Public_Tool_Contracts'" not in a:
               marker="        $map = array(\n"
               if marker not in a: raise SystemExit('autoload map marker not found')
               autoload.write_text(a.replace(marker,marker+"            'PRSTUDIO_UC_Public_Tool_Contracts' => 'includes/class-prstudio-uc-public-tool-contracts.php',\n",1))
+
+          contracts=Path('prstudio-unified-control/includes/class-prstudio-uc-public-tool-contracts.php'); s=contracts.read_text()
+          s=s.replace("'browser_open' => 'Open one absolute URL in the controlled Browser Agent and take ownership of the resulting tab.',","'browser_open' => 'Open one HTTP(S) URL or bare web host in the controlled Browser Agent and take ownership of the resulting tab.',")
+          s=s.replace("                    'format' => 'uri',\n                    'pattern' => '^https?://',\n                    'description' => 'Absolute http(s) URL to open in the controlled Browser Agent tab.',","                    'description' => 'HTTP(S) URL or bare web host; missing scheme is normalized to HTTPS by the Browser Agent.',")
+          contracts.write_text(s)
+
+          test=Path('tests/php-mcp-public-contracts-smoke.php'); t=test.read_text()
+          req="require dirname(__DIR__) . '/prstudio-unified-control/includes/class-prstudio-uc-mcp-v5.php';"
+          if "class-prstudio-uc-public-tool-contracts.php" not in t:
+              t=t.replace(req,"require dirname(__DIR__) . '/prstudio-unified-control/includes/class-prstudio-uc-public-tool-contracts.php';\n"+req,1)
+          t=t.replace("expect_contract(($open['properties']['url']['format'] ?? '') === 'uri', 'browser_open.url must advertise URI format');","expect_contract(!isset($open['properties']['url']['format']) && !isset($open['properties']['url']['pattern']), 'browser_open.url must allow the Browser Agent to normalize bare hosts to HTTPS');")
+          test.write_text(t)
           PY
 
       - name: Replace fragmented PR checks with one whole-suite gate
@@ -169,22 +139,17 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           import re
-          workflow_dir=Path('.github/workflows')
-          unified=workflow_dir/'full-surface-execution.yml'
-          text=unified.read_text()
+          workflow_dir=Path('.github/workflows'); unified=workflow_dir/'full-surface-execution.yml'; text=unified.read_text()
           text=re.sub(r'^name:.*$', 'name: Unified full-suite control', text, count=1, flags=re.M)
           text=re.sub(r'(?ms)^on:\n.*?^permissions:','on:\n  pull_request:\n  push:\n    branches:\n      - master\n  workflow_dispatch:\n\npermissions:',text,count=1)
-          text=text.replace('group: full-surface-execution-${{ github.ref }}','group: unified-full-suite-${{ github.ref }}').replace('cancel-in-progress: false','cancel-in-progress: true').replace('name: Parse everything and execute every test-surface file','name: Entire repository suite / real WordPress / authenticated MCP')
-          marker='      - name: Assert exact arithmetic and fail closed\n'
-          extra='''      - name: Assert unified contract, schema and CI wiring closure\n        run: |\n          set -euo pipefail\n          php tests/php-mcp-public-contracts-smoke.php\n          php tests/schema-validator-single-file.php\n          php tests/enterprise-schema-batch-1.php\n          php tests/enterprise-schema-batch-2.php\n          php tests/php-mcp-catalog-runtime-smoke.php\n          python3 tests/test-wiring-audit.py\n\n'''
+          expr='$'+'{{ github.ref }}'; text=text.replace('group: full-surface-execution-'+expr,'group: unified-full-suite-'+expr).replace('cancel-in-progress: false','cancel-in-progress: true').replace('name: Parse everything and execute every test-surface file','name: Entire repository suite / real WordPress / authenticated MCP')
+          marker='      - name: Assert exact arithmetic and fail closed\n'; extra='''      - name: Assert unified contract, schema and CI wiring closure\n        run: |\n          set -euo pipefail\n          php tests/php-mcp-public-contracts-smoke.php\n          php tests/schema-validator-single-file.php\n          php tests/enterprise-schema-batch-1.php\n          php tests/enterprise-schema-batch-2.php\n          php tests/php-mcp-catalog-runtime-smoke.php\n          python3 tests/test-wiring-audit.py\n\n'''
           if 'Assert unified contract, schema and CI wiring closure' not in text:
               if marker not in text: raise SystemExit('unified workflow insertion point not found')
               text=text.replace(marker,extra+marker,1)
           unified.write_text(text)
-
           def strip_event_block(source,event):
-              lines=source.splitlines(True); out=[]; i=0
-              pat=re.compile(r'^  '+re.escape(event)+r':(?:\s*#.*)?\s*$')
+              lines=source.splitlines(True); out=[]; i=0; pat=re.compile(r'^  '+re.escape(event)+r':(?:\s*#.*)?\s*$')
               while i<len(lines):
                   line=lines[i]
                   if pat.match(line.rstrip('\n')):
@@ -198,14 +163,12 @@ jobs:
                       continue
                   out.append(line); i+=1
               return ''.join(out)
-
+          temporary={'consolidate-backlog-20260820.yml','consolidate-backlog-pr-v2-20260820.yml'}
           for p in sorted(workflow_dir.glob('*.yml'))+sorted(workflow_dir.glob('*.yaml')):
-              if p==unified or p.name in {'consolidate-backlog-20260820.yml','consolidate-backlog-pr-20260820.yml'}: continue
-              s=strip_event_block(p.read_text(),'push'); s=strip_event_block(s,'pull_request')
-              s=re.sub(r'^on:\s*\[(.*?)\]\s*$',lambda m:'on: ['+', '.join(x.strip() for x in m.group(1).split(',') if x.strip() not in {'push','pull_request'})+']',s,flags=re.M)
+              if p==unified or p.name in temporary: continue
+              s=strip_event_block(p.read_text(),'push'); s=strip_event_block(s,'pull_request'); s=re.sub(r'^on:\s*\[(.*?)\]\s*$',lambda m:'on: ['+', '.join(x.strip() for x in m.group(1).split(',') if x.strip() not in {'push','pull_request'})+']',s,flags=re.M)
               if re.search(r'(?m)^on:\s*\n(?=\S)',s): s=re.sub(r'(?m)^on:\s*\n','on:\n  workflow_dispatch:\n',s,count=1)
               p.write_text(s)
-
           tokens=('test','smoke','integration','audit','selftest','conformance','fuzz','chaos','invariant','model','benchmark','bench','gate','readiness','slo','verification','assurance','replay','liveness','security'); exts={'.py','.php','.mjs','.js','.sh'}; candidates=[]
           for base in (Path('tests'),Path('prstudio-unified-browser-agent/tests')):
               if not base.is_dir(): continue
@@ -213,15 +176,14 @@ jobs:
                   if q.is_file() and q.suffix.lower() in exts:
                       low=q.name.lower()
                       if any(t in low for t in tokens) or low.endswith('.test.mjs'): candidates.append(q.as_posix())
-          u=unified.read_text().rstrip()+'\n\n# Unified full-suite inventory (executed by full-surface-execution.py):\n'+''.join('# - '+q+'\n' for q in sorted(candidates))
-          unified.write_text(u)
+          unified.write_text(unified.read_text().rstrip()+'\n\n# Unified full-suite inventory (executed by full-surface-execution.py):\n'+''.join('# - '+q+'\n' for q in sorted(candidates)))
           for p in sorted(workflow_dir.glob('*.yml'))+sorted(workflow_dir.glob('*.yaml')):
-              if p==unified or p.name in {'consolidate-backlog-20260820.yml','consolidate-backlog-pr-20260820.yml'}: continue
+              if p==unified or p.name in temporary: continue
               s=p.read_text()
               if re.search(r'(?m)^  (push|pull_request):',s) or re.search(r'(?m)^on:\s*\[[^\]]*(push|pull_request)',s): raise SystemExit(f'fragmented PR/push trigger remains in {p}')
           PY
 
-      - name: Apply the Dependabot action-pin upgrade across the resulting suite
+      - name: Apply Dependabot action-pin upgrade across resulting workflows
         shell: bash
         run: |
           set -euo pipefail
@@ -237,7 +199,7 @@ jobs:
       - name: Remove temporary consolidation machinery before verification
         shell: bash
         run: |
-          rm -f .github/workflows/consolidate-backlog-20260820.yml .github/workflows/consolidate-backlog-pr-20260820.yml
+          rm -f .github/workflows/consolidate-backlog-20260820.yml .github/workflows/consolidate-backlog-pr-v2-20260820.yml
 
       - name: Pre-push deterministic closure checks
         shell: bash
@@ -254,7 +216,7 @@ jobs:
           node --test prstudio-unified-browser-agent/tests/*.test.mjs
           test -z "$(grep -RIl '^<<<<<<<\|^=======\|^>>>>>>>' -- . --exclude-dir=.git || true)"
 
-      - name: Publish one reconciled installation candidate to master
+      - name: Publish reconciled installation candidate to master
         shell: bash
         run: |
           set -euo pipefail
@@ -273,7 +235,7 @@ jobs:
             if [ "$state" = OPEN ]; then gh pr close "$n" --repo "$GITHUB_REPOSITORY" --comment "Integrated/reconciled into master by the 2026-08-20 backlog consolidation; Unified full-suite control is now the sole PR/push gate."; fi
           done
 
-      - name: Cancel superseded runs and dispatch the single generalized gate
+      - name: Cancel superseded runs and dispatch single generalized gate
         shell: bash
         run: |
           set -euo pipefail
