@@ -43,9 +43,15 @@ declare(strict_types=1);
 define('PRSTUDIO_UC_TESTING', true);
 define('ABSPATH', dirname(__DIR__) . '/');
 define('PRSTUDIO_UC_DIR', dirname(__DIR__) . '/prstudio-unified-control/');
+define('WPAIB_DIR', PRSTUDIO_UC_DIR);
 
 if (!function_exists('trailingslashit')) {
     function trailingslashit(string $value): string { return rtrim($value, '/\\') . '/'; }
+}
+if (!function_exists('sanitize_key')) {
+    function sanitize_key($value): string {
+        return strtolower((string)preg_replace('/[^a-z0-9_\-]/', '', str_replace(' ', '_', trim((string)$value))));
+    }
 }
 
 // Capability discovery filters non-callable executors. These inert fixtures
@@ -64,6 +70,8 @@ foreach (array(
 require PRSTUDIO_UC_DIR . 'includes/class-prstudio-uc-capability-registry.php';
 require PRSTUDIO_UC_DIR . 'includes/class-prstudio-uc-action-index.php';
 require PRSTUDIO_UC_DIR . 'includes/class-prstudio-uc-do.php';
+require PRSTUDIO_UC_DIR . 'includes/class-prstudio-agency.php';
+require PRSTUDIO_UC_DIR . 'includes/class-wpaib-mcp.php';
 
 $passed = 0;
 
@@ -216,6 +224,56 @@ if (!empty($detailed_unknown['items']) || 0 !== (int)($detailed_unknown['total_m
 }
 ++ $passed;
 fwrite(STDOUT, "PASS shared action index rejects nonsense\n");
+
+/* -- The legacy public discovery tool delegates to the shared index -------- */
+
+function wpaib_match_result(string $query, bool $includeSchema = false): array {
+    static $method = null;
+    if (!$method) {
+        $method = new ReflectionMethod('WPAIB_MCP', 'capability_matches');
+        $method->setAccessible(true);
+    }
+    return (array)$method->invoke(null, $query, '', 8, $includeSchema);
+}
+
+$wpaib_pairs = array(
+    array('gestisci le spedizioni', 'manage shipping'),
+    array('pubblica un articolo', 'publish an article'),
+    array('ottimizza le immagini', 'optimize images'),
+    array('rimborsa un ordine', 'refund an order'),
+);
+foreach ($wpaib_pairs as [$italian_query, $english_query]) {
+    $it = wpaib_match_result($italian_query);
+    $en = wpaib_match_result($english_query);
+    $it_matches = (array)($it['matches'] ?? array());
+    $en_matches = (array)($en['matches'] ?? array());
+    $it_tools = array_column($it_matches, 'tool_name');
+    $en_tools = array_column($en_matches, 'tool_name');
+    if (!$it_tools || $it_tools !== $en_tools) {
+        fail_relevance("legacy capability ranking differs for '{$italian_query}'/'{$english_query}'");
+    }
+    foreach ($it_matches as $match) {
+        if ('' === (string)($match['route'] ?? '') || 'rpconnector_action_call' !== (string)($match['call']['tool'] ?? '')) {
+            fail_relevance("legacy capability adapter returned a non-routed or non-callable match for '{$italian_query}'");
+        }
+    }
+    if ((int)($it['total_matches'] ?? 0) < count($it_matches)) {
+        fail_relevance("legacy capability adapter returned an invalid total for '{$italian_query}'");
+    }
+    ++$passed;
+    fwrite(STDOUT, "PASS legacy discovery {$italian_query} == {$english_query}\n");
+}
+
+$without_schema = wpaib_match_result('aggiungi un coupon', false);
+$with_schema = wpaib_match_result('create a coupon', true);
+if (array_column((array)$without_schema['matches'], 'tool_name') !== array_column((array)$with_schema['matches'], 'tool_name')) {
+    fail_relevance('legacy schema inclusion changed bilingual ranking');
+}
+if (isset($without_schema['matches'][0]['input_schema']) || !isset($with_schema['matches'][0]['input_schema'])) {
+    fail_relevance('legacy schema inclusion no longer follows include_schema');
+}
+++ $passed;
+fwrite(STDOUT, "PASS legacy discovery schema flag preserves ranking\n");
 
 /* -- The public command front door has equivalent IT/EN fast paths -------- */
 

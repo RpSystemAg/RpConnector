@@ -117,11 +117,14 @@ final class PRSTUDIO_UC_Action_Index {
 		$limit = max( 1, min( 100, $limit ) );
 		$query = trim( $query );
 		$domain = self::sanitize_key_safe( $domain );
-		$route = '' !== trim( $route ) ? '/' . trim( $route, '/' ) : '';
+		$route_input = trim( $route );
+		$routed_only = '*' === $route_input;
+		$route = ! $routed_only && '' !== $route_input ? '/' . trim( $route_input, '/' ) : '';
 		if ( '' === $query ) {
 			$names = array();
 			foreach ( (array) ( $data['tools'] ?? array() ) as $tool_name => $meta ) {
 				if ( '' !== $domain && (string) ( $meta['domain'] ?? '' ) !== $domain ) { continue; }
+				if ( $routed_only && '' === (string) ( $meta['route'] ?? '' ) ) { continue; }
 				if ( '' !== $route && (string) ( $meta['route'] ?? '' ) !== $route ) { continue; }
 				$names[] = (string) $tool_name;
 			}
@@ -129,7 +132,7 @@ final class PRSTUDIO_UC_Action_Index {
 		}
 		if ( isset( $data['tools'][ $query ] ) ) {
 			$exact = (array) $data['tools'][ $query ];
-			if ( ( '' === $domain || (string) ( $exact['domain'] ?? '' ) === $domain ) && ( '' === $route || (string) ( $exact['route'] ?? '' ) === $route ) ) {
+			if ( ( ! $routed_only || '' !== (string) ( $exact['route'] ?? '' ) ) && ( '' === $domain || (string) ( $exact['domain'] ?? '' ) === $domain ) && ( '' === $route || (string) ( $exact['route'] ?? '' ) === $route ) ) {
 				return array( 'items' => array( $exact + array( '_score' => 1000 ) ), 'total_matches' => 1 );
 			}
 		}
@@ -142,6 +145,7 @@ final class PRSTUDIO_UC_Action_Index {
 				foreach ( (array) ( $data['token_index'][ $token ] ?? array() ) as $position => $tool_name ) {
 					$meta = (array) ( $data['tools'][ $tool_name ] ?? array() );
 					if ( '' !== $domain && (string) ( $meta['domain'] ?? '' ) !== $domain ) { continue; }
+					if ( $routed_only && '' === (string) ( $meta['route'] ?? '' ) ) { continue; }
 					if ( '' !== $route && (string) ( $meta['route'] ?? '' ) !== $route ) { continue; }
 					$weight = 12 - min( 8, (int) floor( $position / 12 ) );
 					$concept_scores[ $tool_name ] = max( $concept_scores[ $tool_name ] ?? 0, $weight );
