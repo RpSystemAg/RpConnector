@@ -72,7 +72,6 @@ final class PRSTUDIO_UC_Autoload {
             'PRSTUDIO_UC_Auth' => 'includes/class-prstudio-uc-auth.php',
             'PRSTUDIO_UC_Backend_Executability' => 'includes/class-prstudio-uc-backend-executability.php',
             'PRSTUDIO_UC_Bridge' => 'includes/class-prstudio-uc-bridge.php',
-            'PRSTUDIO_UC_Browser_Live' => 'includes/class-prstudio-uc-browser-live.php',
             'PRSTUDIO_UC_Browser_Orchestrator' => 'includes/class-prstudio-uc-browser-orchestrator-v3.php',
             'PRSTUDIO_UC_Browser_Protocol' => 'includes/class-prstudio-uc-browser-protocol.php',
             'PRSTUDIO_UC_Business_Intelligence' => 'includes/class-prstudio-uc-business-intelligence.php',

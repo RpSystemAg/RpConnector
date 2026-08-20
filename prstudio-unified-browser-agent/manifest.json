@@ -2,83 +2,37 @@
   "manifest_version": 3,
   "name": "PR STUDIO Unified Browser Agent",
   "version": "1.0.0",
-  "description": "Executor Browser PR STUDIO: sessione visuale controllata, input CDP nativo, screenshot percettivi, CWV, recovery Anti-Crash. Pairing e protocollo 3.0.0 restano compatibili.",
-  "minimum_chrome_version": "120",
+  "description": "Browser Agent e Local Studio per PR STUDIO.",
   "permissions": [
-    "tabs",
-    "tabGroups",
-    "scripting",
     "storage",
-    "debugger",
-    "sidePanel",
-    "notifications",
     "alarms",
-    "windows",
-    "system.display",
+    "tabs",
+    "scripting",
+    "debugger",
     "activeTab",
-    "tabCapture",
-    "offscreen",
-    "contextMenus"
+    "downloads",
+    "webNavigation",
+    "sidePanel",
+    "tabGroups"
   ],
-  "host_permissions": [
-    "<all_urls>"
-  ],
+  "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "service-worker.js",
     "type": "module"
   },
+  "action": {
+    "default_title": "PR STUDIO Browser"
+  },
   "side_panel": {
     "default_path": "sidepanel.html"
   },
-  "action": {
-    "default_title": "PR STUDIO Browser",
-    "default_icon": {
-      "16": "icons/icon16.png",
-      "32": "icons/icon32.png",
-      "48": "icons/icon48.png",
-      "128": "icons/icon128.png"
-    }
-  },
-  "icons": {
-    "16": "icons/icon16.png",
-    "32": "icons/icon32.png",
-    "48": "icons/icon48.png",
-    "128": "icons/icon128.png"
-  },
-  "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'"
-  },
   "content_scripts": [
     {
-      "matches": [
-        "http://*/*",
-        "https://*/*"
-      ],
-      "js": [
-        "lib/web-vitals-runtime.js",
-        "page-runtime-main.js"
-      ],
+      "matches": ["<all_urls>"],
+      "js": ["page-runtime.js"],
       "run_at": "document_start",
       "all_frames": true,
-      "world": "MAIN",
-      "match_about_blank": true,
-      "match_origin_as_fallback": true
-    },
-    {
-      "matches": [
-        "http://*/*",
-        "https://*/*"
-      ],
-      "js": [
-        "lib/reconnect-backoff.js",
-        "lib/runtime-dirty-notifier.js",
-        "page-runtime.js"
-      ],
-      "run_at": "document_start",
-      "all_frames": true,
-      "world": "ISOLATED",
-      "match_about_blank": true,
-      "match_origin_as_fallback": true
+      "match_about_blank": true
     }
   ]
 }

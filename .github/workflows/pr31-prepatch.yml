@@ -1,0 +1,40 @@
+name: PR31 complete Browser LIVE removal
+on:
+  pull_request:
+    branches: [master]
+permissions:
+  contents: write
+jobs:
+  complete:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: chatgpt/remove-browser-live-streaming-20260820
+          fetch-depth: 0
+      - name: Apply final removal
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('prstudio-unified-control/includes/class-prstudio-uc-public-tool-contracts.php')
+          s=p.read_text(encoding='utf-8')
+          old="            'browser_live_status' => 'Inspect private WebRTC signaling readiness and the latest Browser Agent diagnostic evidence for this lane.',\n"
+          if old not in s:
+              raise SystemExit('Expected Browser LIVE lead contract not found')
+          p.write_text(s.replace(old,'',1), encoding='utf-8')
+          PY
+          python3 pr31-finalize.py
+          php -l prstudio-unified-control/includes/class-prstudio-uc-mcp-v5.php
+          php -l prstudio-unified-control/includes/class-prstudio-uc-rest.php
+          php -l prstudio-unified-control/includes/class-prstudio-uc-public-tool-contracts.php
+          node --check prstudio-unified-browser-agent/service-worker.js
+          node --check prstudio-unified-browser-agent/sidepanel.js
+          php tests/php-browser-live-signaling-smoke.php
+          node tests/validate-browser-live-webrtc.mjs
+          rm -f pr31-finalize.py .github/workflows/pr31-prepatch.yml .github/workflows/pr31-finalize.yml .github/workflows/pr31-run.yml .github/workflows/pr31-debug.yml .github/workflows/pr31-remove-browser-live.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Remove Browser LIVE streaming surface [pr31-patched]"
+          git push origin HEAD:chatgpt/remove-browser-live-streaming-20260820

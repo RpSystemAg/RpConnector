@@ -53,14 +53,6 @@ import {
   localStepMutates,
 } from "./lib/local-studio.js";
 import {
-  livePrepare,
-  liveSetupMenus,
-  liveHandleContextMenu,
-  liveHandleRuntimeMessage,
-  liveHandleInternalMessage,
-  liveOnCaptureStatusChanged,
-} from "./lib/live-webrtc.js";
-import {
   collectLocalPageHealth,
   collectLocalSemanticSnapshot,
   collectLocalResponsiveSnapshot,
@@ -255,8 +247,6 @@ chrome.runtime.onInstalled.addListener(async (details = {}) => {
   await ensureLocalScheduleAlarms().catch(logError);
   await recoverLocalExecution().catch(logError);
   await reconcileAgentOwnership().catch((error) => appendLog("tab.reconcile.error", serializeError(error)));
-  await liveSetupMenus().catch(logError);
-  await livePrepare().catch(logError);
   const config = await getConfig();
   await setBadge(config?.token && !config.authExpired ? "ON" : (config?.authExpired ? "KEY" : "OFF"), config?.token && !config.authExpired ? "#176b32" : (config?.authExpired ? "#a32020" : "#666666"));
   startPolling().catch(logError);
@@ -273,33 +263,12 @@ chrome.runtime.onStartup.addListener(() => {
   recoverLocalExecution().catch(logError);
   reconcileAgentOwnership().catch(logError);
   reconcileRuntimeSessionsAfterRestart().catch(logError);
-  liveSetupMenus().catch(logError);
-  livePrepare().catch(logError);
   startPolling().catch(logError);
   flushRemoteLogs().catch(() => {});
 });
 
-chrome.contextMenus?.onClicked?.addListener((info, tab) => {
-  liveHandleContextMenu(info, tab).catch(logError);
-});
 
-// action.onClicked is a real activeTab invocation (there is no action popup).
-// If the global Side Panel was already open, its document is reused and cannot
-// infer that the user clicked the icon on a different tab, so forward the exact
-// granted target instead of authorizing whichever tab happens to be active.
-chrome.action?.onClicked?.addListener((tab) => {
-  const tabId = Number(tab?.id || 0);
-  if (!tabId) return;
-  chrome.runtime.sendMessage({
-    target: "prstudio-live-panel",
-    type: "active_tab_granted",
-    detail: { tabId, status: "action_granted" },
-  }).catch(() => {});
-});
 
-chrome.tabCapture?.onStatusChanged?.addListener((info) => {
-  liveOnCaptureStatusChanged(info).catch(logError);
-});
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "prstudio-reconnect") {
@@ -320,17 +289,6 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
-    if (message?.target === "prstudio-live-runtime") {
-      sendResponse(await liveHandleRuntimeMessage(message, sender));
-      return;
-    }
-    if (message?.target === "prstudio-live-runtime-internal") {
-      sendResponse(await liveHandleInternalMessage(message, sender));
-      return;
-    }
-    // Panel state notifications are consumed by sidepanel.js. The worker must
-    // not race it with an "unknown_message" response.
-    if (message?.target === "prstudio-live-panel") return;
     switch (message?.type) {
       case "pair":
         sendResponse(await pairDevice(message.siteUrl, message.code, message.name));

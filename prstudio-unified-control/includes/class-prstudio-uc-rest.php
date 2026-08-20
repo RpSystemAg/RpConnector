@@ -90,24 +90,6 @@ final class PRSTUDIO_UC_REST {
 
 		register_rest_route(
 			self::NS,
-			'/stream/session',
-			array(
-				array( 'methods'=>'POST', 'callback'=>array(__CLASS__,'stream_session_create'), 'permission_callback'=>array('PRSTUDIO_UC_Auth','device_permission') ),
-				array( 'methods'=>'GET', 'callback'=>array(__CLASS__,'stream_active'), 'permission_callback'=>array('PRSTUDIO_UC_Auth','device_permission') ),
-			)
-		);
-
-		register_rest_route(
-			self::NS,
-			'/stream/session/(?P<session>[a-f0-9]{32})',
-			array(
-				array( 'methods'=>array('GET','POST'), 'callback'=>array(__CLASS__,'stream_session_exchange'), 'permission_callback'=>array('PRSTUDIO_UC_Auth','device_permission') ),
-				array( 'methods'=>'DELETE', 'callback'=>array(__CLASS__,'stream_session_close'), 'permission_callback'=>array('PRSTUDIO_UC_Auth','device_permission') ),
-			)
-		);
-
-		register_rest_route(
-			self::NS,
 			'/artifact/screenshot',
 			array(
 				array( 'methods' => 'GET', 'callback' => array( __CLASS__, 'screenshot_status' ), 'permission_callback' => array( 'PRSTUDIO_UC_Auth', 'device_permission' ) ),
@@ -389,40 +371,6 @@ final class PRSTUDIO_UC_REST {
 	}
 
 
-	public static function stream_session_create( WP_REST_Request $request ) {
-		$device=(array)$request->get_param('_prstudio_device');
-		$device_id=(string)($device['device_uuid']??'');
-		$tab_id=absint($request->get_param('tab_id'));
-		$meta=array(
-			'source'=>sanitize_text_field((string)$request->get_param('source')),
-			'title'=>sanitize_text_field((string)$request->get_param('title')),
-			'url'=>esc_url_raw((string)$request->get_param('url')),
-		);
-		return PRSTUDIO_UC_Browser_Live::create_agent_session($device_id,$tab_id,$meta);
-	}
-
-	public static function stream_active( WP_REST_Request $request ) {
-		$device=(array)$request->get_param('_prstudio_device');
-		$tab_id=absint($request->get_param('tab_id'));
-		if($tab_id<=0)return new WP_Error('browser_live_tab_required','tab_id è obbligatorio.',array('status'=>400));
-		$session=PRSTUDIO_UC_Browser_Live::find_active($tab_id,(string)($device['device_uuid']??''));
-		return $session?:array('ok'=>true,'available'=>false,'tab_id'=>$tab_id);
-	}
-
-	public static function stream_session_exchange( WP_REST_Request $request ) {
-		$device=(array)$request->get_param('_prstudio_device');
-		$session=sanitize_text_field((string)$request['session']);
-		$after=max(0,(int)$request->get_param('after'));
-		$events=(array)$request->get_param('events');
-		return PRSTUDIO_UC_Browser_Live::agent_exchange($session,(string)($device['device_uuid']??''),$after,$events);
-	}
-
-	public static function stream_session_close( WP_REST_Request $request ) {
-		$device=(array)$request->get_param('_prstudio_device');
-		$session=sanitize_text_field((string)$request['session']);
-		$reason=sanitize_text_field((string)$request->get_param('reason'));
-		return PRSTUDIO_UC_Browser_Live::close_agent($session,(string)($device['device_uuid']??''),$reason?:'agent_stop');
-	}
 
 	public static function screenshot_status(): array {
 		return PRSTUDIO_UC_Artifacts::status();
@@ -501,7 +449,6 @@ final class PRSTUDIO_UC_REST {
 			'browser_fresh_restart_after_attempts' => 2,
 			'browser_fresh_restart_limit' => 1,
 			'browser_stale_lease_detection' => true,
-			'browser_live_webrtc' => class_exists('PRSTUDIO_UC_Browser_Live') ? PRSTUDIO_UC_Browser_Live::status() : array('ok'=>false,'available'=>false),
 			'mcp_toolchain_version' => class_exists( 'PRSTUDIO_UC_MCP_Toolchain' ) ? PRSTUDIO_UC_MCP_Toolchain::VERSION : '',
 			'mcp_toolchain_native_first' => true,
 			'mcp_toolchain_sidecars_optional' => true,

@@ -14,7 +14,6 @@ final class PRSTUDIO_UC_Public_Tool_Contracts {
     private const TARGETS = array(
         'agency_status',
         'browser_launch',
-        'browser_live_status',
         'browser_open',
         'browser_screenshot',
         'browser_snapshot',
@@ -97,12 +96,6 @@ final class PRSTUDIO_UC_Public_Tool_Contracts {
             case 'browser_launch':
                 self::merge_property( $input, 'device_id', array(
                     'description' => 'Optional paired Browser Agent device ID. Omit to use the active paired device.',
-                ) );
-                break;
-
-            case 'browser_live_status':
-                self::merge_property( $input, 'lane_handle', array(
-                    'description' => 'Execution-lane handle returned by prstudio_context_open.',
                 ) );
                 break;
 
@@ -479,7 +472,6 @@ final class PRSTUDIO_UC_Public_Tool_Contracts {
         $map = array(
             'agency_status' => 'Inspect durable agency queues, schedules, dead letters, Browser availability, and truthful H24 runner health.',
             'browser_launch' => 'Establish the paired Browser Agent human-work context for an execution lane before controlled browsing.',
-            'browser_live_status' => 'Inspect private WebRTC signaling readiness and the latest Browser Agent diagnostic evidence for this lane.',
             'browser_open' => 'Open one HTTP(S) URL or bare web host in the controlled Browser Agent and take ownership of the resulting tab.',
             'browser_screenshot' => 'Capture bounded visual evidence from a controlled Browser Agent tab, with optional OCR only when needed.',
             'browser_snapshot' => 'Observe a controlled tab with a bounded screenshot, DOM/AX targets, and explicit screenshot-to-CDP coordinate context.',
