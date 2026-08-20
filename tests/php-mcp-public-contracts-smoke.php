@@ -61,6 +61,10 @@ $do = $by_name['prstudio_do']['inputSchema'];
 expect_contract(($do['properties']['params']['additionalProperties'] ?? null) === true, 'prstudio_do.params must remain intent-defined/dynamic');
 expect_contract(strpos((string)$do['properties']['params']['description'], 'Dynamic by design') !== false, 'prstudio_do must explain why params is dynamic');
 
+$capability_search = $by_name['prstudio_capability_search']['inputSchema'];
+expect_contract(strpos((string)$capability_search['properties']['query']['description'], 'Italian or English') !== false, 'capability search must advertise its bilingual public contract');
+expect_contract(strpos((string)$capability_search['properties']['include_legacy']['description'], 'Default true') !== false, 'capability search must advertise the complete catalog as its public default');
+
 $observe = $by_name['prstudio_observe']['inputSchema'];
 expect_contract(isset($observe['allOf']) && count($observe['allOf']) >= 4, 'prstudio_observe must advertise target-dependent argument requirements');
 expect_contract(!in_array('target', $observe['required'] ?? array(), true), 'prstudio_observe must preserve id/url target inference compatibility');
