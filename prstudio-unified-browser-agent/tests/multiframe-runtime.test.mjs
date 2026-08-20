@@ -63,3 +63,65 @@ test('recursive OOPIF auto attach targets child debugger sessions directly', asy
  assert.equal(calls[0].method,'Target.setAutoAttach');
  assert.equal(calls[0].params.flatten,true);
 });
+
+// WordPress 7.1, released 19 August 2026, completed the transition to an
+// always-iframed post editor -- every site, including those with legacy
+// metaboxes, where before it depended on the theme and the block API versions
+// in use. The Field Guide calls it out for anyone "reaching across editor
+// document boundaries", and this agent drives the editor for a living.
+//
+// The reason it deserves a test rather than a reading of the code is the shape
+// of the failure. The parent document still exists, still answers, and still
+// contains the admin chrome; asked for the Publish button it truthfully replies
+// that it has no such element. A search that stops at the first frame therefore
+// gets a well-formed, confident, wrong answer -- "not found" is indistinguishable
+// from "not here", and nothing in the response says which one happened.
+//
+// The machinery to survive this already existed before 7.1: frames are
+// aggregated and ranked globally. What was missing was anything asserting it
+// against the editor layout specifically, so a future narrowing of the search
+// to the top frame would pass every other test in this file.
+test('WordPress 7.1 always-iframed editor: controls are found in the editor frame, not the admin document', async()=>{
+ const tabId=71;
+ const adminUrl='https://site.test/wp-admin/post.php?post=12&action=edit';
+ const canvasUrl='https://site.test/wp-admin/post.php?post=12&action=edit&canvas=edit';
+
+ // Frame 0 is wp-admin itself. It holds the admin chrome and genuinely does not
+ // contain the editor controls -- in 7.1 they live one document down.
+ // Frame 6 is the editor canvas iframe.
+ const frames=new Map([
+  [0,{url:adminUrl,name:'Opzioni schermo',holdsEditorControls:false}],
+  [6,{url:canvasUrl,name:'Pubblica',holdsEditorControls:true}],
+ ]);
+
+ for(const [frameId,d] of frames){
+  const port=portFor(tabId,frameId,d.url,payload=>{
+    if(payload.kind==='dom_action'&&payload.action==='page_snapshot'){
+      return {ok:true,url:d.url,title:d.holdsEditorControls?'Editor canvas':'Modifica articolo',
+        text:`text-${frameId}`,runtime:{domVersion:frameId+1},interactionMap:{generation:1},
+        interactive:[describe(d.name,frameId,false)]};
+    }
+    if(payload.kind==='dom_action'&&payload.action==='locate'){
+      // The admin document answers honestly and unhelpfully.
+      if(!d.holdsEditorControls) return {ok:false,error:'element_not_found'};
+      return {ok:true,matched:true,element:describe('Pubblica',frameId,false),match:{strategy:'semantic_rank',score:410}};
+    }
+    return {pong:true};
+  });
+  await chrome.runtime.onConnect.emit(port);
+  await port.onMessage.emit({type:'runtime_ready',domVersion:frameId+1,url:d.url});
+ }
+
+ assert.equal(__test.runtimeFramesForTab(tabId).size,2,'both the admin document and the editor canvas are tracked');
+
+ const snap=await __test.snapshotAcrossRuntimeFrames(tabId,{includeInteractive:true,maxChars:10000},1000);
+ assert.equal(snap.runtime.frameCount,2);
+ assert.deepEqual(new Set(snap.interactive.map(x=>x.frameId)),new Set([0,6]),
+   'the editor frame contributes to the snapshot; a top-frame-only snapshot would show the admin chrome and nothing to edit with');
+ assert.ok(snap.interactive.some(x=>x.frameId===6&&x.accessibleName==='Pubblica'),
+   'the publish control is visible to the agent at all');
+
+ const located=await __test.locateAcrossRuntimeFrames(tabId,'locate',{role:'button',name:'Pubblica',intendedAction:'click'},1000);
+ assert.equal(located.element.frameId,6,'resolved inside the editor iframe rather than the admin document');
+ assert.notEqual(located.element.frameId,0,'the frame that answered element_not_found did not end the search');
+});
