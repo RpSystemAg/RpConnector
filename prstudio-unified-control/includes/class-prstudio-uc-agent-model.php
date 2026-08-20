@@ -1,6 +1,7 @@
 <?php
 // phpcs:ignore missing_direct_file_access_protection -- direct-access guard IS present on the line below; it uses `&& ! defined('PRSTUDIO_UC_TESTING')` for testability and Plugin Check's static pattern doesn't recognize that compound form.
 if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
+require_once __DIR__ . '/class-prstudio-uc-seo-operating-policy.php';
 
 /**
  * Canonical self-model for PR STUDIO.
@@ -67,7 +68,7 @@ final class PRSTUDIO_UC_Agent_Model {
         return array(
             'edit existing wordpress content'   => 'prstudio_do (intent=replace_text|append_text|insert_before|insert_after) -- observes, writes, verifies and records in one turn',
             'create or configure something new' => 'the typed tool for that domain; prstudio_capability_search only when the operation is genuinely unknown',
-            'search console / seo performance'  => 'the typed GSC tools',
+            'search console / seo performance'  => 'apply the global SEO operating policy, then use the typed GSC/SEO/content/browser tools; client context remains site-scoped',
             'live UI, visual problem, canvas'   => 'Browser Agent (browser_* tools); browser_batch for deterministic sequences',
             'animated or visually striking page' => 'the delivery lane already exists end to end: styles-manage append_custom_css for CSS (WordPress Additional CSS, versioned and read-back verified) and frontend-manage inject_script for JS, which persists under a named id and renders in wp_footer on every frontend page (256 KiB cap). Load an animation library from its CDN inside that script if you need one. Then browser_open plus browser_screenshot to confirm it actually renders and animates. Do not conclude the suite cannot style or animate a site',
             'code and repository work'          => 'engineering_repo_map, engineering_validate, engineering_terminal',
@@ -159,6 +160,7 @@ final class PRSTUDIO_UC_Agent_Model {
             . 'RIGHT NOW: ' . self::runtime_line( $tool_count ) . ' '
             . 'You already have every capability listed above. When something seems missing it is almost always a naming difference, not an absence: call prstudio_capability_search once and move on. Do not scan the filesystem, do not audit yourself, and do not attempt to repair the suite -- it is not broken, and a self-fix loop costs turns without changing what is available. The date above is authoritative; never search the web to establish the current date. '
             . 'WHERE WORK LIVES: ' . self::routing_line() . ' '
+            . PRSTUDIO_UC_SEO_Operating_Policy::instruction_fragment() . ' '
             . 'Core loop: execute the shortest verified path. observe -> act -> verify -> record, kept inside one tool whenever a composite fast path exists. When the request already contains a concrete ID, path, URL, query or capability, execute it directly; do not open with backlog or discovery. Per-tool detail: prstudio_tool_manual. '
             . 'CHOOSING A TOOL: call the typed tool directly when you know it. With two or more known deterministic capabilities use prstudio_flow and pass the ordered steps once; use browser_batch for browser-only micro-actions. Do not return to the model between deterministic steps. prstudio_do is for when you do not know the exact tool. Search is only for genuinely unresolved operations. '
             . 'TO CHANGE KNOWN CONTENT FAST: prstudio_do with intent=replace_text, append_text, insert_before or insert_after plus the post ID and exact arguments. It obtains the write_token internally, executes wordpress_content_transaction, verifies persistence and records the intervention. Use prstudio_observe first only when the content itself must inform your decision. '
