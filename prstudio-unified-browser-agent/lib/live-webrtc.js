@@ -11,6 +11,9 @@ const OFFSCREEN_URL = 'offscreen-live.html';
 const API_TIMEOUT_MS = 15000;
 const CAPTUREABLE = /^https?:/i;
 const BLOCKED = /^(chrome|edge|devtools|chrome-extension|about|view-source):/i;
+let offscreenCreationPromise = null;
+let offscreenCloseTimer = null;
+let offscreenUseEpoch = 0;
 
 function safeError(error) {
   return {
@@ -124,15 +127,49 @@ async function hasOffscreen() {
 
 async function ensureOffscreen() {
   if (await hasOffscreen()) return true;
-  await chrome.offscreen.createDocument({
-    url: OFFSCREEN_URL,
-    reasons: ['USER_MEDIA', 'WEB_RTC'],
-    justification: 'Trasmettere in tempo reale la scheda selezionata con MediaStream e WebRTC senza registrare il video.',
-  });
+  if (!offscreenCreationPromise) {
+    offscreenCreationPromise = chrome.offscreen.createDocument({
+      url: OFFSCREEN_URL,
+      reasons: ['USER_MEDIA', 'WEB_RTC'],
+      justification: 'Trasmettere in tempo reale la scheda selezionata con MediaStream e WebRTC senza registrare il video.',
+    }).catch(async (error) => {
+      // Concurrent service-worker events can both observe "no document". If
+      // Chrome reports the singleton race after the other event created it,
+      // the requested invariant is already true.
+      if (await hasOffscreen().catch(() => false)) return;
+      throw error;
+    }).finally(() => { offscreenCreationPromise = null; });
+  }
+  await offscreenCreationPromise;
   return true;
 }
 
+function markOffscreenNeeded() {
+  offscreenUseEpoch += 1;
+  if (offscreenCloseTimer) clearTimeout(offscreenCloseTimer);
+  offscreenCloseTimer = null;
+}
+
+async function closeOffscreenIfIdle() {
+  const epoch = offscreenUseEpoch;
+  if (offscreenCreationPromise) await offscreenCreationPromise.catch(() => {});
+  if (!(await hasOffscreen())) return false;
+  const status = await chrome.runtime.sendMessage({ target: 'prstudio-live-offscreen', type: 'status' }).catch(() => null);
+  if (epoch !== offscreenUseEpoch || !status?.ok || (status.captures || []).length > 0) return false;
+  await chrome.offscreen.closeDocument().catch(() => {});
+  return true;
+}
+
+function scheduleOffscreenClose() {
+  if (offscreenCloseTimer) clearTimeout(offscreenCloseTimer);
+  offscreenCloseTimer = setTimeout(() => {
+    offscreenCloseTimer = null;
+    closeOffscreenIfIdle().catch(() => {});
+  }, 500);
+}
+
 async function offscreenMessage(message) {
+  markOffscreenNeeded();
   await ensureOffscreen();
   const result = await chrome.runtime.sendMessage({ target: 'prstudio-live-offscreen', ...message });
   if (!result?.ok) {
@@ -155,11 +192,15 @@ async function releaseStaleCapture(tabId) {
   const offscreen = await offscreenStatus();
   const ours = (offscreen?.captures || []).some((item) => Number(item?.tabId) === Number(tabId));
   if (ours) return false;
+  if ((offscreen?.captures || []).length > 0) {
+    const error = new Error('Un’altra scheda LIVE è attiva: il recupero di questa cattura non può interromperla. Ferma prima la sessione indicata nel pannello.');
+    error.code = 'LIVE_CAPTURE_CONFLICT';
+    throw error;
+  }
   // A capture owned by this extension survived a failed pipeline but no
   // offscreen session owns it. Closing the orphan offscreen context releases
   // MediaStream tracks authoritatively before the next attempt.
   if (await hasOffscreen()) await chrome.offscreen.closeDocument().catch(() => {});
-  await ensureOffscreen();
   return true;
 }
 
@@ -194,10 +235,10 @@ export async function livePrepare() {
   const permissionCheck = await chrome.permissions.contains({ permissions: ['activeTab', 'tabCapture', 'offscreen', 'contextMenus'] }).catch(() => false);
   await diagnostic('01_manifest_permissions', permissionCheck, { permissions: ['activeTab', 'tabCapture', 'offscreen', 'contextMenus'] });
   if (!permissionCheck) return { ok: false, error: { code: 'LIVE_PERMISSIONS_MISSING', message: 'Permessi LIVE non caricati: ricarica l’estensione aggiornata.' } };
-  await ensureOffscreen();
-  await diagnostic('05_offscreen', true, {});
   await liveSetupMenus();
-  return { ok: true };
+  // Do not keep a hidden document alive while LIVE is off. It is created on
+  // the first explicit start and closed after the last capture stops.
+  return { ok: true, offscreenActive: await hasOffscreen() };
 }
 
 export async function liveSetupMenus() {
@@ -241,6 +282,7 @@ export async function liveStart(tabOrId, source = 'panel') {
 
   let sessionId = '';
   try {
+    markOffscreenNeeded();
     await diagnostic('02_invocation', true, { tabId, source });
     await releaseStaleCapture(tabId);
     await ensureOffscreen();
@@ -273,6 +315,7 @@ export async function liveStart(tabOrId, source = 'panel') {
   } catch (error) {
     if (sessionId) await closeServerSession(sessionId, 'start_failed');
     await setSession(tabId, null);
+    scheduleOffscreenClose();
     const safe = safeError(error);
     notifyPanel({ tabId, status: 'error', message: safe.message });
     return { ok: false, error: safe };
@@ -283,9 +326,10 @@ export async function liveStop(tabId, reason = 'user_stop') {
   tabId = Number(tabId || 0);
   const current = await state();
   const record = current.sessions?.[String(tabId)] || null;
-  await chrome.runtime.sendMessage({ target: 'prstudio-live-offscreen', type: 'stop', tabId, reason }).catch(() => {});
+  if (await hasOffscreen()) await chrome.runtime.sendMessage({ target: 'prstudio-live-offscreen', type: 'stop', tabId, reason }).catch(() => {});
   if (record?.sessionId) await closeServerSession(record.sessionId, reason);
   await setSession(tabId, null);
+  scheduleOffscreenClose();
   notifyPanel({ tabId, status: 'stopped', reason });
   return { ok: true, tabId, stopped: true };
 }
@@ -355,6 +399,7 @@ export async function liveHandleInternalMessage(message) {
     case 'agent_close':
       await closeServerSession(sessionId, String(message.reason || 'agent_close'));
       if (message.tabId) await setSession(Number(message.tabId), null);
+      scheduleOffscreenClose();
       return { ok: true };
     default:
       return { ok: false, error: { code: 'LIVE_INTERNAL_UNKNOWN', message: 'Messaggio interno LIVE sconosciuto.' } };
@@ -371,6 +416,7 @@ export async function liveOnCaptureStatusChanged(info) {
     const record = current.sessions?.[String(tabId)];
     if (record?.sessionId) await closeServerSession(record.sessionId, `capture_${status}`);
     await setSession(tabId, null);
+    scheduleOffscreenClose();
   }
 }
 

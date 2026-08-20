@@ -195,17 +195,17 @@ test('all primary controls register click/change handlers', () => {
 });
 
 test('visibilitychange pauses every panel timer and resumes each refresh loop', async () => {
-  await new Promise((resolve) => setTimeout(resolve, 100));
-  assert.equal(panelTimers.size, 3, 'should have 3 scheduled timers at start');
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(panelTimers.size, 3);
   documentStub.hidden = true;
   await documentStub.dispatchEvent('visibilitychange');
-  assert.equal(panelTimers.size, 0, 'all timers should be cleared when hidden');
+  assert.equal(panelTimers.size, 0);
   const before = calls.length;
   documentStub.hidden = false;
   await documentStub.dispatchEvent('visibilitychange');
-  await new Promise((resolve) => setTimeout(resolve, 50));
-  assert.ok(calls.length > before, 'local and remote refreshes did not resume');
-  assert.equal(panelTimers.size, 3, 'should have 3 timers rearmed after resume');
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.ok(calls.length >= before + 2, 'local and remote refreshes did not resume');
+  assert.equal(panelTimers.size, 3);
 });
 
 test('Automation/Log tabs are interactive and pairing controls remain exposed', async () => {

@@ -45,6 +45,7 @@ final class PRSTUDIO_UC_Recovery_Manager {
         $result=array(
             'ok'=>true,
             'schema'=>false,
+            'audit_schema'=>false,
             'schema_existing'=>$existing_schema,
             'fresh_install'=>$fresh_install,
             'secret'=>false,
@@ -58,6 +59,15 @@ final class PRSTUDIO_UC_Recovery_Manager {
                 $result['schema']=true;
             } catch(Throwable $e) {
                 $result['ok']=false; $result['schema_error']=self::error_record($e);
+            }
+            try {
+                // OAuth and connector requests can emit audit events before the
+                // deferred migration runs, so their table is part of the
+                // minimum fresh-install schema as well.
+                WPAIB_Audit::install();
+                $result['audit_schema']=true;
+            } catch(Throwable $e) {
+                $result['ok']=false; $result['audit_schema_error']=self::error_record($e);
             }
         } else {
             // Existing 2.x/3.x/4.x installations keep their current tables untouched until the deferred migration job runs.
@@ -90,6 +100,9 @@ final class PRSTUDIO_UC_Recovery_Manager {
         try {
             $schema=PRSTUDIO_UC_Store::maybe_upgrade();
             if(!$schema)throw new RuntimeException('schema_not_ready');
+            // Repair installations that predate the unified activation path or
+            // whose legacy bridge was never activated.
+            WPAIB_Audit::install();
             $v3=PRSTUDIO_UC_Migration_V3::run();
             if(empty($v3['completed']))throw new RuntimeException('migration_v3_technical_error:'.(string)($v3['error']??'unknown'));
             $v4=PRSTUDIO_UC_Migration_V4::run();

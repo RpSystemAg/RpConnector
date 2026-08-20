@@ -130,7 +130,7 @@
     clsEntries = [];
     interactions = [];
     interactionMap = new Map();
-    previousInteractionCount = nativeInteractionCount();
+    previousInteractionCount = Math.max(0, nativeInteractionCount());
     // Do not reset the interaction-id estimator here. web-vitals keeps its
     // page-lifetime interaction counter and snapshots the previous count per
     // navigation; resetting min/max would under-count INP after soft-nav/BFCache.

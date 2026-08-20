@@ -56,7 +56,21 @@ def named_in(text: str, candidate: Path) -> bool:
                 return True
     return False
 
+
 reachable: set[Path] = {path for path in candidates if named_in(workflow_text, path)}
+
+# The exact-checkout full-surface runner is itself a workflow root and
+# deliberately discovers every tracked file under both test roots at runtime.
+# Recognize that dynamic edge instead of requiring a duplicate filename list
+# in the workflow comments every time a new test is added.
+dynamic_runner_rel = ".github/scripts/full-surface-execution.py"
+dynamic_runner = ROOT / dynamic_runner_rel
+if dynamic_runner_rel in workflow_text and dynamic_runner.is_file():
+    runner_text = dynamic_runner.read_text(encoding="utf-8", errors="replace")
+    discovers_both_roots = 'Path("tests")' in runner_text and 'Path("prstudio-unified-browser-agent/tests")' in runner_text
+    executes_discovered_files = "tracked_files()" in runner_text and "execution_command(rel)" in runner_text
+    if discovers_both_roots and executes_discovered_files:
+        reachable.update(candidates)
 
 # Fixed-point expansion: a reached runner may invoke another test script.
 changed = True

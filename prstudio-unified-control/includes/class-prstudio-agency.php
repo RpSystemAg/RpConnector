@@ -22,11 +22,12 @@ final class PRSTUDIO_Agency {
 	}
 
 	public static function init(): void {
-		add_action( self::CRON_HOOK, array( __CLASS__, 'cron_tick' ) );
-		add_filter( 'cron_schedules', array( __CLASS__, 'cron_schedules' ) );
+		// The unified Agency Runtime owns the sole worker chain. Keep the legacy
+		// MCP response filters, but remove any scheduler left by older releases so
+		// enabling compatibility mode cannot create a parallel five-minute writer.
+		self::clear_legacy_cron();
 		add_filter( 'rest_pre_dispatch', array( __CLASS__, 'mcp_pre_dispatch' ), 5, 3 );
 		add_filter( 'rest_request_after_callbacks', array( __CLASS__, 'mcp_after_callbacks' ), 20, 3 );
-		if ( ! wp_next_scheduled( self::CRON_HOOK ) ) { wp_schedule_event( time() + 120, 'prstudio_five_minutes', self::CRON_HOOK ); }
 	}
 	public static function activate(): void { self::init(); }
 	public static function deactivate(): void { self::clear_legacy_cron(); }

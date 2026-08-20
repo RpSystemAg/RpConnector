@@ -1,72 +1,73 @@
-export function createRefreshLoop(refresh, { intervalMs = 5_000 } = {}) {
-  if (typeof refresh !== 'function') throw new TypeError('refresh must be a function');
-  const delay = Math.max(1_000, Number.isFinite(Number(intervalMs)) ? Number(intervalMs) : 5_000);
+export function createRefreshLoop(task, options = {}) {
+  if (typeof task !== 'function') throw new TypeError('panel_refresh_task_required');
+  const intervalMs = Math.max(250, Math.min(300_000, Number(options.intervalMs || 10_000)));
+  const scheduleTimer = typeof options.scheduleTimer === 'function' ? options.scheduleTimer : setTimeout;
+  const clearTimer = typeof options.clearTimer === 'function' ? options.clearTimer : clearTimeout;
+  const onError = typeof options.onError === 'function' ? options.onError : () => {};
 
-  let timer = null;
-  let running = false;
+  let stopped = true;
   let paused = false;
-  let stopped = false;
-  let inFlight = null;
+  let timer = null;
+  let running = null;
 
-  const clearTimer = () => {
-    if (timer !== null) clearTimeout(timer);
+  const clearScheduled = () => {
+    if (timer === null) return;
+    clearTimer(timer);
     timer = null;
   };
 
-  const schedule = () => {
-    clearTimer();
-    if (!running || paused || stopped) return;
-    timer = setTimeout(() => {
+  const arm = () => {
+    if (stopped || paused || running || timer !== null) return;
+    timer = scheduleTimer(() => {
       timer = null;
-      void tick();
-    }, delay);
+      void run();
+    }, intervalMs);
   };
 
-  const tick = async () => {
-    if (!running || paused || stopped) return;
-    if (inFlight) {
-      schedule();
-      return inFlight;
-    }
-    inFlight = Promise.resolve().then(refresh);
-    try {
-      await inFlight;
-    } finally {
-      inFlight = null;
-      schedule();
-    }
+  const run = () => {
+    if (stopped || paused) return Promise.resolve(undefined);
+    if (running) return running;
+    running = Promise.resolve()
+      .then(task)
+      .catch((error) => { onError(error); return undefined; })
+      .finally(() => {
+        running = null;
+        arm();
+      });
+    return running;
   };
 
-  return {
-    async start({ immediate = true } = {}) {
-      if (stopped) return;
-      running = true;
+  return Object.freeze({
+    start({ immediate = true } = {}) {
+      if (!stopped) return running || Promise.resolve(undefined);
+      stopped = false;
       paused = false;
-      clearTimer();
-      if (immediate) await tick();
-      else schedule();
+      if (immediate) return run();
+      arm();
+      return Promise.resolve(undefined);
     },
-
     pause() {
       if (stopped) return;
       paused = true;
-      clearTimer();
+      clearScheduled();
     },
-
-    async resume({ immediate = true } = {}) {
-      if (stopped) return;
-      running = true;
+    resume({ immediate = true } = {}) {
+      if (stopped) return Promise.resolve(undefined);
       paused = false;
-      clearTimer();
-      if (immediate) await tick();
-      else schedule();
+      if (immediate) return run();
+      arm();
+      return Promise.resolve(undefined);
     },
-
+    runNow() {
+      return run();
+    },
     stop() {
       stopped = true;
-      running = false;
       paused = false;
-      clearTimer();
+      clearScheduled();
     },
-  };
+    state() {
+      return { stopped, paused, running: Boolean(running), scheduled: timer !== null, intervalMs };
+    },
+  });
 }

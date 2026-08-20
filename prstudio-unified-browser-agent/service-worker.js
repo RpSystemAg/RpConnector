@@ -283,6 +283,20 @@ chrome.contextMenus?.onClicked?.addListener((info, tab) => {
   liveHandleContextMenu(info, tab).catch(logError);
 });
 
+// action.onClicked is a real activeTab invocation (there is no action popup).
+// If the global Side Panel was already open, its document is reused and cannot
+// infer that the user clicked the icon on a different tab, so forward the exact
+// granted target instead of authorizing whichever tab happens to be active.
+chrome.action?.onClicked?.addListener((tab) => {
+  const tabId = Number(tab?.id || 0);
+  if (!tabId) return;
+  chrome.runtime.sendMessage({
+    target: "prstudio-live-panel",
+    type: "active_tab_granted",
+    detail: { tabId, status: "action_granted" },
+  }).catch(() => {});
+});
+
 chrome.tabCapture?.onStatusChanged?.addListener((info) => {
   liveOnCaptureStatusChanged(info).catch(logError);
 });
@@ -2313,7 +2327,10 @@ async function ensurePageRuntime(tabId, frameId = 0) {
     if (pong?.ok) return true;
   } catch { /* content script may predate this extension build */ }
   try {
-    await chrome.scripting.executeScript({ target: { tabId: id, frameIds: [fid] }, files: ["page-runtime.js"] });
+    await chrome.scripting.executeScript({
+      target: { tabId: id, frameIds: [fid] },
+      files: ["lib/reconnect-backoff.js", "lib/runtime-dirty-notifier.js", "page-runtime.js"],
+    });
     const pong = await chrome.tabs.sendMessage(id, { channel: "prstudio-page-runtime", kind: "ping" }, { frameId: fid });
     return Boolean(pong?.ok);
   } catch {
@@ -5223,12 +5240,24 @@ async function captureScreenshotWithFallback(tabId, candidates = [], options = {
       const shot = await screenshotCdp(tabId, "Page.captureScreenshot", candidates[index], deadlineAt);
       if (shot?.data) return capturedShotEvidence(shot, { downgradeLevel: index, params: candidates[index], via: "cdp", actualFormat: String(candidates[index]?.format || "png") });
       lastError = codedError("screenshot_empty", "Chrome DevTools Protocol non ha restituito dati immagine.");
+      const alternate = candidates.findIndex((candidate, candidateIndex) => candidateIndex > index && (candidate?.fromSurface === false) !== (candidates[index]?.fromSurface === false));
+      if (alternate > index && deadlineAt - Date.now() >= 500) {
+        await appendLog("screenshot.capture_source_fallback", { tabId, level: index, nextLevel: alternate, error: serializeError(lastError) }).catch(() => {});
+        index = alternate - 1;
+        continue;
+      }
       await appendLog("screenshot.protocol_fast_fallback", { tabId, level: index, error: serializeError(lastError) }).catch(() => {});
       break;
     } catch (error) {
       lastError = error;
       if (isScreenshotProtocolCompatibilityError(error) && index + 1 < candidates.length && deadlineAt - Date.now() >= 500) {
         await appendLog("screenshot.protocol_downgrade", { tabId, level: index, error: serializeError(error) }).catch(() => {});
+        continue;
+      }
+      const alternate = candidates.findIndex((candidate, candidateIndex) => candidateIndex > index && (candidate?.fromSurface === false) !== (candidates[index]?.fromSurface === false));
+      if (alternate > index && deadlineAt - Date.now() >= 500) {
+        await appendLog("screenshot.capture_source_fallback", { tabId, level: index, nextLevel: alternate, error: serializeError(error) }).catch(() => {});
+        index = alternate - 1;
         continue;
       }
       await appendLog("screenshot.protocol_fast_fallback", { tabId, level: index, error: serializeError(error) }).catch(() => {});
@@ -5296,11 +5325,14 @@ async function captureScreenshot(tabId, fullPage = false, lazyLoad = false, opti
   // guards it cannot drift. The property that matters is that the chain ends
   // with a renderer capture: a tab created with active:false has no compositor
   // surface, and every surface variant photographs nothing at all.
+  const captureTab = await chrome.tabs.get(Number(tabId)).catch(() => null);
+  const preferRenderer = captureTab?.active === false;
   const compatible = buildScreenshotCandidates({
     format,
     quality,
     fullPage: Boolean(fullPage),
     clip: requestedRegion || ((fullPage || perception) ? { x: 0, y: 0, width: plannedWidth, height: plannedHeight, scale } : null),
+    preferRenderer,
   });
   const captured = await captureScreenshotWithFallback(tabId, compatible, { deadlineAt });
   const actualFormat = captured.actualFormat === "jpeg" ? "jpeg" : "png";
@@ -5353,11 +5385,13 @@ async function captureElementScreenshot(tabId, boundingBox, options = {}) {
   }
   await attachDebuggerIfNeeded(tabId, screenshotTimeoutRemainingMs(deadlineAt, SCREENSHOT_ATTACH_TIMEOUT_MS, "cdp_attach"));
   const clip = { x, y, width, height, scale: 1 };
-  const captured = await captureScreenshotWithFallback(tabId, [
-    { format: "png", fromSurface: true, captureBeyondViewport: true, clip },
-    { format: "png", fromSurface: true, clip },
-    { format: "png", clip },
-  ], { deadlineAt });
+  const captureTab = await chrome.tabs.get(Number(tabId)).catch(() => null);
+  const captured = await captureScreenshotWithFallback(tabId, buildScreenshotCandidates({
+    format: "png",
+    fullPage: true,
+    clip,
+    preferRenderer: captureTab?.active === false,
+  }), { deadlineAt });
   const actualFormat = captured.actualFormat === "jpeg" ? "jpeg" : "png";
   const elementComplete = captured.via === "cdp" && Boolean(captured.params?.clip)
     && (!captured.actualDimensionsVerified || (Number(captured.actualWidth || 0) >= Math.ceil(width) && Number(captured.actualHeight || 0) >= Math.ceil(height)));
