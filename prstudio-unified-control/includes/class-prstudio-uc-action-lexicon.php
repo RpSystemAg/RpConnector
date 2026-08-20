@@ -87,15 +87,15 @@ final class PRSTUDIO_UC_Action_Lexicon {
 
 		/* -- What to do ---------------------------------------------------- */
 
-		'create'                         => 'crea creare creo aggiungi aggiungere inserisci inserire nuovo nuova nuovi nuove add new insert',
-		'update edit modify'             => 'aggiorna aggiornare aggiorno modifica modificare modifico cambia cambiare cambio amend',
-		'delete remove'                  => 'elimina eliminare elimino cancella cancellare cancello rimuovi rimuovere rimuovo togli togliere destroy drop',
-		'list show'                      => 'elenca elencare elenco lista liste mostra mostrare mostrami visualizza visualizzare vedi vedere guarda guardare display browse',
-		'get read'                       => 'leggi leggere ottieni ottenere prendi prendere recupera recuperare dammi fetch retrieve',
+		'create add insert new'          => 'crea creare creo aggiungi aggiungere inserisci inserire nuovo nuova nuovi nuove',
+		'update edit modify set change configure' => 'aggiorna aggiornare aggiorno modifica modificare modifico cambia cambiare cambio imposta impostare configura configurare configuro amend setup',
+		'delete remove destroy drop'     => 'elimina eliminare elimino cancella cancellare cancello rimuovi rimuovere rimuovo togli togliere',
+		'list show display browse'       => 'elenca elencare elenco lista liste mostra mostrare mostrami visualizza visualizzare vedi vedere guarda guardare',
+		'get read fetch retrieve'        => 'leggi leggere ottieni ottenere prendi prendere recupera recuperare dammi',
 		'check inspect status list'      => 'controlla controllare controllo ispeziona ispezionare',
 		'verify validate'                => 'verifica verificare verifico valida validare convalida convalidare',
 		'audit'                          => 'traccia tracciare tracciamento auditing',
-		'search find'                    => 'cerca cercare cerco trova trovare trovo ricerca ricercare lookup locate',
+		'search find lookup locate'      => 'cerca cercare cerco trova trovare trovo ricerca ricercare',
 		'publish'                        => 'pubblica pubblicare pubblico',
 		'unpublish draft'                => 'spubblica spubblicare bozza bozze',
 		'upload'                         => 'carica caricare carico',
@@ -110,16 +110,16 @@ final class PRSTUDIO_UC_Action_Lexicon {
 		'activate enable'                => 'attiva attivare attivo abilita abilitare',
 		'deactivate disable'             => 'disattiva disattivare disabilita disabilitare',
 		'schedule'                       => 'pianifica pianificare programma programmare schedula schedulare',
-		'run execute'                    => 'esegui eseguire eseguo lancia lanciare avvia avviare launch start perform',
-		'stop cancel'                    => 'ferma fermare arresta arrestare annulla annullare interrompi interrompere abort',
-		'generate'                       => 'genera generare genero produce',
+		'run execute launch start perform' => 'esegui eseguire eseguo lancia lanciare avvia avviare',
+		'stop cancel abort'              => 'ferma fermare arresta arrestare annulla annullare interrompi interrompere',
+		'generate produce'               => 'genera generare genero',
 		'regenerate rebuild'             => 'rigenera rigenerare ricostruisci ricostruire',
 		'manage administer'              => 'gestisci gestire gestione amministra amministrare',
 		'clone duplicate copy'           => 'clona clonare duplica duplicare copia copiare',
-		'move'                           => 'sposta spostare relocate',
+		'move relocate'                  => 'sposta spostare',
 		'rename'                         => 'rinomina rinominare',
-		'replace'                        => 'sostituisci sostituire rimpiazza rimpiazzare swap',
-		'merge'                          => 'unisci unire fondi fondere combine',
+		'replace swap'                   => 'sostituisci sostituire rimpiazza rimpiazzare',
+		'merge combine'                  => 'unisci unire fondi fondere',
 		'split'                          => 'dividi dividere separa separare',
 		'assign'                         => 'assegna assegnare attribuisci attribuire',
 		'reorder sort'                   => 'riordina riordinare ordina ordinare',
@@ -132,7 +132,6 @@ final class PRSTUDIO_UC_Action_Lexicon {
 		'migrate'                        => 'migra migrare migrazione',
 		'lock'                           => 'blocca bloccare blocco freeze',
 		'unlock'                         => 'sblocca sbloccare unfreeze',
-		'set configure'                  => 'imposta impostare configura configurare configuro setup',
 		'reset'                          => 'azzera azzerare resetta resettare',
 		'test'                           => 'testa testare prova provare',
 		'debug'                          => 'debugga debuggare diagnostica diagnosticare',
@@ -150,13 +149,16 @@ final class PRSTUDIO_UC_Action_Lexicon {
 		/* -- Browser actions ----------------------------------------------- */
 
 		'screenshot'                     => 'schermata schermate istantanea',
-		'click'                          => 'clicca cliccare clicco premi premere tap press',
+		'click tap press'                => 'clicca cliccare clicco premi premere',
 		'type write'                     => 'scrivi scrivere digita digitare',
-		'navigate open goto'             => 'naviga navigare vai andare apri aprire visit',
+		'navigate open goto visit'       => 'naviga navigare vai andare apri aprire',
 		'scroll'                         => 'scorri scorrere',
 		'close'                          => 'chiudi chiudere',
 		'record video'                   => 'registra registrare registrazione filmato',
 		'wait'                           => 'aspetta aspettare attendi attendere',
+		'crop'                           => 'ritaglia ritagliare ritaglio',
+		'resize scale'                   => 'ridimensiona ridimensionare scala scalare',
+		'rotate'                         => 'ruota ruotare rotazione',
 
 		/* -- What to act on ------------------------------------------------ */
 
@@ -177,7 +179,7 @@ final class PRSTUDIO_UC_Action_Lexicon {
 		'video'                          => 'filmati',
 		'file files'                     => 'documento documenti',
 		'directory folder'               => 'cartella cartelle folders',
-		'database'                       => 'db banca-dati',
+		'database'                       => 'db',
 		'table tables'                   => 'tabella tabelle',
 		'query'                          => 'interrogazione interrogazioni',
 		'cache'                          => 'cache',
@@ -192,6 +194,11 @@ final class PRSTUDIO_UC_Action_Lexicon {
 		'tag tags'                       => 'etichetta etichette',
 		'taxonomy taxonomies'            => 'tassonomia tassonomie',
 		'term terms'                     => 'termine termini',
+		'tax taxes vat'                  => 'tassa tasse iva imposta imposte fiscale fiscalita',
+		'invoice invoices billing'       => 'fattura fatture fatturazione',
+		'attribute attributes'           => 'attributo attributi caratteristica caratteristiche',
+		'attachment attachments'         => 'allegato allegati',
+		'gallery galleries'              => 'galleria gallerie',
 		'settings options'               => 'impostazione impostazioni configurazione configurazioni preferenze option',
 		'permissions'                    => 'permesso permessi autorizzazione autorizzazioni permission',
 		'role roles'                     => 'ruolo ruoli',
@@ -207,25 +214,34 @@ final class PRSTUDIO_UC_Action_Lexicon {
 		'price prices'                   => 'prezzo prezzi costo costi',
 		'reviews review'                 => 'recensione recensioni',
 		'payment payments'               => 'pagamento pagamenti',
+		'cart carts basket baskets'      => 'carrello carrelli',
 		'refunds'                        => 'rimborso rimborsi',
 		'seo'                            => 'posizionamento indicizzazione',
-		'sitemap'                        => 'mappa-del-sito',
+		'sitemap'                        => 'sitemap',
 		'redirect redirects'             => 'reindirizzamento reindirizzamenti',
 		'link links'                     => 'collegamento collegamenti',
-		'keyword keywords'               => 'parola-chiave parole-chiave',
+		'keyword keywords'               => 'keyword keywords',
 		'schema'                         => 'schemi markup',
 		'robots'                         => 'robot',
 		'site website'                   => 'sito siti',
-		'frontend'                       => 'front-end vetrina',
+		'frontend'                       => 'vetrina',
 		'browser'                        => 'navigatore chrome chromium',
 		'console'                        => 'consolle',
 		'network'                        => 'rete',
 		'dom'                            => 'dom',
-		'css styles style'               => 'stile stili foglio-di-stile',
+		'css styles style'               => 'stile stili',
 		'javascript'                     => 'js',
 		'font fonts'                     => 'carattere caratteri tipografia',
 		'logo logos'                     => 'loghi',
 		'design'                         => 'grafica aspetto',
+		'header headers'                 => 'header intestazione intestazioni testata testate',
+		'footer footers'                 => 'footer pie fondo',
+		'language languages locale locales' => 'lingua lingue idioma idiomi localizzazione',
+		'translation translations translate' => 'traduzione traduzioni traduci tradurre',
+		'currency currencies'            => 'valuta valute moneta monete',
+		'field fields input inputs'      => 'campo campi input',
+		'button buttons'                 => 'pulsante pulsanti bottone bottoni',
+		'tab tabs'                       => 'scheda schede linguetta linguette',
 		'revision revisions'             => 'revisione revisioni',
 		'metadata meta'                  => 'metadato metadati',
 		'cron'                           => 'cron',
@@ -238,7 +254,7 @@ final class PRSTUDIO_UC_Action_Lexicon {
 		'story stories'                  => 'storia storie',
 		'variation variations'           => 'variazione variazioni variante varianti',
 		'note notes'                     => 'nota',
-		'snapshot'                       => 'istantanea-stato',
+		'snapshot'                       => 'snapshot',
 		'integrity'                      => 'integrita',
 		'state status'                   => 'stato stati',
 		'bulk'                           => 'massa massivo massiva multiplo multipla',
@@ -250,138 +266,253 @@ final class PRSTUDIO_UC_Action_Lexicon {
 		'google'                         => 'google',
 	);
 
+	/** Multi-word surface forms, matched before individual words are reduced. */
+	private const PHRASES = array(
+		'banca dati'              => 'database',
+		'mappa del sito'          => 'sitemap',
+		'mappe del sito'          => 'sitemap',
+		'parola chiave'           => 'keyword keywords',
+		'parole chiave'           => 'keyword keywords',
+		'foglio di stile'         => 'css styles style',
+		'fogli di stile'          => 'css styles style',
+		'front end'               => 'frontend',
+		'istantanea di stato'     => 'snapshot',
+		'istantanea stato'        => 'snapshot',
+		'pie di pagina'           => 'footer footers',
+		'intestazione di pagina'  => 'header headers',
+		'campo di input'          => 'field fields input inputs',
+		'campi di input'          => 'field fields input inputs',
+		'carrello della spesa'    => 'cart carts basket baskets',
+		'tasso di cambio'         => 'currency currencies',
+	);
+
 	/** @var array<string,int>|null word => position of the concept it means */
 	private static ?array $word_to_concept = null;
 
 	/** @var array<int,array<int,string>>|null concept position => catalog tokens */
 	private static ?array $concept_tokens = null;
 
+	/** @var array<string,int>|null normalised phrase => concept position */
+	private static ?array $phrase_to_concept = null;
+
+	/** @var array<string,string>|null token signature => stable concept key */
+	private static ?array $signature_to_key = null;
+
 	/** @var array<string,bool>|null */
 	private static ?array $stop_words = null;
 
-	/**
-	 * Build the reverse lookup once.
-	 *
-	 * A word listed under two concepts keeps its first binding rather than
-	 * silently taking the last: a duplicate is a mistake in the table above, and
-	 * the meaning written first is the one that was chosen deliberately.
-	 */
+	/** Normalise human text and technical identifiers identically everywhere. */
+	public static function normalize_text( string $value ): string {
+		if ( function_exists( 'remove_accents' ) ) {
+			$value = remove_accents( $value );
+		} elseif ( function_exists( 'iconv' ) ) {
+			$ascii = @iconv( 'UTF-8', 'ASCII//TRANSLIT//IGNORE', $value );
+			if ( false !== $ascii ) {
+				$value = $ascii;
+			}
+		}
+		$value = function_exists( 'mb_strtolower' ) ? mb_strtolower( $value, 'UTF-8' ) : strtolower( $value );
+		$value = strtr( $value, array(
+			'à' => 'a', 'á' => 'a', 'â' => 'a', 'ä' => 'a', 'è' => 'e', 'é' => 'e', 'ê' => 'e', 'ë' => 'e',
+			'ì' => 'i', 'í' => 'i', 'î' => 'i', 'ï' => 'i', 'ò' => 'o', 'ó' => 'o', 'ô' => 'o', 'ö' => 'o',
+			'ù' => 'u', 'ú' => 'u', 'û' => 'u', 'ü' => 'u', 'ç' => 'c', 'ñ' => 'n',
+			'À' => 'a', 'Á' => 'a', 'È' => 'e', 'É' => 'e', 'Ì' => 'i', 'Í' => 'i', 'Ò' => 'o', 'Ó' => 'o', 'Ù' => 'u', 'Ú' => 'u',
+		) );
+		$value = str_replace( array( '_', '/', '\\', '-' ), ' ', $value );
+		$value = (string) preg_replace( '/[^a-z0-9]+/', ' ', $value );
+		return trim( (string) preg_replace( '/\s+/', ' ', $value ) );
+	}
+
+	/** @return array<int,string> */
+	private static function words( string $value ): array {
+		$seen = array();
+		foreach ( explode( ' ', self::normalize_text( $value ) ) as $word ) {
+			if ( strlen( $word ) >= 2 ) {
+				$seen[ $word ] = true;
+			}
+		}
+		return array_keys( $seen );
+	}
+
+	/** @param array<int,string> $tokens */
+	private static function token_signature( array $tokens ): string {
+		$tokens = array_values( array_unique( array_filter( array_map( 'strval', $tokens ) ) ) );
+		sort( $tokens, SORT_STRING );
+		return implode( '|', $tokens );
+	}
+
+	/** Build all reverse lookups once. First binding wins for ambiguous words. */
 	private static function boot(): void {
 		if ( is_array( self::$word_to_concept ) ) {
 			return;
 		}
 		self::$word_to_concept = array();
 		self::$concept_tokens  = array();
-		$position              = 0;
-		foreach ( self::CONCEPTS as $catalog_tokens => $surface_words ) {
-			$tokens = array_values( array_filter( explode( ' ', (string) $catalog_tokens ) ) );
+		self::$phrase_to_concept = array();
+		self::$signature_to_key = array();
+		$catalog_positions = array();
+		$position = 0;
+		foreach ( self::CONCEPTS as $catalog_key => $surface_words ) {
+			$tokens = array_values( array_filter( explode( ' ', self::normalize_text( (string) $catalog_key ) ) ) );
 			if ( array() === $tokens ) {
 				continue;
 			}
 			self::$concept_tokens[ $position ] = $tokens;
-			foreach ( array_merge( $tokens, explode( ' ', (string) $surface_words ) ) as $word ) {
-				$word = trim( $word );
-				if ( '' === $word || isset( self::$word_to_concept[ $word ] ) ) {
+			$catalog_positions[ (string) $catalog_key ] = $position;
+			self::$signature_to_key[ self::token_signature( $tokens ) ] = 'concept:' . str_replace( ' ', '_', (string) $catalog_key );
+			foreach ( array_merge( $tokens, explode( ' ', (string) $surface_words ) ) as $surface_word ) {
+				$word = self::normalize_text( (string) $surface_word );
+				if ( '' === $word ) {
 					continue;
 				}
-				self::$word_to_concept[ $word ] = $position;
+				if ( str_contains( $word, ' ' ) ) {
+					if ( ! isset( self::$phrase_to_concept[ $word ] ) ) {
+						self::$phrase_to_concept[ $word ] = $position;
+					}
+					continue;
+				}
+				if ( ! isset( self::$word_to_concept[ $word ] ) ) {
+					self::$word_to_concept[ $word ] = $position;
+				}
 			}
 			++$position;
 		}
-		self::$stop_words = array_fill_keys( array_filter( explode( ' ', self::STOP_WORDS ) ), true );
+		foreach ( self::PHRASES as $phrase => $catalog_key ) {
+			$phrase = self::normalize_text( (string) $phrase );
+			if ( '' !== $phrase && isset( $catalog_positions[ $catalog_key ] ) && ! isset( self::$phrase_to_concept[ $phrase ] ) ) {
+				self::$phrase_to_concept[ $phrase ] = $catalog_positions[ $catalog_key ];
+			}
+		}
+		uksort( self::$phrase_to_concept, static function ( string $left, string $right ): int {
+			$length = strlen( $right ) <=> strlen( $left );
+			return 0 !== $length ? $length : strcmp( $left, $right );
+		} );
+		self::$stop_words = array_fill_keys( self::words( self::STOP_WORDS ), true );
 	}
 
-	/**
-	 * Whether a word carries no intent.
-	 *
-	 * @param string $word Already normalised.
-	 * @return bool
-	 */
+	/** Whether a word carries no intent. */
 	public static function is_stop_word( string $word ): bool {
 		self::boot();
-		return isset( self::$stop_words[ $word ] );
+		$word = self::normalize_text( $word );
+		return '' !== $word && isset( self::$stop_words[ $word ] );
 	}
 
 	/**
-	 * Reduce a query's words to the concepts they mean.
+	 * Legacy word-list entry point retained for existing consumers.
 	 *
-	 * Each returned entry is one unit of intent holding every catalog token that
-	 * satisfies it. A word with no row in the table becomes a concept of its own
-	 * -- product names, plugin slugs and anything this vocabulary has not
-	 * learned still reach the catalog on their own spelling, with a plural fold
-	 * so "widgets" finds "widget" without needing a row.
-	 *
-	 * The result is ordered and deduplicated, so two phrasings that mean the
-	 * same thing produce the identical structure. That is what makes Italian and
-	 * English rank the same rather than merely rank similarly.
-	 *
-	 * @param array<int,string> $words Normalised query words.
-	 * @return array<int,array<int,string>> Concepts, each a list of catalog tokens.
+	 * @param array<int,string> $words
+	 * @return array<int,array<int,string>>
 	 */
 	public static function concepts( array $words ): array {
 		self::boot();
-		$seen     = array();
+		$seen = array();
 		$concepts = array();
-		foreach ( $words as $word ) {
-			$word = trim( (string) $word );
-			if ( '' === $word || self::is_stop_word( $word ) ) {
-				continue;
-			}
-			if ( isset( self::$word_to_concept[ $word ] ) ) {
-				$position = self::$word_to_concept[ $word ];
-				$key      = 'c' . $position;
-				if ( isset( $seen[ $key ] ) ) {
+		foreach ( $words as $raw_word ) {
+			foreach ( self::words( (string) $raw_word ) as $word ) {
+				if ( self::is_stop_word( $word ) ) {
 					continue;
 				}
-				$seen[ $key ] = true;
-				$concepts[]   = self::$concept_tokens[ $position ];
-				continue;
+				$tokens = isset( self::$word_to_concept[ $word ] )
+					? self::$concept_tokens[ self::$word_to_concept[ $word ] ]
+					: self::plural_forms( $word );
+				$signature = self::token_signature( $tokens );
+				if ( '' === $signature || isset( $seen[ $signature ] ) ) {
+					continue;
+				}
+				$seen[ $signature ] = true;
+				$concepts[] = $tokens;
 			}
-			$tokens = self::plural_forms( $word );
-			$key    = 'w' . $tokens[0];
-			if ( isset( $seen[ $key ] ) ) {
-				continue;
-			}
-			$seen[ $key ] = true;
-			$concepts[]   = $tokens;
 		}
 		return $concepts;
 	}
 
-	/**
-	 * Singular and plural spellings of a word this vocabulary does not know.
-	 *
-	 * Only the English -s is folded. Italian plurals change the final vowel
-	 * ("ordine"/"ordini", "pagina"/"pagine") and folding that mechanically
-	 * collides with unrelated words, so Italian plurals are listed explicitly in
-	 * the table above rather than guessed at here.
-	 *
-	 * @param string $word Normalised word.
-	 * @return array<int,string>
-	 */
+	/** Reduce text to ordered, deduplicated units of intent. */
+	public static function query_concepts( string $value ): array {
+		self::boot();
+		$remaining = self::normalize_text( $value );
+		if ( '' === $remaining ) {
+			return array();
+		}
+		$concepts = array();
+		foreach ( self::$phrase_to_concept as $phrase => $position ) {
+			$bounded = ' ' . $remaining . ' ';
+			$needle = ' ' . $phrase . ' ';
+			if ( false === strpos( $bounded, $needle ) ) {
+				continue;
+			}
+			$concepts[] = self::$concept_tokens[ $position ];
+			$remaining = self::normalize_text( str_replace( $needle, ' ', $bounded ) );
+		}
+		$concepts = array_merge( $concepts, self::concepts( self::words( $remaining ) ) );
+		$deduplicated = array();
+		$seen = array();
+		foreach ( $concepts as $tokens ) {
+			$signature = self::token_signature( (array) $tokens );
+			if ( '' !== $signature && ! isset( $seen[ $signature ] ) ) {
+				$seen[ $signature ] = true;
+				$deduplicated[] = array_values( (array) $tokens );
+			}
+		}
+		return $deduplicated;
+	}
+
+	/** Stable, order-independent identities for a concept list. */
+	public static function concept_keys( array $concepts ): array {
+		self::boot();
+		$keys = array();
+		foreach ( $concepts as $concept ) {
+			if ( is_string( $concept ) && ( str_starts_with( $concept, 'concept:' ) || str_starts_with( $concept, 'word:' ) ) ) {
+				$keys[ $concept ] = true;
+				continue;
+			}
+			$tokens = is_array( $concept ) ? $concept : array( (string) $concept );
+			$signature = self::token_signature( $tokens );
+			if ( '' !== $signature ) {
+				$keys[ self::$signature_to_key[ $signature ] ?? ( 'word:' . $signature ) ] = true;
+			}
+		}
+		$keys = array_keys( $keys );
+		sort( $keys, SORT_STRING );
+		return $keys;
+	}
+
+	/** @param array<int,array<int,string>> $concepts */
+	public static function catalog_tokens_for( array $concepts ): array {
+		return self::catalog_tokens( $concepts );
+	}
+
+	public static function equivalent( array $left, array $right ): bool {
+		return self::concept_keys( $left ) === self::concept_keys( $right );
+	}
+
+	/** Whether every concept in needle is present in haystack. */
+	public static function covers( array $haystack, array $needle ): bool {
+		$available = array_fill_keys( self::concept_keys( $haystack ), true );
+		foreach ( self::concept_keys( $needle ) as $key ) {
+			if ( ! isset( $available[ $key ] ) ) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/** Singular and plural spellings for an unknown English-looking token. */
 	private static function plural_forms( string $word ): array {
-		if ( mb_strlen( $word ) < 4 ) {
+		if ( strlen( $word ) < 4 ) {
 			return array( $word );
 		}
 		if ( str_ends_with( $word, 's' ) ) {
-			return array( $word, mb_substr( $word, 0, -1 ) );
+			return array( $word, substr( $word, 0, -1 ) );
 		}
 		return array( $word, $word . 's' );
 	}
 
-	/**
-	 * Every catalog token the query could match, flattened.
-	 *
-	 * Used to pull candidate rows out of the posting lists before scoring.
-	 *
-	 * @param array<int,array<int,string>> $concepts From concepts().
-	 * @return array<int,string>
-	 */
+	/** @param array<int,array<int,string>> $concepts */
 	public static function catalog_tokens( array $concepts ): array {
 		$flat = array();
 		foreach ( $concepts as $tokens ) {
-			foreach ( $tokens as $token ) {
-				$flat[ $token ] = true;
+			foreach ( (array) $tokens as $token ) {
+				$flat[ (string) $token ] = true;
 			}
 		}
 		return array_keys( $flat );

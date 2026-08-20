@@ -46,6 +46,7 @@ final class PRSTUDIO_UC_Autoload {
             'PRSTUDIO_Domain_Orders_Customers' => 'includes/orchestrator/domains/class-prstudio-domain-orders-customers.php',
             'PRSTUDIO_Domain_Security_Identity' => 'includes/orchestrator/domains/class-prstudio-domain-security-identity.php',
             'PRSTUDIO_Report' => 'includes/class-prstudio-report.php',
+            'PRSTUDIO_UC_Action_Lexicon' => 'includes/class-prstudio-uc-action-lexicon.php',
             'PRSTUDIO_UC_Action_Index' => 'includes/class-prstudio-uc-action-index.php',
             'PRSTUDIO_UC_Action_Feasibility' => 'includes/class-prstudio-uc-action-feasibility.php',
             'PRSTUDIO_UC_Audit_Trail' => 'includes/class-prstudio-uc-audit-trail.php',
