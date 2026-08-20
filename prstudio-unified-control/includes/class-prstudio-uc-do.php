@@ -9,26 +9,30 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
  * *names to choose between* — and choosing is where a model with a truncated
  * tool list fails.
  *
- * `prstudio_do` is that front door. Every one of the 111 typed tools, 1,378
- * capabilities and 1,076 catalog actions stays exactly where it was and remains
- * directly callable by name; nothing here removes or hides anything. This adds
- * a route for the common case: the caller states an intent in plain words plus
- * a target, and the router resolves it to the canonical tool with the canonical
- * arguments, then hands it to the normal dispatcher.
+ * `prstudio_do` is that front door. Every typed tool and registered capability
+ * remains directly callable by name. This adds a route for the common case:
+ * the caller states an intent in plain words plus a target, and the router
+ * resolves it to the canonical tool with canonical arguments.
  *
  * The router is deliberately literal. It never guesses at a mutation: when the
  * intent is ambiguous it returns the candidates it considered and refuses to
  * pick, because a wrong guess that writes is far more expensive than a question.
  */
 final class PRSTUDIO_UC_Do {
-    public const VERSION = '1.1.0';
+    public const VERSION = '1.2.0';
 
-    /**
-     * Direct intent synonyms. Order matters only for readability; matching is
-     * exact-first, then longest-phrase, so "open tab" cannot be shadowed by
-     * "open".
-     */
+    /** Direct intent synonyms. Exact-first, then longest/fullest token match. */
     private static function intent_map(): array {
+        $study = array(
+            'tool' => 'agency_submit',
+            'defaults' => array(
+                'playbook' => 'site_study',
+                'context' => array(),
+                'objective' => 'Study the requested website with rendered same-origin coverage, screenshots and verified reusable site memory.',
+            ),
+            'params_into_context' => true,
+            'target_context_arg' => 'url',
+        );
         return array(
             // Browser navigation and interaction.
             'open'        => array( 'tool' => 'browser_open', 'target_arg' => 'url' ),
@@ -73,6 +77,13 @@ final class PRSTUDIO_UC_Do {
             'baseline'    => array( 'tool' => 'browser_capture_baseline' ),
             'compare_baseline' => array( 'tool' => 'browser_compare_baseline' ),
 
+            // Durable generic site learning. It stays behind agency_submit so
+            // tools/list does not grow and every browser step uses normal laws.
+            'study_site' => $study,
+            'study_website' => $study,
+            'learn_site' => $study,
+            'learn_website' => $study,
+
             // Reading and writing site content.
             'read'        => array( 'tool' => 'prstudio_observe' ),
             'observe'     => array( 'tool' => 'prstudio_observe' ),
@@ -113,250 +124,76 @@ final class PRSTUDIO_UC_Do {
     /** Italian aliases for every public fast-path family. */
     private static function italian_aliases(): array {
         return array(
-            'apri' => 'open',
-            'apri_scheda' => 'open_tab',
-            'nuova_scheda' => 'open_tab',
-            'naviga' => 'navigate',
-            'vai' => 'goto',
-            'vai_a' => 'navigate',
-            'visita' => 'visit',
-            'ricarica' => 'reload',
-            'indietro' => 'back',
-            'avanti' => 'forward',
-            'chiudi_scheda' => 'close_tab',
-            'clicca' => 'click',
-            'doppio_clic' => 'double_click',
-            'passa_sopra' => 'hover',
-            'metti_a_fuoco' => 'focus',
-            'compila' => 'fill',
-            'riempi' => 'fill',
-            'scrivi_nel_campo' => 'fill',
-            'digita' => 'type',
-            'premi' => 'press',
-            'seleziona' => 'select',
-            'spunta' => 'check',
-            'scorri' => 'scroll',
-            'schermata' => 'screenshot',
-            'cattura_pagina' => 'screenshot',
-            'istantanea' => 'snapshot',
-            'estrai' => 'extract',
-            'leggi_pagina' => 'extract',
-            'estrai_testo' => 'extract',
-            'attendi' => 'wait',
-            'schede' => 'tabs',
-            'adotta_schede' => 'adopt_tabs',
-            'rete' => 'network',
-            'errori_pagina' => 'page_errors',
-            'controlla_pagina' => 'audit_page',
-            'metriche_vitali' => 'vitals',
-            'accessibilita' => 'accessibility',
-            'scansiona_sito' => 'crawl',
-            'scansiona_link' => 'crawl',
-            'esplora_sito' => 'crawl',
-            'scansiona_sitemap' => 'crawl_sitemap',
-            'riferimento' => 'baseline',
-            'confronta_riferimento' => 'compare_baseline',
-            'leggi' => 'read',
-            'osserva' => 'observe',
-            'ispeziona' => 'inspect',
-            'analizza_pagina' => 'inspect',
-            'modifica_contenuto' => 'edit_content',
-            'sostituisci_testo' => 'replace_text',
-            'aggiungi_testo' => 'append_text',
-            'inserisci_prima' => 'insert_before',
-            'inserisci_dopo' => 'insert_after',
-            'prestazioni_gsc' => 'gsc_performance',
-            'ispeziona_gsc' => 'gsc_inspect',
-            'richiedi_indicizzazione' => 'request_indexing',
-            'sitemap_gsc' => 'gsc_sitemaps',
-            'analizza_prodotto' => 'product_audit',
-            'attivita' => 'backlog',
-            'cose_da_fare' => 'todo',
-            'salute' => 'health',
-            'stato' => 'status',
-            'lavoro' => 'job',
-            'memoria' => 'memory',
-            'mappa_repo' => 'repo_map',
-            'valida_codice' => 'validate_code',
-            'missione' => 'mission',
+            'apri' => 'open','apri_scheda' => 'open_tab','nuova_scheda' => 'open_tab','naviga' => 'navigate','vai' => 'goto','vai_a' => 'navigate','visita' => 'visit','ricarica' => 'reload','indietro' => 'back','avanti' => 'forward','chiudi_scheda' => 'close_tab','clicca' => 'click','doppio_clic' => 'double_click','passa_sopra' => 'hover','metti_a_fuoco' => 'focus','compila' => 'fill','riempi' => 'fill','scrivi_nel_campo' => 'fill','digita' => 'type','premi' => 'press','seleziona' => 'select','spunta' => 'check','scorri' => 'scroll','schermata' => 'screenshot','cattura_pagina' => 'screenshot','istantanea' => 'snapshot','estrai' => 'extract','leggi_pagina' => 'extract','estrai_testo' => 'extract','attendi' => 'wait','schede' => 'tabs','adotta_schede' => 'adopt_tabs','rete' => 'network','errori_pagina' => 'page_errors','controlla_pagina' => 'audit_page','metriche_vitali' => 'vitals','accessibilita' => 'accessibility','scansiona_sito' => 'crawl','scansiona_link' => 'crawl','esplora_sito' => 'crawl','scansiona_sitemap' => 'crawl_sitemap','riferimento' => 'baseline','confronta_riferimento' => 'compare_baseline',
+            'studia_sito' => 'study_site','studia_website' => 'study_website','impara_sito' => 'learn_site','impara_website' => 'learn_website','apprendi_sito' => 'learn_site','apprendi_website' => 'learn_website',
+            'leggi' => 'read','osserva' => 'observe','ispeziona' => 'inspect','analizza_pagina' => 'inspect','modifica_contenuto' => 'edit_content','sostituisci_testo' => 'replace_text','aggiungi_testo' => 'append_text','inserisci_prima' => 'insert_before','inserisci_dopo' => 'insert_after','prestazioni_gsc' => 'gsc_performance','ispeziona_gsc' => 'gsc_inspect','richiedi_indicizzazione' => 'request_indexing','sitemap_gsc' => 'gsc_sitemaps','analizza_prodotto' => 'product_audit','attivita' => 'backlog','cose_da_fare' => 'todo','salute' => 'health','stato' => 'status','lavoro' => 'job','memoria' => 'memory','mappa_repo' => 'repo_map','valida_codice' => 'validate_code','missione' => 'mission',
         );
     }
 
     /** Complete bilingual routing surface, preserving canonical tool targets. */
     private static function bilingual_intent_map(): array {
         $map = self::intent_map();
-        foreach ( self::italian_aliases() as $alias => $canonical ) {
-            if ( isset( $map[ $canonical ] ) ) {
-                $map[ $alias ] = $map[ $canonical ];
-            }
-        }
+        foreach ( self::italian_aliases() as $alias => $canonical ) { if ( isset( $map[ $canonical ] ) ) { $map[ $alias ] = $map[ $canonical ]; } }
         return $map;
     }
 
-    /** Words that carry no routing information and only add noise to matching. */
     private static function noise(): array {
-        return array(
-            'the', 'a', 'an', 'to', 'on', 'in', 'of', 'for', 'this', 'that', 'please', 'now',
-            'il', 'lo', 'la', 'i', 'gli', 'le', 'un', 'una', 'di', 'da', 'per', 'su', 'con', 'del', 'della',
-            'mi', 'ti', 'si', 'e', 'ed', 'o', 'che', 'al', 'allo', 'alla',
-        );
+        return array('the','a','an','to','on','in','of','for','this','that','please','now','how','works','work','every','all','section','sections','il','lo','la','i','gli','le','un','una','di','da','per','su','con','del','della','mi','ti','si','e','ed','o','che','al','allo','alla','questo','questa','tutte','tutti','sezione','sezioni','favore','come','funziona');
     }
 
     private static function normalize( string $value ): string {
         $value = strtolower( trim( $value ) );
-        if ( function_exists( 'remove_accents' ) ) {
-            $value = remove_accents( $value );
-        } else {
-            $value = strtr( $value, array(
-                'à' => 'a', 'è' => 'e', 'é' => 'e', 'ì' => 'i',
-                'ò' => 'o', 'ù' => 'u', 'À' => 'a', 'È' => 'e',
-                'É' => 'e', 'Ì' => 'i', 'Ò' => 'o', 'Ù' => 'u',
-            ) );
-        }
+        if ( function_exists( 'remove_accents' ) ) { $value = remove_accents( $value ); }
+        else { $value = strtr( $value, array('à'=>'a','è'=>'e','é'=>'e','ì'=>'i','ò'=>'o','ù'=>'u','À'=>'a','È'=>'e','É'=>'e','Ì'=>'i','Ò'=>'o','Ù'=>'u') ); }
         $value = preg_replace( '/[^a-z0-9\s_]+/', ' ', $value );
         $value = preg_replace( '/\s+/', ' ', (string) $value );
         return trim( (string) $value );
     }
 
-    /**
-     * Resolves an intent to a concrete { tool, arguments } call.
-     *
-     * @return array|WP_Error
-     */
+    /** Resolves an intent to a concrete { tool, arguments } call. */
     public static function resolve( array $args ) {
         $raw_intent = (string) ( $args['intent'] ?? '' );
         if ( '' === trim( $raw_intent ) ) {
-            // The tool manual documents "call with no arguments to list known
-            // intents", so do exactly that. Returning an error here contradicted
-            // the manual and turned the cheapest discovery path in the suite into
-            // a dead end -- the model would fall back to a capability search that
-            // costs a round trip and often lands somewhere less direct.
-            $map = self::bilingual_intent_map();
-            $intents = array();
-            foreach ( $map as $key => $spec ) {
-                $intents[ (string) $key ] = (string) ( $spec['tool'] ?? '' );
-            }
-            ksort( $intents );
-            return array(
-                'ok' => true,
-                'listing' => 'intents',
-                'count' => count( $intents ),
-                'intents' => $intents,
-                'usage' => 'Call again with intent="<one of the keys above>" plus that tool\'s arguments.',
-                'note' => 'These are fast paths to a single typed tool. For an operation not listed here use prstudio_capability_search.',
-                'version' => self::VERSION,
-                'component' => 'prstudio_do',
-                'suite_version' => defined( 'PRSTUDIO_UC_VERSION' ) ? PRSTUDIO_UC_VERSION : '',
-            );
+            $map = self::bilingual_intent_map();$intents=array();foreach($map as $key=>$spec){$intents[(string)$key]=(string)($spec['tool']??'');}ksort($intents);
+            return array('ok'=>true,'listing'=>'intents','count'=>count($intents),'intents'=>$intents,'usage'=>'Call again with intent="<one of the keys above>" plus that tool\'s arguments.','note'=>'These are fast paths to a single typed tool. For an operation not listed here use prstudio_capability_search.','version'=>self::VERSION,'component'=>'prstudio_do','suite_version'=>defined('PRSTUDIO_UC_VERSION')?PRSTUDIO_UC_VERSION:'');
         }
 
-        $map = self::bilingual_intent_map();
-        $normalized = self::normalize( $raw_intent );
-        $underscored = str_replace( ' ', '_', $normalized );
+        $map=self::bilingual_intent_map();$normalized=self::normalize($raw_intent);$underscored=str_replace(' ','_',$normalized);$match=null;
+        if(isset($map[$underscored]))$match=array('key'=>$underscored,'spec'=>$map[$underscored],'confidence'=>'exact');
+        if(!$match){
+            $tokens=array_values(array_diff(explode(' ',$normalized),self::noise()));$scored=array();
+            foreach($map as $key=>$spec){$key_tokens=explode('_',$key);$overlap=count(array_intersect($key_tokens,$tokens));if($overlap<1)continue;$scored[$key]=($overlap*10)+($overlap===count($key_tokens)?5:0)-count($key_tokens);}
+            arsort($scored,SORT_NUMERIC);$best=array_key_first($scored);
+            if(null!==$best){$top_score=$scored[$best];$tied=array_keys(array_filter($scored,static fn($s):bool=>$s===$top_score));if(count($tied)>1)return self::ambiguous($raw_intent,$tied,$map);$match=array('key'=>$best,'spec'=>$map[$best],'confidence'=>'inferred');}
+        }
+        if(!$match)return array('tool'=>'prstudio_capability_search','arguments'=>array('query'=>$raw_intent,'limit'=>10,'include_legacy'=>true),'routing'=>array('confidence'=>'fallback','note'=>'No direct intent match. Searching the capability registry; run prstudio_execute with the chosen capability.'));
 
-        $match = null;
-        if ( isset( $map[ $underscored ] ) ) {
-            $match = array( 'key' => $underscored, 'spec' => $map[ $underscored ], 'confidence' => 'exact' );
+        $spec=$match['spec'];$params=is_array($args['params']??null)?$args['params']:array();
+        if(!empty($spec['params_into_context'])){
+            $call_args=is_array($spec['defaults']??null)?$spec['defaults']:array();
+            $call_args['context']=array_merge(is_array($call_args['context']??null)?$call_args['context']:array(),$params);
+        }else{
+            $call_args=$params;
+            if(isset($spec['defaults'])&&is_array($spec['defaults']))$call_args=array_merge($spec['defaults'],$call_args);
         }
-        if ( ! $match ) {
-            $tokens = array_values( array_diff( explode( ' ', $normalized ), self::noise() ) );
-            $scored = array();
-            foreach ( $map as $key => $spec ) {
-                $key_tokens = explode( '_', $key );
-                $overlap = count( array_intersect( $key_tokens, $tokens ) );
-                if ( $overlap < 1 ) { continue; }
-                // Longer intent keys that match fully rank above single-word hits.
-                $scored[ $key ] = ( $overlap * 10 ) + ( $overlap === count( $key_tokens ) ? 5 : 0 ) - count( $key_tokens );
-            }
-            arsort( $scored, SORT_NUMERIC );
-            $best = array_key_first( $scored );
-            if ( null !== $best ) {
-                $top_score = $scored[ $best ];
-                $tied = array_keys( array_filter( $scored, static fn( $s ): bool => $s === $top_score ) );
-                if ( count( $tied ) > 1 ) {
-                    return self::ambiguous( $raw_intent, $tied, $map );
-                }
-                $match = array( 'key' => $best, 'spec' => $map[ $best ], 'confidence' => 'inferred' );
-            }
+        $target=$args['target']??null;
+        if(null!==$target&&''!==$target){
+            $target_context_arg=(string)($spec['target_context_arg']??'');$target_arg=(string)($spec['target_arg']??'');
+            if(''!==$target_context_arg){if(!isset($call_args['context'])||!is_array($call_args['context']))$call_args['context']=array();if(!isset($call_args['context'][$target_context_arg]))$call_args['context'][$target_context_arg]=$target;}
+            elseif(''!==$target_arg&&!isset($call_args[$target_arg]))$call_args[$target_arg]=$target;
+            elseif(''===$target_arg&&!isset($call_args['id'])&&is_numeric($target))$call_args['id']=(int)$target;
         }
-
-        if ( ! $match ) {
-            // Falling through to capability search is better than failing: the
-            // capability registry knows about operations this map does not.
-            return array(
-                'tool'      => 'prstudio_capability_search',
-                'arguments' => array( 'query' => $raw_intent, 'limit' => 10, 'include_legacy' => true ),
-                'routing'   => array(
-                    'confidence' => 'fallback',
-                    'note'       => 'No direct intent match. Searching the capability registry; run prstudio_execute with the chosen capability.',
-                ),
-            );
-        }
-
-        $spec = $match['spec'];
-        $call_args = is_array( $args['params'] ?? null ) ? $args['params'] : array();
-        if ( isset( $spec['defaults'] ) && is_array( $spec['defaults'] ) ) {
-            $call_args = array_merge( $spec['defaults'], $call_args );
-        }
-        // A bare `target` is placed on the argument the chosen tool actually
-        // expects, so a caller never has to know each tool's parameter names.
-        $target = $args['target'] ?? null;
-        if ( null !== $target && '' !== $target ) {
-            $target_arg = (string) ( $spec['target_arg'] ?? '' );
-            if ( '' !== $target_arg && ! isset( $call_args[ $target_arg ] ) ) {
-                $call_args[ $target_arg ] = $target;
-            } elseif ( '' === $target_arg && ! isset( $call_args['id'] ) && is_numeric( $target ) ) {
-                $call_args['id'] = (int) $target;
-            }
-        }
-        foreach ( array( 'lane_handle', 'lane_token', 'write_token', 'dry_run', 'tab_id', 'device_id' ) as $passthrough ) {
-            if ( isset( $args[ $passthrough ] ) && ! isset( $call_args[ $passthrough ] ) ) {
-                $call_args[ $passthrough ] = $args[ $passthrough ];
-            }
-        }
-
-        return array(
-            'tool'      => (string) $spec['tool'],
-            'arguments' => $call_args,
-            'routing'   => array(
-                'intent'     => $raw_intent,
-                'matched'    => $match['key'],
-                'confidence' => $match['confidence'],
-            ),
-        );
+        foreach(array('lane_handle','lane_token','write_token','dry_run','tab_id','device_id') as $passthrough){if(isset($args[$passthrough])&&!isset($call_args[$passthrough]))$call_args[$passthrough]=$args[$passthrough];}
+        return array('tool'=>(string)$spec['tool'],'arguments'=>$call_args,'routing'=>array('intent'=>$raw_intent,'matched'=>$match['key'],'confidence'=>$match['confidence']));
     }
 
     private static function ambiguous( string $intent, array $candidates, array $map ) {
-        $options = array();
-        foreach ( array_slice( $candidates, 0, 6 ) as $key ) {
-            $options[] = array( 'intent' => $key, 'tool' => (string) ( $map[ $key ]['tool'] ?? '' ) );
-        }
-        return new WP_Error(
-            'prstudio_do_intent_ambiguous',
-            'That intent matches several operations equally well. Pick one rather than letting the router guess at a mutation.',
-            array(
-                'status'     => 409,
-                'intent'     => $intent,
-                'candidates' => $options,
-                'remedy'     => 'Repeat prstudio_do with one of the listed intent values, or call the tool directly by name.',
-            )
-        );
+        $options=array();foreach(array_slice($candidates,0,6) as $key)$options[]=array('intent'=>$key,'tool'=>(string)($map[$key]['tool']??''));
+        return new WP_Error('prstudio_do_intent_ambiguous','That intent matches several operations equally well. Pick one rather than letting the router guess at a mutation.',array('status'=>409,'intent'=>$intent,'candidates'=>$options,'remedy'=>'Repeat prstudio_do with one of the listed intent values, or call the tool directly by name.'));
     }
 
-    /** Machine-readable catalogue of what `prstudio_do` understands. */
     public static function catalogue(): array {
-        $map = self::bilingual_intent_map();
-        $by_tool = array();
-        foreach ( $map as $intent => $spec ) {
-            $tool = (string) $spec['tool'];
-            if ( ! isset( $by_tool[ $tool ] ) ) { $by_tool[ $tool ] = array(); }
-            $by_tool[ $tool ][] = $intent;
-        }
-        return array(
-            'intent_count' => count( $map ),
-            'intents'      => array_keys( $map ),
-            'by_tool'      => $by_tool,
-            'note'         => 'Every typed tool remains directly callable by name. prstudio_do is an additional route, not a replacement.',
-        );
+        $map=self::bilingual_intent_map();$by_tool=array();foreach($map as $intent=>$spec){$tool=(string)$spec['tool'];if(!isset($by_tool[$tool]))$by_tool[$tool]=array();$by_tool[$tool][]=$intent;}
+        return array('intent_count'=>count($map),'intents'=>array_keys($map),'by_tool'=>$by_tool,'note'=>'Every typed tool remains directly callable by name. prstudio_do is an additional route, not a replacement.');
     }
 }
