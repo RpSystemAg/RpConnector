@@ -7,8 +7,16 @@ final class PRSTUDIO_Domain_Browser extends PRSTUDIO_UC_Domain_Abstract {
 	public function keywords(): array { return array( 'browser','chrome','pagina','scheda','tab','apri','naviga','screenshot','schermata','clic','click','compila','ocr','console','rete','dom','accessibilita','playwright','crawler','crawl','metriche','google trends','search console','merchant center','instagram' ); }
 	public function score( string $objective, array $catalog ): int {
 		$text = PRSTUDIO_UC_Orchestrator::normalize( $objective );
+		$intents = $this->grounded_tool_intents( $objective );
 		$score = parent::score( $objective, $catalog ) + 1;
-		if ( preg_match( '/https?:\/\//i', $objective ) || preg_match( '/\b(apri|aprire|open|nuova scheda|nuove schede|new tab|naviga|goto|screenshot|schermata|browser|chrome|crawler|crawl|instagram)\b/u', $text ) ) { $score += 24; }
+		$browser_intent = false;
+		foreach ( array_keys( $intents ) as $tool_name ) {
+			if ( str_starts_with( $tool_name, 'browser_' ) || str_starts_with( $tool_name, 'gsc_' ) ) {
+				$browser_intent = true;
+				break;
+			}
+		}
+		if ( $this->urls( $objective, array(), $text ) || $browser_intent ) { $score += 24; }
 		foreach ( array( 'google trends', 'google search console', 'search console', 'google merchant', 'merchant center' ) as $marker ) {
 			if ( false !== strpos( $text, $marker ) ) { $score += 12; }
 		}
@@ -17,36 +25,35 @@ final class PRSTUDIO_Domain_Browser extends PRSTUDIO_UC_Domain_Abstract {
 
 	public function workflow( string $objective, array $arguments, array $catalog ): array {
 		$text = PRSTUDIO_UC_Orchestrator::normalize( $objective );
+		$intents = $this->grounded_tool_intents( $objective );
 		$steps = array();
 		$urls = $this->urls( $objective, $arguments, $text );
 		$url = $urls[0] ?? '';
 		$tab_id = isset( $arguments['tab_id'] ) ? (int) $arguments['tab_id'] : ( isset( $arguments['tabId'] ) ? (int) $arguments['tabId'] : 0 );
 
-		/* Search Console is a browser-owned composite that prepares its own tab and
-		 * returns normalized rows. Keep the same five public MCP tool names. */
-		if ( false !== strpos( $text, 'search console' ) || false !== strpos( $text, 'google search console' ) ) {
-			$direct = '';
-			if ( preg_match( '/\b(query|queries|pagina|page|click|clic|impression|ctr|position|posizione|performance|metriche|analytics)\b/u', $text ) ) { $direct = 'search_console_search_analytics'; }
-			elseif ( preg_match( '/\b(sitemap|sitemaps)\b/u', $text ) ) { $direct = 'search_console_sitemaps'; }
-			elseif ( preg_match( '/\b(ispeziona url|ispezione url|url inspection|indicizz|index)\b/u', $text ) ) { $direct = 'search_console_url_inspection'; }
-			elseif ( preg_match( '/\b(siti|sites|proprieta|property|properties)\b/u', $text ) ) { $direct = 'search_console_sites'; }
-			elseif ( preg_match( '/\b(stato|status|collegat|conness)\b/u', $text ) ) { $direct = 'search_console_status'; }
-			if ( '' !== $direct ) {
-				$step = $this->direct_step( $catalog, $direct, $arguments, 'Esegue Search Console nello stesso profilo Chrome e restituisce dati strutturati verificati.' );
-				if ( $step ) { return array( $step ); }
-			}
+		/* Search Console remains a browser-owned composite, but intent names now
+		 * come from the same bilingual command catalogue used by prstudio_do. */
+		$gsc_tools = array(
+			'gsc_search_analytics' => 'search_console_search_analytics',
+			'gsc_sitemaps' => 'search_console_sitemaps',
+			'gsc_url_inspection' => 'search_console_url_inspection',
+		);
+		foreach ( $gsc_tools as $intent_tool => $direct_tool ) {
+			if ( ! isset( $intents[ $intent_tool ] ) ) { continue; }
+			$step = $this->direct_step( $catalog, $direct_tool, $arguments, 'Esegue Search Console nello stesso profilo Chrome e restituisce dati strutturati verificati.' );
+			if ( $step ) { return array( $step ); }
 		}
 
-		$needs_open = (bool) preg_match( '/\b(apri|aprire|open|nuova scheda|nuove schede|new tab|new page)\b/u', $text );
-		$needs_navigate = (bool) preg_match( '/\b(naviga|vai a|goto|carica url)\b/u', $text );
-		$needs_shot = (bool) preg_match( '/\b(screenshot|schermata|cattura pagina|capture)\b/u', $text );
-		$needs_ocr = (bool) preg_match( '/\b(ocr|leggi testo immagine|estrai testo immagine)\b/u', $text );
-		$needs_link_crawl = (bool) preg_match( '/\b(link crawl|crawl link|crawler|scansiona link|scansione link|esplora sito|crawl sito)\b/u', $text );
-		$needs_sitemap_crawl = (bool) preg_match( '/\b(sitemap crawl|crawl sitemap|scansiona sitemap)\b/u', $text );
-		$needs_content = (bool) preg_match( '/\b(contenuto|content|testo pagina|estrai testo|leggi pagina)\b/u', $text );
-		$needs_inspect = (bool) preg_match( '/\b(inspect|ispeziona|ispezione|analizza pagina|acquisisci contenuto|profilo|visuale|lettura)\b/u', $text );
-		$needs_click = (bool) preg_match( '/\b(click|clicca|premi pulsante)\b/u', $text );
-		$needs_fill = (bool) preg_match( '/\b(compila|riempi|fill|scrivi nel campo)\b/u', $text );
+		$needs_open = isset( $intents['browser_open'] );
+		$needs_navigate = isset( $intents['browser_navigate'] );
+		$needs_shot = isset( $intents['browser_screenshot'] );
+		$needs_ocr = in_array( 'ocr', explode( ' ', $text ), true );
+		$needs_link_crawl = isset( $intents['browser_link_crawl'] );
+		$needs_sitemap_crawl = isset( $intents['browser_sitemap_crawl'] );
+		$needs_content = isset( $intents['browser_extract'] );
+		$needs_inspect = isset( $intents['prstudio_observe'] );
+		$needs_click = isset( $intents['browser_click'] );
+		$needs_fill = isset( $intents['browser_fill'] ) || isset( $intents['browser_type'] );
 		$page_action = $needs_shot || $needs_ocr || $needs_content || $needs_inspect || $needs_click || $needs_fill;
 
 		/* Crawlers are autonomous in 0.3.9: with an explicit URL they do not need
