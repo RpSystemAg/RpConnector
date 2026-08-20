@@ -12,12 +12,12 @@ const candidates = process.platform === 'darwin'
         'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
         'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
       ]
-    : [process.env.CHROME_BIN, '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium', '/usr/bin/chromium-browser'];
+    : [process.env.CHROME_BIN, '/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable'];
 
 const { existsSync } = await import('node:fs');
 const chrome = candidates.filter(Boolean).find((p) => existsSync(p));
 if (!chrome) {
-  console.error('FAIL real Chrome binary not found');
+  console.error('FAIL real Chrome/Chromium binary not found');
   process.exit(1);
 }
 
@@ -82,7 +82,7 @@ try {
   for (let i = 0; i < 50; i++) {
     const result = await cdp(version.webSocketDebuggerUrl, 'Target.getTargets');
     extensionTargets = (result.targetInfos ?? []).filter((t) => String(t.url ?? '').startsWith('chrome-extension://'));
-    if (extensionTargets.length) break;
+    if (extensionTargets.some((t) => t.type === 'service_worker' && String(t.url ?? '').endsWith('/service-worker.js'))) break;
     await sleep(100);
   }
 
@@ -90,9 +90,9 @@ try {
     throw new Error('Browser Agent produced no chrome-extension:// target in a real Chrome process');
   }
 
-  const serviceWorkers = extensionTargets.filter((t) => t.type === 'service_worker');
+  const serviceWorkers = extensionTargets.filter((t) => t.type === 'service_worker' && String(t.url ?? '').endsWith('/service-worker.js'));
   if (!serviceWorkers.length) {
-    throw new Error(`extension loaded but MV3 service worker target not observed: ${JSON.stringify(extensionTargets)}`);
+    throw new Error(`Browser Agent MV3 service worker /service-worker.js not observed: ${JSON.stringify(extensionTargets)}`);
   }
 
   const runtimeErrors = stderr
@@ -102,7 +102,7 @@ try {
     throw new Error(`Chrome reported extension runtime errors:\n${runtimeErrors.slice(0, 20).join('\n')}`);
   }
 
-  console.log(`PASS real Chrome loaded Browser Agent; chrome=${version.Browser}; extensionTargets=${extensionTargets.length}; serviceWorkers=${serviceWorkers.length}`);
+  console.log(`PASS real Chrome/Chromium loaded Browser Agent; browser=${version.Browser}; extensionTargets=${extensionTargets.length}; prstudioServiceWorkers=${serviceWorkers.length}`);
   exitCode = 0;
 } catch (error) {
   console.error(`FAIL real Chrome Browser Agent smoke: ${error?.stack ?? error}`);

@@ -11,8 +11,10 @@ final class PRSTUDIO_UC_Agency_Capabilities {
 	public static function social_ingest( array $args ): array { return PRSTUDIO_UC_Social_Intelligence::ingest( $args ); }
 	public static function social_insights( array $args ): array { return PRSTUDIO_UC_Social_Intelligence::insights( $args ); }
 	public static function opportunity_rank( array $args ): array { return PRSTUDIO_UC_Opportunity_Engine::rank( $args ); }
-	public static function agency_status( array $args = array() ): array {
-		return class_exists('PRSTUDIO_UC_Agency_Runtime') ? PRSTUDIO_UC_Agency_Runtime::status() : array('ok'=>false,'error'=>'agency_runtime_unavailable');
+	public static function agency_status( array $args = array() ) {
+		return class_exists('PRSTUDIO_UC_Agency_Runtime')
+			? PRSTUDIO_UC_Agency_Runtime::status()
+			: new WP_Error('agency_runtime_unavailable','Agency runtime is unavailable.',array('status'=>503,'retryable'=>true));
 	}
 	public static function sentinel_scan( array $args ): array {
 		return class_exists('PRSTUDIO_UC_Site_Sentinel') ? PRSTUDIO_UC_Site_Sentinel::scan($args) : array('ok'=>false,'error'=>'site_sentinel_unavailable');

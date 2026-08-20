@@ -29,7 +29,21 @@ check($coercions===0,'must not execute object string coercion');
 check($malformed['capability']==='','malformed capability default');
 check($malformed['counts']===array('requested'=>1,'processed'=>1,'changed'=>0,'verified'=>0,'failed'=>2,'skipped'=>0,'memory_reused'=>0),'bounded malformed counts');
 check($malformed['sources']===array('db','browser'),'malformed sources filtered');
-check($malformed['verified']===true,'existing boolean compatibility for truthy verified context');
+check($malformed['verified']===false,'malformed verification evidence must not become verified');
+
+$verificationForms=array(
+    array(true,1,true),
+    array(false,0,false),
+    array(2,2,true),
+    array('2',2,true),
+    array('false',0,false),
+    array(array('unexpected'),0,false),
+);
+foreach($verificationForms as [$input,$expectedCount,$expectedFlag]){
+    $receipt=PRSTUDIO_UC_Evidence_Engine::receipt(array('id'=>'x'),array(),array('verified'=>$input));
+    check($receipt['counts']['verified']===$expectedCount,'verification count normalization');
+    check($receipt['verified']===$expectedFlag,'verification flag normalization');
+}
 
 $badUtf8=PRSTUDIO_UC_Evidence_Engine::receipt(array('id'=>'x'),array('payload'=>"\xB1\x31"));
 check((bool)preg_match('/^[0-9a-f]{64}$/',$badUtf8['evidence_hash']),'bad utf8 hash shape');

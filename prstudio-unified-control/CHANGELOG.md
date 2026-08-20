@@ -278,3 +278,18 @@ its shape, latency and termination contract changed.
 
 - Unione fisica del bridge e del browser runtime.
 - Pairing dell’estensione Chrome, lease task, checkpoint e human takeover.
+
+## 1.0.0 — 2026-08-19 research-driven improvements (arXiv week 13-19 August)
+
+- Added context-leakage gauges as a blocking invariant on every MCP response (`context_leak_blocked`) — The Model's Tell.
+- Added the anti-hallucination evidence gate (verified/unverified/conflicting; Law 2) — Mixture-of-Expert Blocks.
+- Added confidence calibration (ECE binning, overconfidence verdict) — Too Sure to Be Safe.
+- Added style-drift monitoring of model output — When Writing Style Drifts.
+- Added technical action-feasibility prechecks — Fragility of Self-Improving Agents.
+- Added versioned workspace snapshots for Law 5 retries (SQL or file backend, fail-closed digests) — StagedWorkspace.
+- Added jittered exponential-backoff retry policy with transient/permanent classification.
+- Added evidence-preserving memory bank with dual-loop diagnostics — D2ACCI.
+- Added tamper-evident append-only audit trail (SHA-256 chain).
+- Added `prstudio_research_radar` MCP tool (~40 tokens, admitted after essential routers) — Deep Academic Survey / SGHA.
+- Added per-task tool provisioning profiles (`tools_for_intent`) with the Law 9 hard cap unchanged — Task-Aware Harness Provisioning.
+- Autoload map extended with all new modules; no existing API or behavior changed.

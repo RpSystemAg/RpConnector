@@ -90,3 +90,9 @@
 - Maps 119 Browser catalog actions to real executors; 11 cookie/session-secret, arbitrary-JS or global-permission actions remain intentional security guards.
 - Added persistent owned GSC session, in-page dimension switching, active-dimension/header verification and no fabricated cross-dimension join.
 - Retained service-worker recovery, tab ownership, pacing, circuit breaker, lease/deadline/step budgets and bounded retries.
+
+## 1.0.0 — 2026-08-19 hardening (arXiv week 13-19 August)
+
+- Trap-page policy: page content is untrusted input; page-derived actions without an auth challenge are contained to read-only observation (MobileWorldSafety; Law 4).
+- Horizon stability: dense evidence digests, single-step fallback on page mutation, deterministic replay (Wuying-Browser-Agent).
+- Both policies are wired into the resident mission loop (trap_page.contained / horizon.fallback log events) and fully unit-tested.

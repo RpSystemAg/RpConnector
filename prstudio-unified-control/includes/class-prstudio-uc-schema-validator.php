@@ -69,7 +69,30 @@ final class PRSTUDIO_UC_Schema_Validator {
         return false === $count ? strlen( $value ) : $count;
     }
 
-    public static function validate( $value, array $schema, string $path = '$' ): array {
+    /** Local JSON Pointer refs only (`#/$defs/...`). Unresolved refs are technical failures. */
+    private static function resolve_local_ref( string $ref, array $root ): ?array {
+        if ( ! str_starts_with( $ref, '#/' ) ) { return null; }
+        $node = $root;
+        foreach ( explode( '/', substr( $ref, 2 ) ) as $part ) {
+            $part = str_replace( array( '~1', '~0' ), array( '/', '~' ), $part );
+            if ( ! is_array( $node ) || ! array_key_exists( $part, $node ) ) { return null; }
+            $node = $node[ $part ];
+        }
+        return is_array( $node ) ? $node : null;
+    }
+
+    public static function validate( $value, array $schema, string $path = '$', ?array $root = null ): array {
+        $root = is_array( $root ) ? $root : $schema;
+        if ( isset( $schema['$ref'] ) ) {
+            $resolved = self::resolve_local_ref( (string) $schema['$ref'], $root );
+            if ( ! is_array( $resolved ) ) { return array( $path . ' has unresolved $ref' ); }
+            $next = $resolved;
+            foreach ( $schema as $key => $child ) {
+                if ( '$ref' === $key ) { continue; }
+                $next[ $key ] = $child;
+            }
+            return self::validate( $value, $next, $path, $root );
+        }
         $errors = array();
         $types = self::schema_types( $schema );
         if ( null === $types ) { return array( $path . ' has invalid schema type' ); }
@@ -80,27 +103,39 @@ final class PRSTUDIO_UC_Schema_Validator {
             }
             if ( '' === $type ) { return array( $path . ' must match allowed type' ); }
         }
+        if ( array_key_exists( 'const', $schema ) && $value !== $schema['const'] ) {
+            return array( $path . ' must equal const' );
+        }
 
         if ( 'object' === $type ) {
             foreach ( (array) ( $schema['required'] ?? array() ) as $required ) {
                 if ( ! array_key_exists( (string) $required, $value ) ) { $errors[] = $path . '.' . $required . ' is required'; }
             }
             $properties = (array) ( $schema['properties'] ?? array() );
-            if ( array_key_exists( 'additionalProperties', $schema ) && false === $schema['additionalProperties'] ) {
-                foreach ( array_keys( $value ) as $key ) {
-                    if ( ! array_key_exists( $key, $properties ) ) { $errors[] = $path . '.' . $key . ' is not allowed'; }
+            if ( array_key_exists( 'additionalProperties', $schema ) ) {
+                $additional = $schema['additionalProperties'];
+                if ( false === $additional ) {
+                    foreach ( array_keys( $value ) as $key ) {
+                        if ( ! array_key_exists( $key, $properties ) ) { $errors[] = $path . '.' . $key . ' is not allowed'; }
+                    }
+                } elseif ( is_array( $additional ) ) {
+                    foreach ( $value as $key => $child ) {
+                        if ( ! array_key_exists( $key, $properties ) ) {
+                            foreach ( self::validate( $child, $additional, $path . '.' . $key, $root ) as $e ) { $errors[] = $e; }
+                        }
+                    }
                 }
             }
             foreach ( $properties as $key => $child ) {
                 if ( array_key_exists( $key, $value ) ) {
-                    foreach ( self::validate( $value[ $key ], (array) $child, $path . '.' . $key ) as $e ) { $errors[] = $e; }
+                    foreach ( self::validate( $value[ $key ], (array) $child, $path . '.' . $key, $root ) as $e ) { $errors[] = $e; }
                 }
             }
         } elseif ( 'array' === $type ) {
             if ( isset( $schema['minItems'] ) && count( $value ) < (int) $schema['minItems'] ) { $errors[] = $path . ' below minItems'; }
             if ( isset( $schema['maxItems'] ) && count( $value ) > (int) $schema['maxItems'] ) { $errors[] = $path . ' exceeds maxItems'; }
             foreach ( $value as $i => $child ) {
-                foreach ( self::validate( $child, (array) ( $schema['items'] ?? array() ), $path . '[' . $i . ']' ) as $e ) { $errors[] = $e; }
+                foreach ( self::validate( $child, (array) ( $schema['items'] ?? array() ), $path . '[' . $i . ']', $root ) as $e ) { $errors[] = $e; }
             }
         } elseif ( 'string' === $type ) {
             if ( isset( $schema['minLength'] ) && self::unicode_length( $value ) < (int) $schema['minLength'] ) { $errors[] = $path . ' below minLength'; }
@@ -112,6 +147,20 @@ final class PRSTUDIO_UC_Schema_Validator {
             if ( isset( $schema['maximum'] ) && $value > $schema['maximum'] ) { $errors[] = $path . ' above maximum'; }
         }
         if ( isset( $schema['enum'] ) && ! in_array( $value, (array) $schema['enum'], true ) ) { $errors[] = $path . ' is not an allowed value'; }
+        if ( isset( $schema['anyOf'] ) && is_array( $schema['anyOf'] ) ) {
+            $matched = false;
+            foreach ( $schema['anyOf'] as $sub ) {
+                if ( array() === self::validate( $value, (array) $sub, $path, $root ) ) { $matched = true; break; }
+            }
+            if ( ! $matched ) { $errors[] = $path . ' does not match anyOf'; }
+        }
+        if ( isset( $schema['oneOf'] ) && is_array( $schema['oneOf'] ) ) {
+            $matches = 0;
+            foreach ( $schema['oneOf'] as $sub ) {
+                if ( array() === self::validate( $value, (array) $sub, $path, $root ) ) { $matches++; }
+            }
+            if ( 1 !== $matches ) { $errors[] = $path . ' does not match oneOf'; }
+        }
         return array_values( array_unique( $errors ) );
     }
 }

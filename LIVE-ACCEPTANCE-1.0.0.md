@@ -3,6 +3,16 @@
 
 Stato: **PENDING — local candidate only**. `production_proven: false`.
 
+Il gate anti-allucinazione (`class-prstudio-uc-evidence-gate.php`, da
+"Mixture-of-Expert Blocks Contain Strong Hallucination Detection Signals",
+arXiv 2026-08-13..19) è attivo sul flusso MCP → coda → Browser: le azioni
+senza evidenza coerente vengono marcate `unverified` e restano fuori
+dall'accettazione live; l'esecuzione resta `executed=true` con
+`verified=false, degraded=true` (Law 2: verifica come evidenza, mai
+autorizzazione). L'oracolo indipendente con rubriche
+(`quality/live-acceptance-oracle-rubric.json`) valuta i campioni di
+produzione intento → azione → risultato osservato prima di ogni promozione.
+
 - [ ] upgrade del pacchetto WordPress esatto su staging con rollback provato;
 - [ ] refresh **RP Studio Connector** e OAuth 2.1/PKCE reale senza perdita dei grant;
 - [ ] pairing/restart del Browser Agent esatto senza re-pair non richiesto;

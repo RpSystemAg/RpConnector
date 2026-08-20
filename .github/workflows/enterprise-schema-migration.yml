@@ -1,0 +1,46 @@
+name: Enterprise schema migration
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: enterprise-schema-migration-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  batch-contracts:
+    name: Enterprise capability contract batch
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: '8.1'
+          extensions: mbstring
+      - name: Lint touched PHP contract/runtime paths
+        run: |
+          php -l prstudio-unified-control/includes/class-prstudio-uc-agency-capabilities.php
+          php -l prstudio-unified-control/includes/class-prstudio-uc-business-intelligence.php
+          php -l prstudio-unified-control/includes/class-prstudio-uc-capability-registry.php
+          php -l prstudio-unified-control/includes/class-prstudio-uc-schema-validator.php
+          php -l tests/enterprise-schema-batch-1.php
+          php -l tests/enterprise-schema-batch-2.php
+          php -l tests/schema-validator-single-file.php
+      - name: Validate enterprise contract source JSON
+        run: python3 -m json.tool prstudio-unified-control/capabilities/enterprise-capability-contracts.json >/dev/null
+      - name: Schema validator regression
+        run: php -d auto_prepend_file=tests/strict-php-errors.php tests/schema-validator-single-file.php
+      - name: Enterprise contract batches 1 and 2
+        run: |
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/enterprise-schema-batch-1.php
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/enterprise-schema-batch-2.php
+      - name: Existing Browser orchestrator regression
+        run: php -d auto_prepend_file=tests/strict-php-errors.php tests/browser-orchestrator-v3-single-file.php prstudio-unified-control/includes/class-prstudio-uc-browser-orchestrator-v3.php
+      - name: Existing intelligence regression
+        run: php -d auto_prepend_file=tests/strict-php-errors.php tests/php-intelligence-smoke.php
+      - name: Exhaustive checkpoint diagnostic
+        run: python3 tests/exhaustive-checkpoint.py --write

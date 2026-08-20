@@ -12,17 +12,10 @@ try {
     fail('MCP tools() must execute without Throwable: ' . get_class($e) . ': ' . $e->getMessage());
 }
 if (!is_array($tools)) fail('tools() must return array');
-// 123: browser_find, browser_evaluate and browser_upload_file close the last
-// gaps against the reference browser surface (tests/validate-reference-parity.py).
-//
-// A concurrent change set this to 119 in anticipation of prstudio_research_radar
-// arriving with PR #8. That tool is not in the source yet -- grep finds no
-// occurrence -- so 119 would have failed on master for a tool that does not
-// exist. Whoever merges PR #8 raises this to 121 in the same commit.
-//
-// The count is asserted precisely so an inventory change is deliberate, and it
-// is what caught the collision.
-if (count($tools) !== 123) fail('expected 123 tools, got ' . count($tools));
+// Current master exposed 123 unique tools. PR #8 intentionally adds exactly
+// one public tool, prstudio_research_radar, so the consolidated catalogue is
+// 124. Keep this exact invariant coupled to the runtime uniqueness checks below.
+if (count($tools) !== 124) fail('expected 124 tools, got ' . count($tools));
 $names = [];
 foreach ($tools as $index => $tool) {
     if (!is_array($tool)) fail("tool {$index} is not array");

@@ -29,6 +29,18 @@ No result may be promoted in strength. In particular:
 |---|---|---|
 | E0 | Structural | parse/lint, generated-artifact drift, schema integrity, manifest integrity, duplicate detection |
 | E1 | Unit/contract | deterministic unit tests for executors, verifiers, state transitions and serialization |
+
+### 2.1 Independent oracle with explicit rubrics (2026-08-19)
+
+Per "Grading Needs a Rubric, Not Intelligence" (arXiv week 2026-08-13..19),
+an oracle without a rubric is just a bigger model: its verdicts cannot be
+cited, repeated or audited. The suite grades (intent, action, result)
+triples against the explicit per-dimension patterns in
+`quality/live-acceptance-oracle-rubric.json` via
+`tests/live-acceptance-oracle.py` (release-equation column, Law 11). A
+scenario is accepted only when every dimension grades `verified`; the
+negative and conflicting fixtures must be rejected. No verdict may be
+promoted in strength (section 1 applies).
 | E2 | Formal finite model | exhaustive finite-state checks for state machine, retry budget, idempotency identity and verification lattice |
 | E3 | Real database | actual MySQL/MariaDB executes schema, claims, leases, recovery, retries, dead-letter and concurrency |
 | E4 | Real WordPress | plugin installs/upgrades/activates on supported WordPress/PHP combinations and executes representative mutations with read-back |
