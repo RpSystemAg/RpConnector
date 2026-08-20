@@ -38,6 +38,7 @@ import { REMOTE_MAX_STEP_ATTEMPTS, canFreshRestart, isRetrySafeFailure, stepWatc
 import { createObservationEnvelope, redactObservation } from "./lib/observation-security.js";
 import { migrateOneGuardLegacyState } from "./lib/legacy-one-guard-migration.js";
 import { parseUserUrl, describeUrlInput } from "./lib/url-input.js";
+import { agentCursorPainter, isDrawablePoint, cursorModeForEvent, CURSOR_ELEMENT_ID } from "./lib/agent-cursor.js";
 import {
   LOCAL_STUDIO_VERSION,
   LOCAL_STUDIO_FEATURES,
@@ -2994,6 +2995,43 @@ async function runDomAction(tabId, action, step) {
   return { tabId, ...result, runtimePath: usedPersistentRuntime ? "persistent_port" : "execute_script_fallback", ...(semanticSelection ? { semanticSelection } : {}) };
 }
 
+
+// Chrome paints no pointer for CDP-dispatched input, so an agent that is working
+// perfectly looks identical to one doing nothing. This draws where the input
+// actually went, using the same coordinates the event carried.
+//
+// Every failure is swallowed on purpose. The overlay is decoration over a real
+// action; a page that refuses injection (a restricted origin, a frame that just
+// navigated) must never turn a successful click into a failed step.
+async function paintAgentCursor(tabId, x, y, mode) {
+  if (!mode || !isDrawablePoint(x, y)) return;
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId: Number(tabId) },
+      func: agentCursorPainter,
+      args: [Number(x), Number(y), mode, CURSOR_ELEMENT_ID],
+      world: "ISOLATED",
+    });
+  } catch {
+    /* drawing is never allowed to fail an action */
+  }
+}
+
+// Called before a capture: a pointer burned into a perception screenshot or a
+// visual baseline is a diff this suite inflicted on itself.
+async function hideAgentCursor(tabId) {
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId: Number(tabId) },
+      func: agentCursorPainter,
+      args: [0, 0, "hide", CURSOR_ELEMENT_ID],
+      world: "ISOLATED",
+    });
+  } catch {
+    /* nothing to hide, or nowhere to hide it */
+  }
+}
+
 async function dispatchNativeCommands(tabId, commands = [], sessionId = "") {
   await assertOwnedTab(tabId);
   await attachDebuggerIfNeeded(tabId);
@@ -3006,6 +3044,9 @@ async function dispatchNativeCommands(tabId, commands = [], sessionId = "") {
     if (sessionId) await debuggerSessionCommandWithTimeout(tabId, sessionId, command.method, command.params || {}, CDP_DEFAULT_TIMEOUT_MS);
     else await debuggerCommandWithTimeout(tabId, command.method, command.params || {}, CDP_DEFAULT_TIMEOUT_MS, "cdp_command_timeout");
     dispatched += 1;
+    if (String(command.method || "") === "Input.dispatchMouseEvent") {
+      await paintAgentCursor(tabId, command.params?.x, command.params?.y, cursorModeForEvent(command.params?.type));
+    }
     if (command.delayMs) await abortableSleep(command.delayMs, taskAbortController?.signal);
   }
   return { executed: true, dispatched, transport: sessionId ? "persistent_cdp_child_session" : "persistent_cdp_hot_path", ...(sessionId ? { cdpSessionId: sessionId } : {}) };
@@ -4920,6 +4961,10 @@ function isScreenshotProtocolCompatibilityError(error) {
 }
 
 async function captureScreenshotWithFallback(tabId, candidates = [], options = {}) {
+  // The agent pointer is drawn into the page, so it would be captured with it.
+  // Perception screenshots and visual baselines compare pixels; an overlay this
+  // suite drew itself would read as a real change on the page.
+  await hideAgentCursor(tabId);
   const deadlineAt = Number(options.deadlineAt || (Date.now() + SCREENSHOT_CAPTURE_TIMEOUT_MS));
   let lastError = null;
   let attempts = 0;
