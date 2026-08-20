@@ -47,9 +47,7 @@ test("every chain can capture a tab with no compositor surface", () => {
   }
 });
 
-test("surface capture is preferred and renderer capture is last", () => {
-  // Surface capture is the better image when a surface exists. The renderer
-  // variant is a fallback, not a replacement, so it must not displace it.
+test("foreground capture prefers the surface and keeps renderer as fallback", () => {
   const chain = buildScreenshotCandidates({ format: "png" });
   assert.equal(chain[0].fromSurface, true, "the first attempt should still be surface capture");
   assert.equal(chain[chain.length - 1].fromSurface, false, "renderer capture belongs at the end");
@@ -58,6 +56,13 @@ test("surface capture is preferred and renderer capture is last", () => {
     1,
     "one renderer attempt is enough; more would only add latency to a failing capture",
   );
+});
+
+test("background capture tries the renderer before a surface can return a blank frame", () => {
+  const chain = buildScreenshotCandidates({ format: "png", preferRenderer: true });
+  assert.equal(chain[0].fromSurface, false);
+  assert.equal(chain[1].fromSurface, true);
+  assert.equal(chain.filter((entry) => entry.fromSurface === false).length, 1);
 });
 
 test("the renderer variant does not ask for something it cannot have", () => {
@@ -69,6 +74,14 @@ test("the renderer variant does not ask for something it cannot have", () => {
   assert.ok(renderer);
   assert.equal(renderer.captureBeyondViewport, undefined);
   assert.equal(renderer.format, "png", "png avoids a quality parameter the renderer path may reject");
+  assert.deepEqual(renderer.clip, { x: 0, y: 0, width: 1280, height: 4000, scale: 1 });
+});
+
+test("renderer fallback retains an element or region clip", () => {
+  const clip = { x: 12, y: 30, width: 240, height: 80, scale: 2 };
+  const chain = buildScreenshotCandidates({ format: "png", fullPage: true, clip, preferRenderer: true });
+  assert.equal(chain[0].fromSurface, false);
+  assert.deepEqual(chain[0].clip, clip);
 });
 
 test("a full-page request keeps its clip on the preferred attempts", () => {
