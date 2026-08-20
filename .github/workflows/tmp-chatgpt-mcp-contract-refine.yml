@@ -1,0 +1,88 @@
+name: Temporary ChatGPT MCP contract refinement
+
+on:
+  pull_request:
+    branches:
+      - master
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Align public contracts with current runtime and wire catalog
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          helper = Path('prstudio-unified-control/includes/class-prstudio-uc-public-tool-contracts.php')
+          helper_text = helper.read_text()
+          old_browser = """                self::merge_property( $input, 'url', array(
+                    'minLength' => 1,
+                    'maxLength' => 4096,
+                    'format' => 'uri',
+                    'pattern' => '^https?://',
+                    'description' => 'Absolute http(s) URL to open in the controlled Browser Agent tab.',
+                ) );"""
+          new_browser = """                self::merge_property( $input, 'url', array(
+                    'minLength' => 1,
+                    'maxLength' => 4096,
+                    'description' => 'HTTP(S) URL or a human-typed bare host/path accepted by Browser Agent navigation; bare hosts default to HTTPS.',
+                ) );"""
+          if helper_text.count(old_browser) != 1:
+              raise SystemExit(f'browser_open helper anchor count={helper_text.count(old_browser)}, expected 1')
+          helper.write_text(helper_text.replace(old_browser, new_browser, 1))
+
+          test = Path('tests/php-mcp-public-contracts-smoke.php')
+          test_text = test.read_text()
+          old_test = "expect_contract(($open['properties']['url']['format'] ?? '') === 'uri', 'browser_open.url must advertise URI format');"
+          new_test = "expect_contract(!isset($open['properties']['url']['format']) && !isset($open['properties']['url']['pattern']), 'browser_open.url must preserve runtime support for scheme-less hosts');\nexpect_contract(strpos((string)$open['properties']['url']['description'], 'bare host') !== false, 'browser_open.url must document scheme-less host normalization');"
+          if test_text.count(old_test) != 1:
+              raise SystemExit(f'browser_open test anchor count={test_text.count(old_test)}, expected 1')
+          test.write_text(test_text.replace(old_test, new_test, 1))
+
+          path = Path('prstudio-unified-control/includes/class-prstudio-uc-mcp-v5.php')
+          text = path.read_text()
+          include_anchor = "if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }\n\n/**"
+          include_replacement = "if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }\nrequire_once __DIR__ . '/class-prstudio-uc-public-tool-contracts.php';\n\n/**"
+          if text.count(include_anchor) != 1:
+              raise SystemExit(f'include anchor count={text.count(include_anchor)}, expected 1')
+          text = text.replace(include_anchor, include_replacement, 1)
+
+          refine_anchor = "        }\n        self::$manual[$name]=array('title'=>$title,'guidance'=>trim($description),'annotations'=>$annotations);"
+          refine_replacement = "        }\n        array( $description, $input, $annotations ) = PRSTUDIO_UC_Public_Tool_Contracts::refine( $name, $description, $input, $annotations );\n        self::$manual[$name]=array('title'=>$title,'guidance'=>trim($description),'annotations'=>$annotations);"
+          if text.count(refine_anchor) != 1:
+              raise SystemExit(f'refine anchor count={text.count(refine_anchor)}, expected 1')
+          text = text.replace(refine_anchor, refine_replacement, 1)
+          path.write_text(text)
+          PY
+
+      - name: Verify refined catalog
+        run: |
+          php -l prstudio-unified-control/includes/class-prstudio-uc-public-tool-contracts.php
+          php -l prstudio-unified-control/includes/class-prstudio-uc-mcp-v5.php
+          php -l tests/php-mcp-public-contracts-smoke.php
+          php tests/php-mcp-catalog-runtime-smoke.php
+          php tests/php-mcp-public-contracts-smoke.php
+          php tests/php-prstudio-flow-smoke.php
+          if [ -f tests/php-tools-list-budget.php ]; then php tests/php-tools-list-budget.php; fi
+
+      - name: Commit verified source change and remove temporary workflow
+        env:
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/tmp-chatgpt-mcp-contract-refine.yml
+          git add prstudio-unified-control/includes/class-prstudio-uc-mcp-v5.php prstudio-unified-control/includes/class-prstudio-uc-public-tool-contracts.php tests/php-mcp-public-contracts-smoke.php
+          git commit -m "Refine public ChatGPT MCP tool schemas"
+          git push origin "HEAD:${HEAD_BRANCH}"
