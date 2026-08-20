@@ -206,7 +206,7 @@ $browserPairs=[
     ['avanti','forward','playwright_go_forward'],
     ['seleziona opzione','select option','playwright_select_option'],
     ['spunta casella','check checkbox','playwright_check'],
-    ['estrai testo','extract text','playwright_content'],
+    ['estrai','extract','playwright_content'],
     ['cattura pagina','capture page','playwright_screenshot_page'],
     ['istantanea','snapshot','playwright_locator_snapshot'],
 ];
