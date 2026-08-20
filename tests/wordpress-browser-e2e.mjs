@@ -381,6 +381,7 @@ try {
     20000,
   );
   evidence.remote_connection = remoteConnection;
+  await cdp.send('Target.activateTarget', { targetId: extensionTarget.targetId });
   await screenshot(cdp, extensionSessionId, '03-browser-agent-connected.png');
   pass('Browser Agent paired with real WordPress', { message: remoteConnection });
 
@@ -403,12 +404,14 @@ try {
     'Browser Agent real-page audit',
     20000,
   );
-  const auditText = await evaluate(cdp, extensionSessionId, `document.querySelector('#healthResult')?.textContent?.replace(/\s+/g, ' ').trim() || ''`);
+  const auditText = await evaluate(cdp, extensionSessionId, `document.querySelector('#healthResult')?.textContent?.replace(/\\s+/g, ' ').trim() || ''`);
   if (!/\d+\/100/.test(auditText)) throw new Error(`Browser Agent audit produced no score: ${auditText}`);
   evidence.browser_agent_audit = { message: auditMessage, result: auditText.slice(0, 1000) };
+  await cdp.send('Target.activateTarget', { targetId: extensionTarget.targetId });
   await screenshot(cdp, extensionSessionId, '04-browser-agent-audit.png');
   pass('Browser Agent executed a real audit against WordPress', { message: auditMessage });
 
+  await cdp.send('Target.activateTarget', { targetId: wpTargetId });
   await navigate(cdp, wpSessionId, pluginAdminUrl);
   const deviceRow = await waitForExpression(
     cdp,
@@ -418,7 +421,7 @@ try {
       const rows = [...document.querySelectorAll('table.prstudio-grid tbody tr')];
       const row = rows.find((candidate) => candidate.textContent.includes(wanted));
       if (!row) return '';
-      const text = row.textContent.replace(/\s+/g, ' ').trim();
+      const text = row.textContent.replace(/\\s+/g, ' ').trim();
       return /Online/i.test(text) ? text : '';
     })()`,
     'paired device visible as Online in WordPress',
