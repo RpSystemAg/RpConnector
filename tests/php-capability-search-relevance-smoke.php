@@ -44,6 +44,10 @@ define('PRSTUDIO_UC_TESTING', true);
 define('ABSPATH', dirname(__DIR__) . '/');
 define('PRSTUDIO_UC_DIR', dirname(__DIR__) . '/prstudio-unified-control/');
 
+if (!function_exists('trailingslashit')) {
+    function trailingslashit(string $value): string { return rtrim($value, '/\\') . '/'; }
+}
+
 // Capability discovery filters non-callable executors. These inert fixtures
 // expose the real shipped index to the scoring path without executing work.
 foreach (array(
@@ -58,6 +62,7 @@ foreach (array(
 }
 
 require PRSTUDIO_UC_DIR . 'includes/class-prstudio-uc-capability-registry.php';
+require PRSTUDIO_UC_DIR . 'includes/class-prstudio-uc-action-index.php';
 require PRSTUDIO_UC_DIR . 'includes/class-prstudio-uc-do.php';
 
 $passed = 0;
@@ -167,6 +172,50 @@ $equivalent = array(
 );
 
 foreach ($equivalent as $pair) { expect_identical_results($pair[0], $pair[1]); }
+
+/* -- The shared lexicon and hot action index obey the same language contract - */
+
+function action_index_tools(string $query): array {
+    return array_map(
+        static fn(array $item): string => (string)($item['tool_name'] ?? ''),
+        PRSTUDIO_UC_Action_Index::search($query, 8)
+    );
+}
+
+$shared_pairs = array(
+    array('crea una pagina', 'create a page'),
+    array('ridimensiona una immagine', 'resize an image'),
+    array('campo di input', 'input field'),
+    array('piè di pagina', 'footer'),
+    array('iva e fattura', 'vat and invoice'),
+    array('carrello', 'cart'),
+);
+foreach ($shared_pairs as [$italian_query, $english_query]) {
+    $it_concepts = PRSTUDIO_UC_Action_Lexicon::query_concepts($italian_query);
+    $en_concepts = PRSTUDIO_UC_Action_Lexicon::query_concepts($english_query);
+    if (!PRSTUDIO_UC_Action_Lexicon::equivalent($it_concepts, $en_concepts)) {
+        fail_relevance("shared lexicon differs for '{$italian_query}'/'{$english_query}'");
+    }
+    if (!PRSTUDIO_UC_Action_Lexicon::covers($it_concepts, $en_concepts)
+        || !PRSTUDIO_UC_Action_Lexicon::covers($en_concepts, $it_concepts)) {
+        fail_relevance("shared concept coverage differs for '{$italian_query}'/'{$english_query}'");
+    }
+    if (action_index_tools($italian_query) !== action_index_tools($english_query)) {
+        fail_relevance("action index ranking differs for '{$italian_query}'/'{$english_query}'");
+    }
+    if (PRSTUDIO_UC_Action_Index::domain_for_query($italian_query) !== PRSTUDIO_UC_Action_Index::domain_for_query($english_query)) {
+        fail_relevance("action index domain differs for '{$italian_query}'/'{$english_query}'");
+    }
+    ++$passed;
+    fwrite(STDOUT, "PASS shared action concepts {$italian_query} == {$english_query}\n");
+}
+
+$detailed_unknown = PRSTUDIO_UC_Action_Index::search_detailed('quantum banana frobnicate', 8);
+if (!empty($detailed_unknown['items']) || 0 !== (int)($detailed_unknown['total_matches'] ?? -1)) {
+    fail_relevance('shared action index returned results for a nonsense query');
+}
+++ $passed;
+fwrite(STDOUT, "PASS shared action index rejects nonsense\n");
 
 /* -- The public command front door has equivalent IT/EN fast paths -------- */
 

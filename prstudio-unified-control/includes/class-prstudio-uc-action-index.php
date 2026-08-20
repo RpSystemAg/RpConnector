@@ -2,6 +2,8 @@
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
+require_once __DIR__ . '/class-prstudio-uc-action-lexicon.php';
+
 /**
  * Precompiled knowledge graph for instant tool/action resolution.
  *
@@ -24,21 +26,6 @@ final class PRSTUDIO_UC_Action_Index {
 
 	private static function sanitize_key_safe( string $value ): string {
 		return function_exists( 'sanitize_key' ) ? sanitize_key( $value ) : strtolower( preg_replace( '/[^a-z0-9_\-]/i', '', $value ) );
-	}
-
-	private static function normalize( string $value ): string {
-		$value = strtolower( str_replace( array( '_', '/' ), ' ', $value ) );
-		if ( function_exists( 'remove_accents' ) ) { $value = remove_accents( $value ); }
-		$value = preg_replace( '/[^a-z0-9\s\-]+/u', ' ', $value );
-		return trim( preg_replace( '/\s+/', ' ', (string) $value ) );
-	}
-
-	private static function tokens( string $value ): array {
-		$stop = array_fill_keys( array( 'che','con','del','della','delle','degli','per','una','uno','un','il','la','lo','le','i','gli','di','da','in','su','e','o','fare','devo','voglio','please','the','a','to','and' ), true );
-		return array_values( array_unique( array_filter(
-			explode( ' ', self::normalize( $value ) ),
-			static fn( string $token ): bool => strlen( $token ) >= 2 && ! isset( $stop[ $token ] )
-		) ) );
 	}
 
 	public static function warm( bool $force = false ): array {
@@ -118,40 +105,79 @@ final class PRSTUDIO_UC_Action_Index {
 	 * never scans the full catalog at request time.
 	 */
 	public static function search( string $query, int $limit = 20, string $domain = '' ): array {
+		return self::search_detailed( $query, $limit, $domain )['items'];
+	}
+
+	/**
+	 * Ranked search with count and optional exact route scope for compatibility
+	 * adapters. Existing search() keeps its original signature and return shape.
+	 */
+	public static function search_detailed( string $query, int $limit = 20, string $domain = '', string $route = '' ): array {
 		$data = self::warm();
 		$limit = max( 1, min( 100, $limit ) );
 		$query = trim( $query );
+		$domain = self::sanitize_key_safe( $domain );
+		$route = '' !== trim( $route ) ? '/' . trim( $route, '/' ) : '';
 		if ( '' === $query ) {
-			$names = '' !== $domain ? self::domain_tools( $domain ) : array_keys( (array) ( $data['tools'] ?? array() ) );
-			return self::hydrate( array_slice( $names, 0, $limit ) );
+			$names = array();
+			foreach ( (array) ( $data['tools'] ?? array() ) as $tool_name => $meta ) {
+				if ( '' !== $domain && (string) ( $meta['domain'] ?? '' ) !== $domain ) { continue; }
+				if ( '' !== $route && (string) ( $meta['route'] ?? '' ) !== $route ) { continue; }
+				$names[] = (string) $tool_name;
+			}
+			return array( 'items' => self::hydrate( array_slice( $names, 0, $limit ) ), 'total_matches' => count( $names ) );
 		}
-		if ( isset( $data['tools'][ $query ] ) ) { return array( $data['tools'][ $query ] + array( '_score' => 1000 ) ); }
-
-		$tokens = self::tokens( $query );
-		$scores = array();
-		foreach ( $tokens as $token ) {
-			$posting = (array) ( $data['token_index'][ $token ] ?? array() );
-			foreach ( $posting as $position => $tool_name ) {
-				if ( '' !== $domain && (string) ( $data['tools'][ $tool_name ]['domain'] ?? '' ) !== $domain ) { continue; }
-				$scores[ $tool_name ] = ( $scores[ $tool_name ] ?? 0 ) + 12 - min( 8, (int) floor( $position / 12 ) );
+		if ( isset( $data['tools'][ $query ] ) ) {
+			$exact = (array) $data['tools'][ $query ];
+			if ( ( '' === $domain || (string) ( $exact['domain'] ?? '' ) === $domain ) && ( '' === $route || (string) ( $exact['route'] ?? '' ) === $route ) ) {
+				return array( 'items' => array( $exact + array( '_score' => 1000 ) ), 'total_matches' => 1 );
 			}
 		}
-		$normalized = self::normalize( $query );
+
+		$concepts = PRSTUDIO_UC_Action_Lexicon::query_concepts( $query );
+		$scores = array();
+		foreach ( $concepts as $concept ) {
+			$concept_scores = array();
+			foreach ( (array) $concept as $token ) {
+				foreach ( (array) ( $data['token_index'][ $token ] ?? array() ) as $position => $tool_name ) {
+					$meta = (array) ( $data['tools'][ $tool_name ] ?? array() );
+					if ( '' !== $domain && (string) ( $meta['domain'] ?? '' ) !== $domain ) { continue; }
+					if ( '' !== $route && (string) ( $meta['route'] ?? '' ) !== $route ) { continue; }
+					$weight = 12 - min( 8, (int) floor( $position / 12 ) );
+					$concept_scores[ $tool_name ] = max( $concept_scores[ $tool_name ] ?? 0, $weight );
+				}
+			}
+			foreach ( $concept_scores as $tool_name => $weight ) {
+				$scores[ $tool_name ] = ( $scores[ $tool_name ] ?? 0 ) + $weight;
+			}
+		}
+		$technical = strtolower( $query );
 		foreach ( $scores as $tool_name => &$score ) {
 			$meta = (array) ( $data['tools'][ $tool_name ] ?? array() );
-			$exact = self::normalize( (string) ( $meta['action'] ?? '' ) );
-			$title = self::normalize( (string) ( $meta['title'] ?? '' ) );
-			if ( $normalized === self::normalize( $tool_name ) || $normalized === $exact ) { $score += 200; }
-			elseif ( '' !== $exact && str_contains( $normalized, $exact ) ) { $score += 60; }
-			if ( '' !== $title && str_contains( $title, $normalized ) ) { $score += 30; }
+			$action = (string) ( $meta['action'] ?? '' );
+			$title = (string) ( $meta['title'] ?? '' );
+			$action_concepts = PRSTUDIO_UC_Action_Lexicon::query_concepts( $action );
+			$title_concepts = PRSTUDIO_UC_Action_Lexicon::query_concepts( $title );
+			if ( $technical === strtolower( (string) $tool_name ) || $technical === strtolower( $action ) ) {
+				$score += 300;
+			} elseif ( PRSTUDIO_UC_Action_Lexicon::equivalent( $concepts, $action_concepts ) ) {
+				$score += 200;
+			} elseif ( PRSTUDIO_UC_Action_Lexicon::covers( $action_concepts, $concepts ) ) {
+				$score += 60;
+			}
+			if ( PRSTUDIO_UC_Action_Lexicon::covers( $title_concepts, $concepts ) ) { $score += 30; }
 		}
 		unset( $score );
-		arsort( $scores, SORT_NUMERIC );
+		$total_matches = count( $scores );
+		uksort( $scores, static function ( string $left, string $right ) use ( $scores ): int {
+			$rank = $scores[ $right ] <=> $scores[ $left ];
+			return 0 !== $rank ? $rank : strcmp( $left, $right );
+		} );
 		$items = array();
 		foreach ( array_slice( $scores, 0, $limit, true ) as $tool_name => $score ) {
 			$items[] = (array) $data['tools'][ $tool_name ] + array( '_score' => $score );
 		}
-		return $items;
+		return array( 'items' => $items, 'total_matches' => $total_matches );
 	}
 
 	private static function hydrate( array $names ): array {
@@ -164,13 +190,31 @@ final class PRSTUDIO_UC_Action_Index {
 	}
 
 	public static function domain_for_query( string $query ): string {
-		$results = self::search( $query, 8 );
-		$scores = array();
-		foreach ( $results as $item ) {
-			$domain = self::sanitize_key_safe( (string) ( $item['domain'] ?? 'operations' ) );
-			$scores[ $domain ] = ( $scores[ $domain ] ?? 0 ) + max( 1, (int) ( $item['_score'] ?? 1 ) );
+		$data = self::warm();
+		$query = trim( $query );
+		if ( isset( $data['tools'][ $query ] ) ) {
+			return self::sanitize_key_safe( (string) ( $data['tools'][ $query ]['domain'] ?? 'operations' ) );
 		}
-		arsort( $scores, SORT_NUMERIC );
+		$concepts = PRSTUDIO_UC_Action_Lexicon::query_concepts( $query );
+		if ( array() === $concepts ) { return 'operations'; }
+		$scores = array();
+		foreach ( $concepts as $concept ) {
+			$concept_scores = array();
+			foreach ( (array) $concept as $token ) {
+				foreach ( (array) ( $data['token_index'][ $token ] ?? array() ) as $position => $tool_name ) {
+					$domain = self::sanitize_key_safe( (string) ( $data['tools'][ $tool_name ]['domain'] ?? 'operations' ) );
+					$weight = 12 - min( 8, (int) floor( $position / 12 ) );
+					$concept_scores[ $domain ] = max( $concept_scores[ $domain ] ?? 0, $weight );
+				}
+			}
+			foreach ( $concept_scores as $domain => $weight ) {
+				$scores[ $domain ] = ( $scores[ $domain ] ?? 0 ) + $weight;
+			}
+		}
+		uksort( $scores, static function ( string $left, string $right ) use ( $scores ): int {
+			$rank = $scores[ $right ] <=> $scores[ $left ];
+			return 0 !== $rank ? $rank : strcmp( $left, $right );
+		} );
 		return (string) ( array_key_first( $scores ) ?: 'operations' );
 	}
 
