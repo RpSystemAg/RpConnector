@@ -177,13 +177,53 @@ final class PRSTUDIO_UC_Capability_Registry {
     public static function counts(): array { return (array) ( self::document()['counts'] ?? array() ); }
     public static function hash(): string { return (string) ( self::document()['registry_hash'] ?? '' ); }
     private static function normalize( string $value ): string {
-        $value = strtolower( $value );
+        $value = function_exists( 'mb_strtolower' ) ? mb_strtolower( $value, 'UTF-8' ) : strtolower( $value );
+        if ( function_exists( 'remove_accents' ) ) {
+            $value = remove_accents( $value );
+        } elseif ( function_exists( 'iconv' ) ) {
+            $ascii = @iconv( 'UTF-8', 'ASCII//TRANSLIT//IGNORE', $value );
+            if ( false !== $ascii ) { $value = $ascii; }
+        }
         $value = preg_replace( '/[^a-z0-9.]+/', ' ', $value );
         return trim( (string) preg_replace( '/\s+/', ' ', (string) $value ) );
     }
     private static function tokens( string $value ): array {
         $tokens = array_values( array_unique( array_filter( explode( ' ', str_replace( '.', ' ', self::normalize( $value ) ) ), static fn( $x ) => strlen( (string) $x ) >= 2 ) ) );
         return array_slice( $tokens, 0, 32 );
+    }
+    /** Query vocabulary stays bilingual while the generated catalog keeps canonical IDs. */
+    private static function query_tokens( string $value ): array {
+        $stop_words = array_fill_keys( array(
+            'a','ad','agli','ai','al','all','alla','alle','allo','and','an','con','da','dal','dalla','dalle','dallo',
+            'de','dei','del','della','delle','dello','di','e','ed','for','gli','i','il','in','la','le','lo','nei','nel',
+            'nella','nelle','nello','of','on','per','please','su','the','to','un','una','uno','with',
+        ), true );
+        $aliases = array(
+            'aggiorna'=>array('update'), 'aggiornare'=>array('update'), 'articolo'=>array('content'), 'articoli'=>array('content'),
+            'backup'=>array('backup'), 'cancella'=>array('delete'), 'cancellare'=>array('delete'), 'cerca'=>array('search'), 'cercare'=>array('search'),
+            'controlla'=>array('check','list'), 'controllare'=>array('check','list'), 'crea'=>array('create'), 'creare'=>array('create'),
+            'elenca'=>array('list'), 'elencare'=>array('list'), 'elimina'=>array('delete'), 'eliminare'=>array('delete'),
+            'modifica'=>array('update','edit'), 'modificare'=>array('update','edit'), 'mostra'=>array('list'), 'mostrare'=>array('list'),
+            'ordine'=>array('order','orders'), 'ordini'=>array('orders'), 'pagina'=>array('page'), 'pagine'=>array('pages'),
+            'prezzo'=>array('price'), 'prezzi'=>array('prices'), 'prodotto'=>array('product'), 'prodotti'=>array('products'),
+            'pubblica'=>array('publish'), 'pubblicare'=>array('publish'), 'pulisci'=>array('purge'), 'pulire'=>array('purge'),
+            'ripristina'=>array('restore'), 'ripristinare'=>array('restore'), 'sicurezza'=>array('security'), 'sito'=>array('site'),
+            'svuota'=>array('purge'), 'svuotare'=>array('purge'), 'trova'=>array('find'), 'trovare'=>array('find'),
+            'utente'=>array('user','users'), 'utenti'=>array('users'), 'verifica'=>array('verify'), 'verificare'=>array('verify'),
+            'article'=>array('content'), 'articles'=>array('content'),
+        );
+        $expanded = array();
+        foreach ( self::tokens( $value ) as $token ) {
+            if ( isset( $stop_words[ $token ] ) ) { continue; }
+            $expanded[ $token ] = true;
+            foreach ( $aliases[ $token ] ?? array() as $alias ) { $expanded[ $alias ] = true; }
+        }
+        return array_slice( array_keys( $expanded ), 0, 32 );
+    }
+    private static function contains_whole_phrase( string $haystack, string $needle ): bool {
+        $haystack = trim( str_replace( '.', ' ', self::normalize( $haystack ) ) );
+        $needle = trim( str_replace( '.', ' ', self::normalize( $needle ) ) );
+        return '' !== $needle && str_contains( ' ' . $haystack . ' ', ' ' . $needle . ' ' );
     }
     private static function executor_name_available( string $executor ): bool {
         if(''===$executor||!str_contains($executor,'::'))return false;
@@ -208,40 +248,62 @@ final class PRSTUDIO_UC_Capability_Registry {
         $rows=array(); $postings=array();
         foreach((array)(self::compact_document()['items']??array()) as $i=>$cap){
             $id=self::normalize((string)($cap['id']??'')); $desc=self::normalize((string)($cap['description']??'')); $source=self::normalize((string)($cap['source']['tool_name']??'')); $text=$id.' '.$source.' '.$desc;
-            $rows[$i]=array('cap'=>$cap,'id'=>$id,'desc'=>$desc,'source'=>$source,'text'=>$text);
+            $rows[$i]=array(
+                'cap'=>$cap, 'id'=>$id, 'desc'=>$desc, 'source'=>$source, 'text'=>$text,
+                'id_tokens'=>array_fill_keys(self::tokens($id),true),
+                'desc_tokens'=>array_fill_keys(self::tokens($desc),true),
+                'source_tokens'=>array_fill_keys(self::tokens($source),true),
+            );
             foreach(self::tokens($text) as $token){$postings[$token][$i]=true;}
         }
         self::$search_index=array('rows'=>$rows,'postings'=>$postings); return self::$search_index;
     }
     public static function search( string $query, array $filters = array() ): array {
-        $q = self::normalize( $query ); $tokens = self::tokens( $q );
+        $q = self::normalize( $query ); $tokens = self::query_tokens( $q );
         $limit = max( 1, min( self::MAX_LIMIT, (int) ( $filters['limit'] ?? self::DEFAULT_LIMIT ) ) );
         $domain = strtolower( trim( (string) ( $filters['domain'] ?? '' ) ) );
         $include_legacy = array_key_exists( 'include_legacy', $filters ) ? (bool) $filters['include_legacy'] : true;
         $index=self::search_index(); $candidate_ids=array();
-        if(''===$q){$candidate_ids=array_fill_keys(array_keys($index['rows']),true);}else{foreach($tokens as $token){if(isset($index['postings'][$token])){$candidate_ids += $index['postings'][$token];}else{foreach($index['postings'] as $term=>$ids){if(str_contains($term,$token)){$candidate_ids += $ids;}}}}}
-        if(!$candidate_ids&&''!==$q){$candidate_ids=array_fill_keys(array_keys($index['rows']),true);}
+        if(''===$q){$candidate_ids=array_fill_keys(array_keys($index['rows']),true);}else{foreach($tokens as $token){if(isset($index['postings'][$token])){$candidate_ids += $index['postings'][$token];}}}
         $scored = array();
         foreach ( array_keys($candidate_ids) as $idx ) { $row=$index['rows'][$idx]??null; if(!$row)continue; $cap=$row['cap'];
             if ( ! $include_legacy && 'native' !== (string) ( $cap['source']['kind'] ?? '' ) ) { continue; }
             if ( '' !== $domain && strtolower( (string) ( $cap['domain'] ?? '' ) ) !== $domain ) { continue; }
             if(!self::executor_name_available((string)($cap['executor']??''))){continue;}
             $id=$row['id']; $desc=$row['desc']; $source_name=$row['source']; $haystack=$row['text'];
-            $score = 'native' === (string) ( $cap['source']['kind'] ?? '' ) ? 20 : 0;
+            $score = 0;
             if ( '' === $q ) { $score += 1; }
-            elseif ( str_contains( $id, $q ) || str_contains( $source_name, $q ) ) { $score += 100; }
-            elseif ( str_contains( $haystack, $q ) ) { $score += 60; }
+            elseif ( self::contains_whole_phrase( $id, $q ) || self::contains_whole_phrase( $source_name, $q ) ) { $score += 100; }
+            elseif ( self::contains_whole_phrase( $haystack, $q ) ) { $score += 60; }
             foreach ( $tokens as $token ) {
-                if ( str_contains( $id, $token ) ) { $score += 16; }
-                elseif ( str_contains( $source_name, $token ) ) { $score += 12; }
-                elseif ( str_contains( $desc, $token ) ) { $score += 4; }
+                if ( isset( $row['id_tokens'][ $token ] ) ) { $score += 16; }
+                elseif ( isset( $row['source_tokens'][ $token ] ) ) { $score += 12; }
+                elseif ( isset( $row['desc_tokens'][ $token ] ) ) { $score += 4; }
             }
             if ( $score <= 0 ) { continue; }
-            $scored[] = array( 'score'=>$score, 'cap'=>$cap );
+            $kind = (string) ( $cap['source']['kind'] ?? '' );
+            $specific_tokens = $row['source_tokens'] ?: $row['id_tokens'];
+            $specific_matches = count( array_intersect_key( $specific_tokens, array_fill_keys( $tokens, true ) ) );
+            $scored[] = array(
+                'score'=>$score,
+                'native'=>'native' === $kind,
+                'legacy_action'=>'legacy_action' === $kind,
+                'source_matches'=>count( array_intersect_key( $row['source_tokens'], array_fill_keys( $tokens, true ) ) ),
+                'extra_tokens'=>max( 0, count( $specific_tokens ) - $specific_matches ),
+                'cap'=>$cap,
+            );
         }
         usort( $scored, static function ( array $a, array $b ): int {
             $cmp = (int) $b['score'] <=> (int) $a['score'];
-            return 0 !== $cmp ? $cmp : strcmp( (string) $a['cap']['id'], (string) $b['cap']['id'] );
+            if ( 0 !== $cmp ) { return $cmp; }
+            $native_cmp = (int) $b['native'] <=> (int) $a['native'];
+            if ( 0 !== $native_cmp ) { return $native_cmp; }
+            $source_cmp = (int) $b['source_matches'] <=> (int) $a['source_matches'];
+            if ( 0 !== $source_cmp ) { return $source_cmp; }
+            $canonical_cmp = (int) $b['legacy_action'] <=> (int) $a['legacy_action'];
+            if ( 0 !== $canonical_cmp ) { return $canonical_cmp; }
+            $specificity_cmp = (int) $a['extra_tokens'] <=> (int) $b['extra_tokens'];
+            return 0 !== $specificity_cmp ? $specificity_cmp : strcmp( (string) $a['cap']['id'], (string) $b['cap']['id'] );
         } );
         $items = array();
         foreach ( array_slice( $scored, 0, $limit ) as $row ) {
