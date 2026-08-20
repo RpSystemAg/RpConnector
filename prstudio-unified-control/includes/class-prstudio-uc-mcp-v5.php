@@ -1093,7 +1093,7 @@ HTML;
         $tools[]=self::tool('browser_link_crawl','Browser link crawl','Use this to crawl links as rendered in the personal browser when runtime DOM behavior matters.',self::obj(array_merge($tab,array('url'=>self::str('Optional start URL.'),'max_pages'=>self::integer('Maximum pages.',1,500),'same_origin'=>self::bool('Stay on same origin.'))),array(),false),self::annotations(true,false,true,true));
         $tools[]=self::tool('browser_sitemap_crawl','Browser sitemap crawl','Use this to inspect sitemap URLs through the Browser Agent when live browser evidence is required.',self::obj(array_merge($tab,array('url'=>self::str('Sitemap URL.'),'max_urls'=>self::integer('Maximum URLs.',1,5000))),array('url'),false),self::annotations(true,false,true,true));
         $tools[]=self::tool('browser_responsive_matrix','Browser responsive matrix','Use this to render and hash the live page across mobile, tablet and desktop viewport sizes.',self::obj(array_merge($tab,array('viewports'=>array('type'=>'array','maxItems'=>12,'items'=>self::obj(array('width'=>self::integer('Width.',240,7680),'height'=>self::integer('Height.',240,7680),'name'=>self::str('Label.')),array('width','height'),false)))),array(),false),self::annotations(true,false,true,true));
-        $tools[]=self::tool('browser_actions_search','Search advanced browser actions','Use this when the exact browser operation is not one of the typed tools. Searches only actions with a real Browser Agent executor.',self::obj(array('query'=>self::str('Browser intent/action keyword.'),'limit'=>self::integer('',1,50)),array('query')),self::annotations(true,false,true,true));
+        $tools[]=self::tool('browser_actions_search','Search advanced browser actions','Use this when the exact browser operation is not one of the typed tools. Searches Italian and English intent through the shared action lexicon and returns only actions with a real Browser Agent executor.',self::obj(array('query'=>self::str('Browser intent/action keyword in Italian or English.'),'limit'=>self::integer('',1,50)),array('query')),self::annotations(true,false,true,true));
         $tools[]=self::tool('browser_batch','Browser batch on one controlled tab','Execute already-determined browser micro-actions in one resident lane-owned tab session. One external call and one final checkpoint. Each step may be native form {type:click,...} or ergonomic form {action:playwright_click,arguments:{...}}; no syntax-discovery call is required. Agent-created tabs remain owned across task boundaries in the same lane.',self::obj(array('steps'=>array('type'=>'array','minItems'=>1,'maxItems'=>200,'items'=>self::any_object('Ordered deterministic browser step.')),'tab_id'=>self::integer('Optional owned tab id.')) ,array('steps')),self::annotations(false,true,false,true));
         $tools[]=self::tool('browser_action','Advanced browser action','Use this for advanced Browser Agent actions. For 2+ deterministic UI steps already known from current evidence, call action=playwright_flow directly with arguments.steps to execute them in one browser task and avoid model round-trips. Otherwise use browser_actions_search for discovery. Arguments are passed intact after server-side contract validation.',self::obj(array('action'=>self::str('Exact Browser Agent action name.'),'arguments'=>self::any_object('Action arguments including target, selector, browser, tab_id, dimensions, etc.')),array('action','arguments')),self::annotations(false,true,false,true));
         $tools[]=self::tool('agency_status','Agency mission control status','Inspect durable queues, schedules, dead letters, Browser availability and truthful H24 runner health.',self::obj(),self::annotations(true));
@@ -1267,67 +1267,68 @@ HTML;
     }
     private static function browser_actions_search(array $args): array {
         $raw=strtolower(trim((string)($args['query']??'')));
-        $q=str_replace(array('puppeteer','schermata','screen shot'),array('playwright','screenshot','screenshot'),$raw);
+        // Puppeteer is a technical compatibility spelling, not a natural-language
+        // translation. Human-language equivalence belongs to the shared lexicon.
+        $q=str_replace('puppeteer','playwright',$raw);
         $limit=max(1,min(50,(int)($args['limit']??20)));$scored=array();$seen=array();
+        if(!class_exists('PRSTUDIO_UC_Action_Lexicon')){
+            $lexicon_path=defined('PRSTUDIO_UC_DIR')?rtrim((string)PRSTUDIO_UC_DIR,"/\\").'/includes/class-prstudio-uc-action-lexicon.php':__DIR__.'/class-prstudio-uc-action-lexicon.php';
+            if(is_readable($lexicon_path))require_once $lexicon_path;
+        }
+        $lexicon_ready=class_exists('PRSTUDIO_UC_Action_Lexicon');
+        $query_normalized=$lexicon_ready?PRSTUDIO_UC_Action_Lexicon::normalize_text($q):trim(str_replace(array('_','-'),' ',$q));
+        $query_concepts=$lexicon_ready?PRSTUDIO_UC_Action_Lexicon::query_concepts($q):array();
+        $query_keys=$lexicon_ready?PRSTUDIO_UC_Action_Lexicon::concept_keys($query_concepts):array();
         foreach(PRSTUDIO_UC_Contract::domain_actions('browser') as $meta){
             if('browser_agent'!==(string)($meta['executor']??''))continue;
             $action=self::canonical_browser_action((string)($meta['action']??''));
             if(isset($seen[$action]))continue;
-            $desc=(string)($meta['description']??'');$tool=(string)($meta['tool_name']??'');$hay=strtolower($action.' '.$desc.' '.$tool);$score=0;
+            $desc=(string)($meta['description']??'');$tool=(string)($meta['tool_name']??'');$score=0;
             $typed_tool=self::typed_browser_tool_for_action($action);
-            // Score per token, not on the whole phrase. Matching the raw query as
-            // one substring meant a natural request could never hit: "list pages"
-            // does not appear in "playwright_list_pages" because the action uses
-            // underscores, so the search returned nothing for the action that was
-            // sitting right there. Flattening separators and scoring each word
-            // makes the phrasing a caller actually types resolve.
-            // Include the typed tool's own name in what is searchable. A caller
-            // who types "open" means browser_open, but that word appears nowhere
-            // in playwright_new_page, so the obvious query returned an unrelated
-            // action. The typed name is the vocabulary the caller was given, so
-            // it belongs in the haystack.
-            $flat_action=str_replace(array('_','-'),' ',$action);
-            if(''!==$typed_tool){$flat_action.=' '.str_replace(array('browser_','_','-'),array('',' ',' '),$typed_tool);}
-            $flat_hay=str_replace(array('_','-'),' ',$hay).' '.str_replace(array('_','-'),' ',$typed_tool);
-            $q_flat=str_replace(array('_','-'),' ',$q);
-            if(''===$q){
+            if(''===$raw){
                 $score=1;
-            }elseif($action===$q||$flat_action===$q_flat){
-                $score=100;
-            }else{
-                $tokens=array_values(array_filter(preg_split('/\s+/',$q_flat)?:array(),static fn($t)=>strlen((string)$t)>1));
-                if(!$tokens){
-                    $score=str_contains($flat_hay,$q_flat)?30:0;
-                }else{
-                    $in_action=0;$in_hay=0;
-                    foreach($tokens as $token){
-                        if(str_contains($flat_action,$token)){$in_action++;continue;}
-                        if(str_contains($flat_hay,$token))$in_hay++;
+            }elseif($lexicon_ready){
+                $action_normalized=PRSTUDIO_UC_Action_Lexicon::normalize_text($action);
+                $tool_normalized=PRSTUDIO_UC_Action_Lexicon::normalize_text($tool);
+                $typed_normalized=PRSTUDIO_UC_Action_Lexicon::normalize_text($typed_tool);
+                if($query_normalized===$action_normalized||(''!==$tool_normalized&&$query_normalized===$tool_normalized)||(''!==$typed_normalized&&$query_normalized===$typed_normalized)){
+                    $score=120;
+                }elseif($query_concepts){
+                    $action_concepts=PRSTUDIO_UC_Action_Lexicon::query_concepts($action);
+                    $description_concepts=PRSTUDIO_UC_Action_Lexicon::query_concepts($desc);
+                    $tool_concepts=PRSTUDIO_UC_Action_Lexicon::query_concepts(trim($tool.' '.$typed_tool));
+                    $candidate_concepts=array_merge($action_concepts,$description_concepts,$tool_concepts);
+                    $candidate_keys=PRSTUDIO_UC_Action_Lexicon::concept_keys($candidate_concepts);
+                    if(PRSTUDIO_UC_Action_Lexicon::equivalent($action_concepts,$query_concepts)||PRSTUDIO_UC_Action_Lexicon::equivalent($tool_concepts,$query_concepts)){
+                        $score=105;
+                    }elseif(PRSTUDIO_UC_Action_Lexicon::covers($action_concepts,$query_concepts)||PRSTUDIO_UC_Action_Lexicon::covers($tool_concepts,$query_concepts)){
+                        $score=90;
+                    }elseif(PRSTUDIO_UC_Action_Lexicon::covers($description_concepts,$query_concepts)){
+                        $score=70;
+                    }elseif(PRSTUDIO_UC_Action_Lexicon::covers($candidate_concepts,$query_concepts)){
+                        $score=60;
+                    }else{
+                        $overlap=count(array_intersect($query_keys,$candidate_keys));
+                        if($overlap>0)$score=20+(int)round(35*$overlap/max(1,count($query_keys)));
                     }
-                    // Every token present in the action name is the strongest
-                    // signal a caller named the operation, however they spaced it.
-                    if($in_action===count($tokens))$score=80;
-                    elseif($in_action>0)$score=40+(int)round(20*$in_action/count($tokens));
-                    elseif($in_hay===count($tokens))$score=25;
-                    elseif($in_hay>0)$score=10;
                 }
             }
-            if($score<1)continue;if(str_contains($q,'screenshot')&&str_contains($action,'screenshot'))$score+=25;
-            // A typed tool exists for this action, so prefer it in the ranking:
-            // it is the cheaper, better-documented way to do the same thing.
+            if($score<1)continue;
             if(''!==$typed_tool)$score+=5;
             $aliases=str_starts_with($action,'playwright_')?array('puppeteer_'.substr($action,11)):array();
             $item=array('action'=>$action,'aliases'=>$aliases,'description'=>$desc,'read_only'=>(bool)($meta['read_only']??false),'destructive'=>(bool)($meta['destructive']??false),'input_schema'=>$meta['input_schema']??array(),'executor'=>'browser_agent');
             if(''!==$typed_tool){$item['tier']='typed';$item['canonical_tool']=$typed_tool;}else{$item['tier']='advanced';}$item['generic_dispatch_supported']=true;
             $scored[]=array('score'=>$score,'item'=>$item);$seen[$action]=true;
         }
+        // Preserve the Search Console fallback: GSC/Google/Search Console are
+        // technical provider aliases and remain independent from language scoring.
         foreach(array('search_console_sites','search_console_search_analytics','search_console_sitemaps','search_console_url_inspection','search_console_request_indexing') as $action){
             if(isset($seen[$action]))continue;$score=(''===$q||str_contains($action,$q)||str_contains($q,'google')||str_contains($q,'gsc')||str_contains($q,'search console'))?20:0;
             if($score)$scored[]=array('score'=>$score,'item'=>array('action'=>$action,'aliases'=>array(),'description'=>'Browser-first Google Search Console operation.','read_only'=>'search_console_request_indexing'!==$action,'destructive'=>false,'executor'=>'browser_agent'));
         }
         usort($scored,static fn($a,$b)=>$b['score']<=>$a['score'] ?: strcmp((string)$a['item']['action'],(string)$b['item']['action']));
         $items=array_map(static fn($row)=>$row['item'],array_slice($scored,0,$limit));
-        return array('count'=>count($items),'items'=>$items,'query'=>$raw,'query_normalized'=>$q,'browser_first'=>true,'puppeteer_aliases_normalized_to_playwright'=>true,'generic_dispatch_roundtrip_required'=>false);
+        return array('count'=>count($items),'items'=>$items,'query'=>$raw,'query_normalized'=>$query_normalized,'browser_first'=>true,'puppeteer_aliases_normalized_to_playwright'=>true,'generic_dispatch_roundtrip_required'=>false);
     }
 
 
