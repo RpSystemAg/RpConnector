@@ -177,6 +177,7 @@ try {
       frameId: row?.frameId ?? null,
       documentId: row?.documentId || '',
       hasResultProperty: Boolean(row && Object.prototype.hasOwnProperty.call(row, 'result')),
+      resultIsNull: row?.result === null,
       resultType: typeof row?.result,
       resultKeys: row?.result && typeof row.result === 'object' ? Object.keys(row.result).slice(0, 40) : [],
       url: typeof row?.result?.url === 'string' ? row.result.url : '',
@@ -188,6 +189,7 @@ try {
       tab: tab ? { id: tab.id, url: tab.url || '', title: tab.title || '' } : null,
       inline: { ok: false, rows: [], error: null },
       importedHealth: { ok: false, rows: [], error: null },
+      importedResponsive: { ok: false, rows: [], error: null },
     };
     if (!tab?.id) return output;
     try {
@@ -200,8 +202,18 @@ try {
     } catch (error) {
       output.inline.error = { name: error?.name || '', message: error?.message || String(error), stack: String(error?.stack || '').slice(0, 4000) };
     }
+
+    let module = null;
     try {
-      const module = await import(chrome.runtime.getURL('lib/local-page-functions.js'));
+      module = await import(chrome.runtime.getURL('lib/local-page-functions.js'));
+    } catch (error) {
+      const serialized = { name: error?.name || '', message: error?.message || String(error), stack: String(error?.stack || '').slice(0, 4000) };
+      output.importedHealth.error = serialized;
+      output.importedResponsive.error = serialized;
+      return output;
+    }
+
+    try {
       const rows = await chrome.scripting.executeScript({
         target: { tabId: tab.id, allFrames: false },
         func: module.collectLocalPageHealth,
@@ -211,20 +223,38 @@ try {
     } catch (error) {
       output.importedHealth.error = { name: error?.name || '', message: error?.message || String(error), stack: String(error?.stack || '').slice(0, 4000) };
     }
+
+    try {
+      const rows = await chrome.scripting.executeScript({
+        target: { tabId: tab.id, allFrames: false },
+        func: module.collectLocalResponsiveSnapshot,
+      });
+      output.importedResponsive.rows = summarizeRows(rows);
+      output.importedResponsive.ok = Boolean(rows?.[0]?.result?.url);
+    } catch (error) {
+      output.importedResponsive.error = { name: error?.name || '', message: error?.message || String(error), stack: String(error?.stack || '').slice(0, 4000) };
+    }
     return output;
   })()`);
 
   const tabUrl = String(report.probe?.tab?.url || '');
   const tabMatchesWordPress = tabUrl.startsWith(`${wpUrl}/`);
-  report.ok = Boolean(tabMatchesWordPress && report.probe?.inline?.ok && report.probe?.importedHealth?.ok);
+  report.ok = Boolean(
+    tabMatchesWordPress
+    && report.probe?.inline?.ok
+    && report.probe?.importedHealth?.ok
+    && report.probe?.importedResponsive?.ok
+  );
   report.finished_at = new Date().toISOString();
   await writeFile(join(artifactDir, 'scripting-health-probe.json'), JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report.probe, null, 2));
 
   if (!tabMatchesWordPress) throw new Error(`Active tab mismatch: ${tabUrl || '[missing]'}`);
   if (!report.probe?.inline?.ok) throw new Error(`Minimal chrome.scripting probe failed: ${JSON.stringify(report.probe?.inline)}`);
-  if (!report.probe?.importedHealth?.ok) throw new Error(`collectLocalPageHealth injection failed: ${JSON.stringify(report.probe?.importedHealth)}`);
-  console.log('PASS Chrome scripting probe: inline and imported page-health functions returned real WordPress results');
+  if (!report.probe?.importedHealth?.ok || !report.probe?.importedResponsive?.ok) {
+    throw new Error(`Imported scripting functions failed: health=${JSON.stringify(report.probe?.importedHealth)} responsive=${JSON.stringify(report.probe?.importedResponsive)}`);
+  }
+  console.log('PASS Chrome scripting probe: inline, imported health and imported responsive functions returned real WordPress results');
 } catch (error) {
   report.error = { message: error?.message || String(error), stack: String(error?.stack || '').slice(0, 12000) };
   report.finished_at = new Date().toISOString();
