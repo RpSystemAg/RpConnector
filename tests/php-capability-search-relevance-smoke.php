@@ -177,6 +177,12 @@ $equivalent = array(
     array('rimborsa un ordine', 'refund an order'),
     array('controlla la sicurezza', 'check security'),
     array('fai uno screenshot della pagina', 'take a page screenshot'),
+
+    // Multi-word aliases must be consumed as one concept before stop words.
+    array('genera la mappa del sito', 'generate the sitemap'),
+    array('cerca le parole chiave', 'search keywords'),
+    array('modifica il foglio di stile', 'update CSS'),
+    array('crea un backup della banca dati', 'create a database backup'),
 );
 
 foreach ($equivalent as $pair) { expect_identical_results($pair[0], $pair[1]); }
@@ -197,6 +203,10 @@ $shared_pairs = array(
     array('piè di pagina', 'footer'),
     array('iva e fattura', 'vat and invoice'),
     array('carrello', 'cart'),
+	array('mappa del sito', 'sitemap'),
+	array('parole chiave', 'keywords'),
+	array('foglio di stile', 'CSS'),
+	array('banca dati', 'database'),
 );
 foreach ($shared_pairs as [$italian_query, $english_query]) {
     $it_concepts = PRSTUDIO_UC_Action_Lexicon::query_concepts($italian_query);
@@ -210,6 +220,9 @@ foreach ($shared_pairs as [$italian_query, $english_query]) {
     }
     if (action_index_tools($italian_query) !== action_index_tools($english_query)) {
         fail_relevance("action index ranking differs for '{$italian_query}'/'{$english_query}'");
+    }
+    if (result_ids($italian_query) !== result_ids($english_query)) {
+        fail_relevance("capability registry ranking differs for '{$italian_query}'/'{$english_query}'");
     }
     if (PRSTUDIO_UC_Action_Index::domain_for_query($italian_query) !== PRSTUDIO_UC_Action_Index::domain_for_query($english_query)) {
         fail_relevance("action index domain differs for '{$italian_query}'/'{$english_query}'");
