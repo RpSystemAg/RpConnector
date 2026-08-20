@@ -12,7 +12,7 @@ try {
     fail('MCP tools() must execute without Throwable: ' . get_class($e) . ': ' . $e->getMessage());
 }
 if (!is_array($tools)) fail('tools() must return array');
-// 120: browser_find, browser_evaluate and browser_upload_file close the last
+// 123: browser_find, browser_evaluate and browser_upload_file close the last
 // gaps against the reference browser surface (tests/validate-reference-parity.py).
 //
 // A concurrent change set this to 119 in anticipation of prstudio_research_radar
@@ -22,7 +22,7 @@ if (!is_array($tools)) fail('tools() must return array');
 //
 // The count is asserted precisely so an inventory change is deliberate, and it
 // is what caught the collision.
-if (count($tools) !== 120) fail('expected 120 tools, got ' . count($tools));
+if (count($tools) !== 123) fail('expected 123 tools, got ' . count($tools));
 $names = [];
 foreach ($tools as $index => $tool) {
     if (!is_array($tool)) fail("tool {$index} is not array");

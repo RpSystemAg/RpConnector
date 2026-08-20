@@ -911,6 +911,23 @@ HTML;
         $tools[]=self::tool('browser_upload_file','Attach a file to a file input','Set the files of a file input, addressed by target_ref or selector, the way an operator would through the picker.',self::obj(array_merge($selector,array(
             'paths'=>array('type'=>'array','items'=>array('type'=>'string'),'description'=>'Absolute paths available to the Browser Agent host.')
         ))),self::annotations(false,false,false,true));
+        // Recording a run so a person can watch it back. The extension already
+        // streams a live session over WebRTC, which is a different thing: a
+        // stream is for watching now, a recording is for reviewing what
+        // happened. The catalogue action existed; nothing could ask for it.
+        $tools[]=self::tool('browser_video','Record the browser session','Start or stop a video recording of the controlled tab, so a run can be reviewed after it finishes rather than only watched live.',self::obj(array_merge($tab,array(
+            'action'=>self::str('start or stop.')
+        )),array('action')),self::annotations(false,false,false,true));
+        // A viewport width is not a phone. Device emulation also sets the user
+        // agent, the touch points and mouse-to-touch translation, so hover stops
+        // producing hover states -- a responsive layout can pass a narrow
+        // viewport and fail a real device.
+        $tools[]=self::tool('browser_emulate_device','Emulate a device','Emulate a real device rather than only resizing: user agent, touch points and pointer translation together. Use this to test a phone or tablet layout honestly.',self::obj(array_merge($tab,array(
+            'device'=>self::str('Device name, for example iPhone 15 or Pixel 8.')
+        )),array('device')),self::annotations(false,false,false,true));
+        $tools[]=self::tool('browser_color_scheme','Set the colour scheme','Render the page as light or dark so both themes can be observed.',self::obj(array_merge($tab,array(
+            'scheme'=>self::str('light, dark or no-preference.')
+        )),array('scheme')),self::annotations(false,false,false,true));
         $tools[]=self::tool('browser_dom','Browser DOM snapshot','Use this for a structured live DOM snapshot from the personal Browser.',self::obj($tab),self::annotations(true,false,true,true));
         $tools[]=self::tool('browser_accessibility','Browser accessibility tree','Use this for the live accessibility tree and semantic controls.',self::obj($tab),self::annotations(true,false,true,true));
         // button and click_count instead of separate right-click and triple-click
@@ -1422,6 +1439,9 @@ HTML;
             case 'browser_find': return self::browser_dispatch('playwright_find_elements',$args);
             case 'browser_evaluate': return self::browser_dispatch('playwright_evaluate',$args);
             case 'browser_upload_file': return self::browser_dispatch('playwright_set_input_files',$args);
+            case 'browser_video': return self::browser_dispatch('stop'===strtolower((string)($args['action']??''))?'playwright_stop_video':'playwright_start_video',$args);
+            case 'browser_emulate_device': return self::browser_dispatch('playwright_emulate_device',$args);
+            case 'browser_color_scheme': return self::browser_dispatch('playwright_set_color_scheme',$args);
             case 'browser_snapshot': return self::browser_dispatch('playwright_observation_bundle',array_merge($args,array('includeScreenshot'=>true,'detail'=>'compact','sync_wait_seconds'=>15)));
             case 'browser_dom': return self::browser_dispatch('playwright_dom_snapshot',$args);
             case 'browser_accessibility': return self::browser_dispatch('playwright_accessibility_snapshot',$args);

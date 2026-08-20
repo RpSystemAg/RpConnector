@@ -16,6 +16,16 @@ tool per gesture. That is why several rows below map to the same tool with
 different parameters, and why adding browser_right_click would have been the
 wrong answer to a missing right click.
 
+WHAT IS DELIBERATELY NOT LISTED
+-------------------------------
+One reference tool has no row: upload_image, which puts an image into the
+conversation rather than into the page. It is a property of how the agent talks
+to a person, not of what it can do in a browser, so this suite has nothing that
+should provide it. Recorded here rather than dropped silently, because a row
+quietly missing from a parity list is indistinguishable from a gap nobody
+noticed -- and the first version of this file omitted seven of the reference's
+twenty-two tools without saying so.
+
 HOW TO CHANGE IT
 ----------------
 Adding a row is how a newly-noticed reference capability enters the backlog: it
@@ -86,6 +96,32 @@ REFERENCE_SURFACE: list[dict] = [
     {"group": "control", "reference": "resize_window", "provided_by": "browser_viewport", "via": ""},
     {"group": "control", "reference": "browser_batch", "provided_by": "browser_batch", "via": ""},
     {"group": "control", "reference": "file_upload", "provided_by": "browser_upload_file", "via": ""},
+
+    # -- Recording and saved procedures -----------------------------------
+    # gif_creator records what the agent did so a person can watch it back. It
+    # is the capability behind the observation that the reference "seems to be
+    # recording the screen": the extension streams a live session but had no way
+    # to be asked for a recording of a run.
+    {"group": "record", "reference": "gif_creator", "provided_by": "browser_video", "via": ""},
+    {"group": "record", "reference": "shortcuts_list", "provided_by": "local_studio", "via": ""},
+    {"group": "record", "reference": "shortcuts_execute", "provided_by": "local_studio", "via": ""},
+
+    # -- Choosing which browser -------------------------------------------
+    # The reference can enumerate connected browsers and switch between them.
+    # Here the equivalent is the paired device: browser_status lists them and
+    # every browser tool takes a device_id.
+    {"group": "browser_choice", "reference": "list_connected_browsers", "provided_by": "browser_status", "via": "device_status"},
+    {"group": "browser_choice", "reference": "select_browser", "provided_by": "browser_launch", "via": "device_id"},
+    {"group": "browser_choice", "reference": "switch_browser", "provided_by": "browser_open", "via": "device_id"},
+
+    # -- Emulation --------------------------------------------------------
+    # The reference resize_window is not only a size. Its mobile preset also
+    # emulates the device: an Android user agent, five touch points and
+    # mouse-to-touch translation, so hover stops producing hover states. A
+    # viewport resized to 375 wide is not the same test as a phone, and a
+    # responsive layout can pass one and fail the other.
+    {"group": "emulation", "reference": "resize_window(preset)", "provided_by": "browser_emulate_device", "via": ""},
+    {"group": "emulation", "reference": "resize_window(colorScheme)", "provided_by": "browser_color_scheme", "via": ""},
 ]
 
 DUMP_PHP = r"""<?php
