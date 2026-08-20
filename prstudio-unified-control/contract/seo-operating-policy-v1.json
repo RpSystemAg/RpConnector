@@ -1,0 +1,135 @@
+{
+  "id": "prstudio.seo-operating-policy",
+  "version": "1.0.0",
+  "scope": "global",
+  "purpose": "Global RP Studio decision and execution method for SEO, organic search and SEO-directed content or media work. Client data, brand, history and visual systems remain site-scoped.",
+  "activation": {
+    "rule": "Apply when the task concerns SEO, organic search, search-performance evidence, organic content, or media directly supporting an SEO objective. Do not apply merely because a non-SEO task happens on a website.",
+    "signals": [
+      "SEO",
+      "Google Search Console",
+      "GSC",
+      "Ahrefs",
+      "Semrush",
+      "Screaming Frog",
+      "SERP",
+      "keyword research",
+      "search intent",
+      "organic traffic",
+      "organic search",
+      "indexing",
+      "indexability",
+      "crawlability",
+      "canonical",
+      "SEO schema",
+      "internal linking",
+      "backlink analysis",
+      "cannibalization",
+      "content gap",
+      "organic content refresh",
+      "organic landing page",
+      "SEO audit",
+      "SEO metadata",
+      "article or guide with an organic-search objective",
+      "image or media produced as part of SEO editorial work"
+    ],
+    "non_signals": [
+      "stock update",
+      "order management",
+      "generic customer management",
+      "generic database work",
+      "CSS bug fixing without an organic-search objective",
+      "plugin or theme maintenance",
+      "generic browser automation",
+      "engineering work",
+      "non-SEO UI work",
+      "purely promotional or social content without an organic-search objective"
+    ]
+  },
+  "method": [
+    "RESEARCH",
+    "EVIDENCE",
+    "BENCHMARK",
+    "STRATEGY",
+    "EXECUTION",
+    "VERIFICATION",
+    "ITERATION"
+  ],
+  "operating_rules": [
+    "Understand the current site, entity and content before deciding what to change.",
+    "Retrieve the current site's site-scoped memory and relevant history when available.",
+    "Treat GSC, Ahrefs, Semrush, Screaming Frog and other reports as evidence, never as automatic commands.",
+    "Use current research when a decision depends on the present state of the web, search results, competitors or SEO practice.",
+    "Analyze real search intent and relevant observable SERPs when pertinent.",
+    "Benchmark against the strongest relevant competitors and a top-tier international SEO/content agency standard appropriate to the case.",
+    "Check cannibalization, keyword-to-URL ownership, entity/topic coverage, content gaps, factual/source quality, internal linking, crawlability, indexability, canonical, schema, metadata, headings, images/ALT, user usefulness and business/commercial fit when pertinent.",
+    "Do not publish or modify something merely because an external tool flags an issue; choose the strongest intervention supported by the evidence.",
+    "Execute with existing RP Studio capabilities, then verify the real outcome.",
+    "Run the final quality gate. If the work is below the relevant benchmark, iterate instead of accepting the first solution."
+  ],
+  "quality_gate": {
+    "decision": [
+      "PASS",
+      "ITERATE"
+    ],
+    "dimensions": [
+      "search_intent_fit",
+      "evidence_quality",
+      "competitive_advantage",
+      "content_usefulness",
+      "technical_correctness",
+      "business_fit",
+      "brand_consistency",
+      "media_realism",
+      "mobile_readability",
+      "currentness"
+    ],
+    "conditional_dimensions": [
+      "brand_consistency",
+      "media_realism",
+      "mobile_readability"
+    ],
+    "no_numeric_score": true,
+    "guiding_question": "Compared with the best relevant results observable today and a top-tier agency standard, is this solution genuinely competitive?",
+    "failure_action": "ITERATE"
+  },
+  "media_seo": {
+    "rule": "Derive the visual system from the current client/site. Never inherit another site's branding.",
+    "process": [
+      "Analyze the content and SEO objective.",
+      "Retrieve the current site's brand and visual system from site-scoped memory when available.",
+      "If that memory is absent, analyze the current client/site rather than importing a global style.",
+      "Perform current visual research when pertinent and benchmark against strong contemporary references for the sector and format.",
+      "Create media coherent with the current client and verify realism, readability, relevance and quality.",
+      "Iterate when the media does not pass the quality gate."
+    ],
+    "product_truth": "Never invent brands, labels, vintages, packaging or product information when depicting a real product or a credible real-world category."
+  },
+  "context_partition": {
+    "global": [
+      "SEO method",
+      "quality standard",
+      "research process",
+      "decision process"
+    ],
+    "site_scoped": [
+      "brand",
+      "visual identity",
+      "target audience",
+      "locations",
+      "market",
+      "products",
+      "competitors",
+      "content",
+      "previous decisions",
+      "SEO history",
+      "GSC evidence",
+      "approved visual standards"
+    ],
+    "invariant": "Never promote site-specific information into the global policy."
+  },
+  "tool_surface": {
+    "new_public_mcp_tools": 0,
+    "rule": "The policy is internal operating infrastructure and must not add, remove, hide or replace public MCP tools or capabilities."
+  }
+}
