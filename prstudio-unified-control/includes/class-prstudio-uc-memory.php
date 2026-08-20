@@ -196,9 +196,7 @@ final class PRSTUDIO_UC_Memory {
             $extras = array();
             foreach ( array( 'mission_id'=>'mission', 'capability'=>'capability', 'state_initial'=>'initial', 'action'=>'action', 'verification'=>'verification', 'evidence'=>'evidence', 'fingerprint'=>'fingerprint', 'memory_reused'=>'memory_reused', 'reason'=>'reason', 'duration_ms'=>'duration_ms' ) as $key=>$label ) {
                 if ( ! array_key_exists( $key, $clean ) || is_array( $clean[$key] ) || is_object( $clean[$key] ) ) { continue; }
-                $value = str_replace( array("
-","
-","	"), ' ', substr( (string) $clean[$key], 0, 180 ) ); $extras[] = $label . '=' . $value;
+                $value = str_replace( array("\n","\n","\t"), ' ', substr( (string) $clean[$key], 0, 180 ) ); $extras[] = $label . '=' . $value;
             }
             $line = sprintf( '[%s] #%d %s%s%s%s job=%s%s hash=%s', $entry['gmt'], $entry['seq'], $entry['event'], $method ? ' via=' . substr( $method, 0, 100 ) : '', $resource ? ' resource=' . $resource : '', $outcome ? ' outcome=' . substr( $outcome, 0, 80 ) : '', $job ?: '-', $extras ? ' ' . implode( ' ', $extras ) : '', substr( $entry['hash'], 0, 16 ) );
             @file_put_contents( self::summary_path(), $line . "\n", FILE_APPEND | LOCK_EX );
@@ -305,16 +303,50 @@ final class PRSTUDIO_UC_Memory {
         return is_array( $data['context'] ?? null ) ? $data['context'] : array();
     }
 
+    /** Search durable memory through the same IT/EN concepts used by discovery. */
     public static function search( string $query, string $type = '', int $limit = 20 ): array {
-        $state = self::read_state(); $q = strtolower( trim( $query ) ); $type = sanitize_key( $type ); $limit = max( 1, min( 50, $limit ) ); $items = array();
+        $state = self::read_state();
+        $q = trim( $query );
+        $q_lower = strtolower( $q );
+        $type = sanitize_key( $type );
+        $limit = max( 1, min( 50, $limit ) );
+        if ( ! class_exists( 'PRSTUDIO_UC_Action_Lexicon' ) ) {
+            $lexicon_path = __DIR__ . '/class-prstudio-uc-action-lexicon.php';
+            if ( is_readable( $lexicon_path ) ) { require_once $lexicon_path; }
+        }
+        $lexicon_ready = class_exists( 'PRSTUDIO_UC_Action_Lexicon' );
+        $technical_query = '' !== $q && ( str_contains( $q, '://' ) || 1 === preg_match( '/[._:\\/]/', $q ) );
+        $query_normalized = $lexicon_ready ? PRSTUDIO_UC_Action_Lexicon::normalize_text( $q ) : strtolower( trim( str_replace( array( '_', '-' ), ' ', $q ) ) );
+        $query_concepts = ( ! $technical_query && $lexicon_ready ) ? PRSTUDIO_UC_Action_Lexicon::query_concepts( $q ) : array();
+        $query_keys = ( $lexicon_ready && $query_concepts ) ? PRSTUDIO_UC_Action_Lexicon::concept_keys( $query_concepts ) : array();
+        $items = array();
         foreach ( (array) ( $state['resources'] ?? array() ) as $row ) {
             if ( $type && (string) ( $row['type'] ?? '' ) !== $type ) { continue; }
-            $haystack = strtolower( (string) ( $row['type'] ?? '' ) . ' ' . (string) ( $row['id'] ?? '' ) . ' ' . json_encode( $row['summary'] ?? array(), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) );
-            if ( '' !== $q && false === strpos( $haystack, $q ) ) { continue; }
+            $haystack = (string) ( $row['type'] ?? '' ) . ' ' . (string) ( $row['id'] ?? '' ) . ' ' . json_encode( $row['summary'] ?? array(), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+            $hay_lower = strtolower( $haystack );
+            $match = '' === $q;
+            if ( ! $match && $technical_query ) { $match = str_contains( $hay_lower, $q_lower ); }
+            if ( ! $match && $query_concepts ) {
+                $candidate_concepts = PRSTUDIO_UC_Action_Lexicon::query_concepts( $haystack );
+                $candidate_keys = PRSTUDIO_UC_Action_Lexicon::concept_keys( $candidate_concepts );
+                $match = PRSTUDIO_UC_Action_Lexicon::equivalent( $candidate_concepts, $query_concepts )
+                    || PRSTUDIO_UC_Action_Lexicon::covers( $candidate_concepts, $query_concepts )
+                    || 0 < count( array_intersect( $query_keys, $candidate_keys ) );
+            }
+            if ( ! $match && ! $technical_query && '' !== $q ) {
+                $hay_normalized = $lexicon_ready ? PRSTUDIO_UC_Action_Lexicon::normalize_text( $haystack ) : strtolower( trim( str_replace( array( '_', '-' ), ' ', $haystack ) ) );
+                $match = str_contains( $hay_lower, $q_lower ) || ( '' !== $query_normalized && str_contains( $hay_normalized, $query_normalized ) );
+            }
+            if ( ! $match ) { continue; }
             $items[] = array( 'type'=>$row['type']??'', 'id'=>$row['id']??'', 'fingerprint'=>$row['fingerprint']??'', 'verified'=>(bool)($row['verified']??false), 'updated_gmt'=>$row['updated_gmt']??'', 'expires_gmt'=>$row['expires_gmt']??'', 'summary'=>$row['summary']??array() );
         }
-        usort( $items, static fn( $a, $b ) => strcmp( (string) $b['updated_gmt'], (string) $a['updated_gmt'] ) );
-        return array( 'query'=>$query, 'type'=>$type, 'count'=>min(count($items),$limit), 'items'=>array_slice($items,0,$limit), 'site'=>self::site_identity(), 'memory_summary'=>basename(self::summary_path()) );
+        usort( $items, static function( array $a, array $b ): int {
+            $updated = strcmp( (string) ( $b['updated_gmt'] ?? '' ), (string) ( $a['updated_gmt'] ?? '' ) );
+            if ( 0 !== $updated ) { return $updated; }
+            $type_cmp = strcmp( (string) ( $a['type'] ?? '' ), (string) ( $b['type'] ?? '' ) );
+            return 0 !== $type_cmp ? $type_cmp : strcmp( (string) ( $a['id'] ?? '' ), (string) ( $b['id'] ?? '' ) );
+        } );
+        return array( 'query'=>$query, 'query_normalized'=>$query_normalized, 'bilingual_lexicon'=>$lexicon_ready, 'type'=>$type, 'count'=>min(count($items),$limit), 'items'=>array_slice($items,0,$limit), 'site'=>self::site_identity(), 'memory_summary'=>basename(self::summary_path()) );
     }
 
     public static function snapshot(): array {
