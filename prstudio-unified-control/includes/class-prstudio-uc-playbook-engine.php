@@ -1,11 +1,12 @@
 <?php
 
 if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
+require_once __DIR__ . '/class-prstudio-uc-site-learning.php';
 
 /** Deterministic, versioned mission plans for the SQL agency runtime. */
 final class PRSTUDIO_UC_Playbook_Engine {
-	public const VERSION = '1.0.0';
-	private const TYPES = array( 'site_guardian','social_growth','commerce_growth','browser_deep_audit' );
+	public const VERSION = '1.1.0';
+	private const TYPES = array( 'site_guardian','social_growth','commerce_growth','browser_deep_audit','site_study' );
 
 	public static function types(): array { return self::TYPES; }
 	public static function supports( string $type ): bool { return in_array( sanitize_key( $type ), self::TYPES, true ); }
@@ -28,7 +29,7 @@ final class PRSTUDIO_UC_Playbook_Engine {
 	}
 
 	public static function build( string $type, array $context = array() ): array {
-		$type=sanitize_key($type);if(!self::supports($type))return array();$url=self::url($context);
+		$type=sanitize_key($type);if(!self::supports($type))return array();$url=self::url($context);$site_learning=array();
 		switch($type){
 			case 'site_guardian':
 				$steps=array(
@@ -55,14 +56,22 @@ final class PRSTUDIO_UC_Playbook_Engine {
 					self::step('accessibility','browser.action',array('action'=>'playwright_accessibility_scan','arguments'=>array()),array('requires_browser'=>true)),
 					self::step('screenshot','browser.action',array('action'=>'playwright_screenshot_page','arguments'=>array()),array('requires_browser'=>true)),
 				);break;
+			case 'site_study':
+				$study_context=$context;
+				if(''!==$url)$study_context['url']=$url;
+				$site_learning=PRSTUDIO_UC_Site_Learning::prepare_context($study_context);
+				$steps=array(
+					self::step('site_study_discovery','browser.action',array('action'=>'playwright_link_crawl','arguments'=>(array)($site_learning['crawler_arguments']??array())),array('requires_browser'=>true,'timeout_seconds'=>300)),
+				);break;
 			default:$steps=array();
 		}
 		$plan=array('version'=>self::VERSION,'type'=>$type,'steps'=>$steps,'created_from'=>'deterministic_catalog');
+		if('site_study'===$type){$plan['site_learning']=array_intersect_key($site_learning,array_flip(array('module_id','origin','run_id')));}
 		$plan['hash']=hash('sha256',PRSTUDIO_UC_Idempotency::canonical_json($plan));
 		return $plan;
 	}
 
 	public static function describe(): array {
-		$out=array();foreach(self::TYPES as $type){$plan=self::build($type,array());$out[$type]=array('version'=>self::VERSION,'steps'=>count($plan['steps']??array()),'plan_hash'=>$plan['hash']??'');}return $out;
+		$out=array();foreach(self::TYPES as $type){$plan=self::build($type,array('_describe_only'=>true));$out[$type]=array('version'=>self::VERSION,'steps'=>count($plan['steps']??array()),'plan_hash'=>$plan['hash']??'');}return $out;
 	}
 }
