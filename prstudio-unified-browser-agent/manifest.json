@@ -6,6 +6,7 @@
   "minimum_chrome_version": "120",
   "permissions": [
     "tabs",
+    "tabGroups",
     "scripting",
     "storage",
     "debugger",

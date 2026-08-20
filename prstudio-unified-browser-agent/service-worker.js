@@ -39,6 +39,7 @@ import { createObservationEnvelope, redactObservation } from "./lib/observation-
 import { migrateOneGuardLegacyState } from "./lib/legacy-one-guard-migration.js";
 import { parseUserUrl, describeUrlInput } from "./lib/url-input.js";
 import { agentCursorPainter, isDrawablePoint, cursorModeForEvent, CURSOR_ELEMENT_ID } from "./lib/agent-cursor.js";
+import { AGENT_GROUP_TITLE, AGENT_GROUP_COLOR, isReusableGroup } from "./lib/agent-tab-group.js";
 import {
   LOCAL_STUDIO_VERSION,
   LOCAL_STUDIO_FEATURES,
@@ -75,6 +76,7 @@ const STORAGE_KEYS = {
   LOGS: "prstudioLogs",
   LOG_QUEUE: "prstudioLogQueue",
   AGENT_WINDOW: "prstudioAgentWindow",
+  AGENT_TAB_GROUP: "prstudioAgentTabGroup",
   TAB_REGISTRY: "prstudioTabRegistry",
   TAB_AFFINITY: "prstudioTabAffinity",
   LAST_AGENT_TAB: "prstudioLastAgentTab",
@@ -4170,6 +4172,38 @@ async function registerOwnedTab(tabId, meta = {}) {
   return registry[String(id)];
 }
 
+
+// File the agent's tabs into their own group, so the operator and the agent can
+// work in the same Chrome without colliding. Attaching to the real browser is
+// the point of this product; interleaving tabs with the operator's own was not.
+//
+// Best-effort by construction. A Chrome that will not group a tab must still run
+// the task in it: under LAW 1 nothing here may stop a mutation, and filing a tab
+// is bookkeeping, not execution.
+//
+// The group is deliberately left expanded. Collapsing it would hide the work,
+// and invisible work is the defect this suite has been removing all week.
+async function fileTabIntoAgentGroup(tabId, windowId) {
+  if (!chrome.tabGroups || !chrome.tabs?.group) return null;
+  const id = Number(tabId || 0);
+  if (!id) return null;
+  try {
+    const stored = (await chrome.storage.local.get(STORAGE_KEYS.AGENT_TAB_GROUP))?.[STORAGE_KEYS.AGENT_TAB_GROUP];
+    const storedId = Number(stored?.groupId || 0);
+    const live = storedId ? await chrome.tabGroups.get(storedId).catch(() => null) : null;
+
+    const groupId = isReusableGroup(storedId, live, windowId)
+      ? await chrome.tabs.group({ groupId: storedId, tabIds: [id] })
+      : await chrome.tabs.group({ tabIds: [id], createProperties: { windowId: Number(windowId) } });
+
+    await chrome.tabGroups.update(groupId, { title: AGENT_GROUP_TITLE, color: AGENT_GROUP_COLOR, collapsed: false }).catch(() => {});
+    await chrome.storage.local.set({ [STORAGE_KEYS.AGENT_TAB_GROUP]: { groupId: Number(groupId), windowId: Number(windowId), updatedAt: Date.now() } });
+    return Number(groupId);
+  } catch {
+    return null;
+  }
+}
+
 async function createOwnedAgentTab(state, urlInput, meta = {}) {
   const url = validateNavigationUrl(urlInput);
   const windowId = await ensureAgentWindow();
@@ -4180,6 +4214,7 @@ async function createOwnedAgentTab(state, urlInput, meta = {}) {
   const tab = await chrome.tabs.create({ windowId, url: "about:blank", active: false });
   const tabId = Number(tab?.id || 0);
   if (!tabId) throw codedError("agent_tab_create_failed", "Chrome non ha restituito l'identificativo della nuova scheda agente.");
+  await fileTabIntoAgentGroup(tabId, windowId);
   const laneId = String(meta.laneId || state?.arguments?._prstudio_lane_id || "");
   const taskId = String(meta.taskId || state?.taskId || "");
   const expectedOrigin = String(meta.expectedOrigin || (() => { try { return new URL(url).origin; } catch { return ""; } })());
