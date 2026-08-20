@@ -80,6 +80,69 @@ check(!PRSTUDIO_UC_SEO_Operating_Policy::applies_to('Aggiorna lo stock di questo
 check(!PRSTUDIO_UC_SEO_Operating_Policy::applies_to('Correggi questo bug CSS'),'G CSS bug does not activate SEO policy');
 check(str_contains(PRSTUDIO_UC_SEO_Operating_Policy::instruction_fragment(),'never inherits another site\'s branding'),'SEO media rule derives branding from the current site');
 
+// The policy has to recognise SEO work in whichever language it is asked for.
+//
+// Measured across 18 equivalent objectives before the bilingual trigger table
+// existed, it fired on 6 of the Italian ones and 7 of the English ones, so this
+// was never only an Italian gap: "sistema la sitemap", "controlla il file
+// robots", "sistema i reindirizzamenti" and "controlla i dati strutturati"
+// activated nothing in EITHER language.
+//
+// Each row asserts two things at once, and the first is the one that matters.
+// The two languages must AGREE -- a policy that attaches for an English
+// operator and not an Italian one is two different products sharing a version
+// number, and nothing in the runtime would report the difference. Then both
+// must match what the row says the right answer is, which is what catches a
+// term that was never taught rather than merely taught unevenly.
+$seo_pairs = array(
+    // Work that must carry the policy.
+    array('migliora il posizionamento del sito', 'improve the site ranking', true),
+    array('fai una ricerca di parole chiave', 'do keyword research', true),
+    array('ottimizza per i motori di ricerca', 'optimize for search engines', true),
+    array('aumenta le visite organiche', 'increase organic traffic', true),
+    array('sistema la sitemap', 'fix the sitemap', true),
+    array('controlla il file robots', 'check the robots file', true),
+    array('analizza i backlink', 'analyse the backlinks', true),
+    array('ottimizza i meta title', 'optimise the meta titles', true),
+    array('controlla la search console', 'check search console', true),
+    array('analisi delle serp', 'serp analysis', true),
+    array('migliora la visibilita su google', 'improve google visibility', true),
+    array('sistema i reindirizzamenti', 'fix the redirects', true),
+    array('controlla i dati strutturati', 'check structured data', true),
+    array('correggi i titoli duplicati', 'fix duplicate titles', true),
+    array('analizza i concorrenti organici', 'analyse organic competitors', true),
+    array('controlla i link interni', 'check the internal links', true),
+    array('migliora la velocita della pagina per la seo', 'improve page speed for seo', true),
+
+    // Work that must not. Page speed and organic are the two traps: both are
+    // ranking vocabulary and both are ordinary words. "prodotti organici" is
+    // food in a shop this suite is built to run, and a slow page is as often a
+    // hosting complaint as an SEO task, so neither activates on its own.
+    array('migliora la velocita della pagina', 'improve page speed', false),
+    array('vendi prodotti organici', 'sell organic products', false),
+    array('svuota la cache', 'purge the cache', false),
+    array('rimborsa un ordine', 'refund an order', false),
+    array('carica una immagine', 'upload an image', false),
+    array('pubblica un articolo', 'publish an article', false),
+);
+foreach ($seo_pairs as $row) {
+    list($italian, $english, $expected) = $row;
+    $itHit = PRSTUDIO_UC_SEO_Operating_Policy::applies_to($italian);
+    $enHit = PRSTUDIO_UC_SEO_Operating_Policy::applies_to($english);
+    check(
+        $itHit === $enHit && $itHit === $expected,
+        sprintf(
+            'SEO activation %s: "%s" / "%s" (IT=%s EN=%s, expected %s)',
+            ($itHit !== $enHit) ? 'DISAGREES between languages' : 'correct',
+            $italian,
+            $english,
+            $itHit ? 'yes' : 'no',
+            $enHit ? 'yes' : 'no',
+            $expected ? 'yes' : 'no'
+        )
+    );
+}
+
 // Requested isolation case H: same global method, distinct site-scoped context.
 PRSTUDIO_UC_Memory::$identity=['key'=>'site-a','host'=>'a.example','path'=>'/','blog_id'=>1];
 $siteA=PRSTUDIO_UC_SEO_Operating_Policy::runtime_context('Analizza Search Console e proponi la strategia SEO');

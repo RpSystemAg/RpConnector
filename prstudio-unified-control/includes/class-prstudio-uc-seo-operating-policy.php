@@ -59,6 +59,80 @@ final class PRSTUDIO_UC_SEO_Operating_Policy {
     }
 
     /**
+     * What counts as SEO work, in whichever language the objective was written.
+     *
+     * Every row carries both languages. That is the whole discipline here: an
+     * Italian operator and an English one must get the same policy for the same
+     * request, and the only way that stays true as the table grows is if adding
+     * a term forces you to add it in both languages at once, on the same line,
+     * where a missing half is visible.
+     *
+     * Measured across 18 equivalent objectives before this table existed, the
+     * policy fired on 6 of the Italian ones and 7 of the English ones -- so this
+     * was never only an Italian gap. "sistema la sitemap", "controlla il file
+     * robots", "sistema i reindirizzamenti" and "controlla i dati strutturati"
+     * activated nothing in EITHER language, because sitemap, robots, redirects
+     * and structured data were simply absent. Three pairs also disagreed with
+     * each other: "meta title" matched but "meta titles" did not, so the same
+     * request activated the policy in Italian and not in English.
+     *
+     * Two things are deliberately NOT here.
+     *
+     * Page speed and Core Web Vitals as bare terms. They are ranking factors,
+     * and they are also ordinary operations work. "migliora la velocita della
+     * pagina" is as likely to be a hosting complaint as an SEO task, so speed
+     * activates only through the conditional pairing below, when the objective
+     * itself says the purpose is search.
+     *
+     * Bare "organic". In Italian this suite serves shops, and "prodotti
+     * organici" is food, not search. Both languages therefore require organic
+     * to sit next to a search-domain noun, in either word order.
+     */
+    private const TRIGGERS = array(
+
+        // The field itself, and the tools people name instead of naming it.
+        '/\bseo\b/',
+        '/\b(?:google )?search console\b/', '/\bgsc\b/', '/\bconsole di ricerca\b/',
+        '/\bahrefs\b/', '/\bsemrush\b/', '/\bscreaming frog\b/', '/\bseozoom\b/', '/\bsistrix\b/', '/\bubersuggest\b/', '/\bmoz\b/',
+        '/\bserps?\b/', '/\bsearch engines?\b/', '/\bmotor[ei] di ricerca\b/',
+
+        // Rankings and visibility.
+        '/\brank(?:s|ing|ings)?\b/', '/\bposizionament[oi]\b/', '/\bposizionar\w*\b/',
+        '/\borganic\s+(?:search|traffic|visits?|visibility|rankings?|results?|competitors?|content|growth|landing\s+pages?)\b/',
+        '/\b(?:traffico|visite|ricerc\w+|risultat[oi]|concorrent[ei]|contenut[oi]|posizionament[oi]|visibilita|crescita)\s+organic(?:[oai]|he)\b/',
+
+        // What people ask you to look at.
+        '/\bkeywords?\b/', '/\bparol[ae] chiave\b/', '/\bchiav[ei] di ricerca\b/',
+        '/\bsearch intent\b/', '/\bintento di ricerca\b/',
+        '/\bcannibali[sz]ation\b/', '/\bcannibalizzazione\b/',
+        '/\bcontent gap\b/', '/\bgap (?:di )?contenut[oi]\b/',
+        '/\bduplicate (?:titles?|content|pages?)\b/', '/\b(?:titol[oi]|contenut[oi]|pagin[ae]) duplicat[aeoi]\b/',
+
+        // Crawling and indexing.
+        '/\bindex(?:ing|ability|able|ed)?\b/', '/\b(?:de)?indicizza\w*\b/',
+        '/\bcrawl(?:s|ing|ed|ability)?\b/', '/\bscansione del sito\b/',
+        '/\bsitemaps?\b/', '/\bmappa del sito\b/',
+        '/\brobots(?: txt)?\b/', '/\bfile robots\b/',
+        '/\bcanonical\b/', '/\bcanonic[oi]\b/', '/\bhreflang\b/',
+        '/\bredirects?\b/', '/\breindirizzament[oi]\b/',
+
+        // On-page signals.
+        '/\bmeta titles?\b/', '/\bmeta descriptions?\b/', '/\bmeta descrizion[ei]\b/',
+        '/\btitle tags?\b/', '/\btag title\b/',
+        '/\bschema markup\b/', '/\bstructured data\b/', '/\bdati strutturati\b/',
+        '/\brich (?:snippets?|results?)\b/', '/\bfeatured snippets?\b/',
+
+        // Links.
+        '/\bbacklinks?\b/', '/\blink in entrata\b/', '/\bprofilo (?:di )?link\b/',
+        '/\binternal link(?:ing|s)?\b/', '/\blink intern[oi]\b/', '/\bcollegamenti intern[oi]\b/',
+        '/\banchor text\b/', '/\btesto ancora\b/',
+        '/\bdomain authority\b/', '/\bautorita di dominio\b/',
+
+        // Local search.
+        '/\bgoogle business profile\b/', '/\bgoogle my business\b/', '/\bscheda google\b/',
+    );
+
+    /**
      * Semantic-enough deterministic activation for runtime routing/tests.
      * Operator instructions remain the model-facing activation rule, so this is
      * a runtime companion rather than a public action or a second policy source.
@@ -67,31 +141,18 @@ final class PRSTUDIO_UC_SEO_Operating_Policy {
         $text = self::normalize( $objective );
         if ( '' === $text ) { return false; }
 
-        $positive = array(
-            '/\bseo\b/',
-            '/\bgoogle search console\b/', '/\bsearch console\b/', '/\bgsc\b/',
-            '/\bahrefs\b/', '/\bsemrush\b/', '/\bscreaming frog\b/', '/\bserps?\b/',
-            '/\bkeyword(?:s| research| map| mapping)?\b/', '/\bsearch intent\b/', '/\bintento di ricerca\b/',
-            '/\borganic (?:search|traffic|visibility|ranking|rankings|landing page|landing pages|content)\b/',
-            '/\bricerca organica\b/', '/\btraffico organico\b/', '/\bvisibilita organica\b/', '/\bposizionamento organico\b/',
-            '/\bindex(?:ing|ability|able)?\b/', '/\bindicizzazione\b/', '/\bindicizzabilita\b/', '/\bcrawlability\b/', '/\bcanonical\b/',
-            '/\binternal link(?:ing|s)?\b/', '/\blink interni\b/', '/\bbacklink(?:s| analysis)?\b/',
-            '/\bcannibali[sz]ation\b/', '/\bcannibalizzazione\b/', '/\bcontent gap\b/', '/\bgap (?:di )?contenut[oi]\b/',
-            '/\bmeta title\b/', '/\bmeta description\b/', '/\bseo metadata\b/',
-            '/\bseo audit\b/', '/\baudit seo\b/', '/\bseo schema\b/', '/\bschema markup\b/',
-            '/\bsearch ranking(?:s)?\b/', '/\borganic ranking(?:s)?\b/',
-        );
-        foreach ( $positive as $pattern ) {
+        foreach ( self::TRIGGERS as $pattern ) {
             if ( 1 === preg_match( $pattern, $text ) ) { return true; }
         }
 
-        // Content/media activates only when the objective itself states an
-        // organic-search purpose; generic editorial/social work stays unchanged.
-        if ( preg_match( '/\b(article|articolo|guide|guida|content|contenuto|hero|image|immagine|media|landing page)\b/', $text )
-            && preg_match( '/\b(search|ricerca|organic|organica|organico|rank|ranking|index|indicizzazione)\b/', $text ) ) {
-            return true;
-        }
-        return false;
+        // Content, media and page speed activate only when the objective itself
+        // states an organic-search purpose; generic editorial, social and
+        // performance work stays unchanged. This is the clause that keeps the
+        // policy from attaching itself to most of the catalog.
+        $ambiguous = '/\b(?:articles?|articol[oi]|guides?|guid[ae]|content|contenut[oi]|hero|images?|immagin[ei]|media|landing pages?|page speed|velocita|prestazioni|performance|core web vitals|web vitals|visibilita|visibility|presenza|presence)\b/';
+        $purpose   = '/\b(?:search|ricerca|organic|organic(?:[oai]|he)|rank|ranking|index|indicizza\w*|seo|google|serps?)\b/';
+
+        return 1 === preg_match( $ambiguous, $text ) && 1 === preg_match( $purpose, $text );
     }
 
     /** Compact model-facing rule; the full policy stays out of initial context. */
