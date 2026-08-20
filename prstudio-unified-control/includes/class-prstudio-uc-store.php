@@ -567,7 +567,21 @@ final class PRSTUDIO_UC_Store {
 			gmdate( 'Y-m-d H:i:s', time() + self::LEASE_SECONDS ), self::now(), $task_uuid, $lease_token,
 			PRSTUDIO_UC_State_Machine::LEASED, PRSTUDIO_UC_State_Machine::RUNNING
 		) );
-		return 1 === (int) $updated;
+		if ( false === $updated ) { return false; }
+		if ( 1 === (int) $updated ) { return true; }
+		if ( 0 !== (int) $updated ) { return false; }
+		// MySQL DATETIME has one-second precision. The Browser Agent deliberately
+		// sends its first heartbeat immediately after mark_running(); when both
+		// operations land in the same second, the requested expiry/updated values
+		// are byte-for-byte identical and MySQL reports affected_rows=0. That is a
+		// live lease, not lease loss. Re-read the exact ownership predicate before
+		// returning false, just as the durable job heartbeat already does.
+		// phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.NotPrepared -- fixed table identifier and parameterized values.
+		$owned=$wpdb->get_var($wpdb->prepare(
+			'SELECT 1 FROM '.self::tasks_table().' WHERE task_uuid = %s AND lease_token = %s AND status IN (%s,%s) AND lease_expires_gmt >= UTC_TIMESTAMP() LIMIT 1',
+			$task_uuid,$lease_token,PRSTUDIO_UC_State_Machine::LEASED,PRSTUDIO_UC_State_Machine::RUNNING
+		));
+		return '1' === (string) $owned;
 	}
 
 // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.

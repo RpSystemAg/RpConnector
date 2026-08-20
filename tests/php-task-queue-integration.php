@@ -328,6 +328,18 @@ check( 'database row shows the lease persisted',
     is_array( $row ) && 1 === (int) $row['attempt_count'] && '' !== (string) $row['lease_token'],
     'row=' . wp_json_encode( $row ) );
 
+// The Agent sends its first heartbeat immediately after marking the task
+// running. Two calls in the same MySQL DATETIME second can update zero bytes;
+// ownership must be re-read instead of reporting a false lease_lost.
+if ( is_array( $claimed ) ) {
+    $lease_token = (string) ( $claimed['lease_token'] ?? '' );
+    $running = PRSTUDIO_UC_Store::mark_running( $task_uuid, $lease_token );
+    check( 'claimed task enters RUNNING before immediate heartbeat', is_array( $running ) );
+    check( 'first immediate heartbeat keeps the Browser lease', PRSTUDIO_UC_Store::heartbeat( $task_uuid, $lease_token ) );
+    check( 'same-second no-op heartbeat rechecks and keeps ownership', PRSTUDIO_UC_Store::heartbeat( $task_uuid, $lease_token ) );
+    check( 'wrong Browser lease is still rejected', ! PRSTUDIO_UC_Store::heartbeat( $task_uuid, 'wrong-browser-lease' ) );
+}
+
 // 5. A second poll must not hand out the same task twice.
 $second = PRSTUDIO_UC_Store::claim_next( 'device-other' );
 check( 'a leased task is not handed to a second device', null === $second,

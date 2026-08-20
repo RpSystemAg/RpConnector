@@ -327,6 +327,10 @@ try {
     if (is_array($claimedTask)) {
         $running = PRSTUDIO_UC_Store::mark_running($taskId, (string)$claimedTask['lease_token']);
         check_runtime(is_array($running), 'browser task enters RUNNING');
+		$leaseToken = (string)$claimedTask['lease_token'];
+		check_runtime(PRSTUDIO_UC_Store::heartbeat($taskId, $leaseToken), 'first Browser heartbeat immediately after RUNNING preserves the live lease');
+		check_runtime(PRSTUDIO_UC_Store::heartbeat($taskId, $leaseToken), 'same-second no-op Browser heartbeat is accepted after ownership recheck');
+		check_runtime(!PRSTUDIO_UC_Store::heartbeat($taskId, 'wrong-browser-lease'), 'wrong Browser lease still fails heartbeat ownership');
         $GLOBALS['wpdb']->update(PRSTUDIO_UC_Store::tasks_table(), ['lease_expires_gmt' => gmdate('Y-m-d H:i:s', time() - 120)], ['task_uuid' => $taskId]);
         try {
             $count = PRSTUDIO_UC_Store::recover_stale_tasks();
