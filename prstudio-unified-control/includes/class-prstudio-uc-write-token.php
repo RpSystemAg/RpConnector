@@ -176,7 +176,11 @@ final class PRSTUDIO_UC_Write_Token {
     }
 
     private static function compact_facts( array $facts ): array {
-        $allowed = array( 'sha256', 'modified_gmt', 'occurrences', 'anchors', 'bytes', 'entity_type', 'entity_id', 'revision_id' );
+        // `state_sha256` is the commerce equivalent of `sha256`: the hash of a
+        // product's mutable field surface rather than of a post body. It is a
+        // separate key on purpose, so a token that binds a product's commerce
+        // state can never be mistaken for one that binds its post content.
+        $allowed = array( 'sha256', 'state_sha256', 'modified_gmt', 'occurrences', 'anchors', 'bytes', 'entity_type', 'entity_id', 'revision_id' );
         $compact = array();
         foreach ( $allowed as $key ) {
             if ( array_key_exists( $key, $facts ) ) { $compact[ $key ] = $facts[ $key ]; }

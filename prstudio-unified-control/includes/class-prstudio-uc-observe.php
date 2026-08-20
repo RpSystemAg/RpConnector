@@ -127,6 +127,50 @@ final class PRSTUDIO_UC_Observe {
             $observation['content'] = self::bound( $content );
         }
         $observation['ledger'] = self::ledger_for( $entity_key );
+        $observation = self::attach_commerce( $observation, $post, $id, (string) ( $args['_client_id'] ?? '' ) );
+        return $observation;
+    }
+
+    /**
+     * A product has two independent states, and only one of them is post_content.
+     *
+     * The write_token above binds a content transaction: it carries the SHA-256
+     * of the post body. Price, stock, SKU, catalogue visibility and the SEO meta
+     * live nowhere near that body, so a caller that observed a product and then
+     * changed its price had nothing to bind the change to -- the commerce
+     * executors could not even accept a precondition. This attaches the second
+     * state and a token scoped to it, so the observe -> plan -> write loop is
+     * closed for commerce exactly as it already was for content.
+     */
+    private static function attach_commerce( array $observation, WP_Post $post, int $id, string $client ): array {
+        if ( 'product' !== (string) $post->post_type || ! class_exists( 'PRSTUDIO_UC_Commerce_Engine' ) ) {
+            return $observation;
+        }
+        $commerce = PRSTUDIO_UC_Commerce_Engine::product_read( array( 'id' => $id ) );
+        if ( ! is_array( $commerce ) ) {
+            // WooCommerce absent or the product unreadable through its CRUD.
+            // Reporting that is more useful than silently omitting the block.
+            $observation['commerce'] = array(
+                'available' => false,
+                'reason' => is_wp_error( $commerce ) ? $commerce->get_error_code() : 'commerce_state_unreadable',
+            );
+            return $observation;
+        }
+        $state = (string) ( $commerce['state_sha256'] ?? '' );
+        $observation['commerce'] = array(
+            'available' => true,
+            'state_sha256' => $state,
+            'regular_price' => (string) ( $commerce['regular_price'] ?? '' ),
+            'sale_price' => (string) ( $commerce['sale_price'] ?? '' ),
+            'stock_quantity' => $commerce['stock_quantity'] ?? null,
+            'stock_status' => (string) ( $commerce['stock_status'] ?? '' ),
+            'write_token' => PRSTUDIO_UC_Write_Token::issue(
+                'product:' . $id,
+                array( 'state_sha256' => $state, 'entity_type' => 'product', 'entity_id' => $id ),
+                $client
+            ),
+            'how_to_write' => 'Pass this write_token to commerce.product.update or commerce.inventory.update so the write is bound to the product as observed here. Do not compute or pass a hash yourself.',
+        );
         return $observation;
     }
 
