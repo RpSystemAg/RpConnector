@@ -141,10 +141,22 @@ holds( 'negative counts are treated as none rather than throwing', 0.0 === $c( -
 /* -- The bar itself has not been quietly moved ----------------------------- */
 
 $source = (string) file_get_contents( dirname( __DIR__ ) . '/prstudio-unified-control/includes/class-prstudio-uc-procedural-skills.php' );
+// The bar used to be an inline 0.5 inside best_match(). It is now a named
+// constant, because the retrieval ranking added for arXiv:2608.14036 needs the
+// same bar to decide which rows are worth one of twelve result slots, and one
+// number written in two places is a number that will eventually disagree with
+// itself. Both halves are checked: that the constant still says 0.5, and that
+// best_match() is what reads it. Either one alone can be true while the bar has
+// silently moved.
 holds(
-	'best_match still requires 0.5, so this test measures the real bar',
-	false !== strpos( $source, "'confidence']??0)<0.5" ),
-	'the reuse threshold moved; update REUSE_THRESHOLD here in the same change'
+	'the reuse bar is still 0.5, so this test measures the real bar',
+	0.5 === PRSTUDIO_UC_Procedural_Skills::REUSE_THRESHOLD,
+	sprintf( 'the reuse threshold is now %s; update REUSE_THRESHOLD here in the same change', var_export( PRSTUDIO_UC_Procedural_Skills::REUSE_THRESHOLD, true ) )
+);
+holds(
+	'best_match is the code that applies that bar',
+	false !== strpos( $source, "'confidence']??0)<self::REUSE_THRESHOLD" ),
+	'best_match no longer compares confidence against REUSE_THRESHOLD, so the constant proves nothing'
 );
 holds(
 	'the discredited linear score is gone',

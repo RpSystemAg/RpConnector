@@ -7,7 +7,69 @@ final class PRSTUDIO_UC_Procedural_Skills {
     public const VERSION='1.0.0';
     private const INDEX='procedural-skills-v1.json';
     private const LOCK='.procedural-skills-v1.lock';
-    private const MAX_SKILLS=2000;
+    /**
+     * Retrieval sizing, taken from a measured curve rather than from taste.
+     *
+     * arXiv:2608.14036 (Demystifying Agent Skills: Why They Work -- Until They
+     * Don't, 14 Aug 2026) measured actual-use precision -- the share of the
+     * skills put in front of the agent that it actually goes on to use -- as the
+     * available pool grows:
+     *
+     *     pool of   5 skills  ->  29.6% precision
+     *     pool of 100 skills  ->   3.3% precision
+     *
+     * Those are the only two points the paper reports, and they are far enough
+     * apart to pin a power law. Fitting precision(n) = a * n^-b through them:
+     *
+     *     b = ln(29.6 / 3.3) / ln(100 / 5) = 0.7323
+     *     a = 29.6 * 5^0.7323               = 96.20
+     *     precision(n) = 96.20 * n^-0.7323  (percent)
+     *
+     * which reproduces both measured points exactly. The same paper found that
+     * 65.7% of a skill's value comes from procedural anchoring and only 4.5%
+     * from explicit knowledge injection: skills stabilise how the agent acts,
+     * they do not teach it facts. Ten mediocre recipes therefore do not add up
+     * to one good one -- they only add noise to the anchor. A small,
+     * well-evidenced pool beats a large one, and that is what these three
+     * numbers encode.
+     *
+     * MAX_SKILLS = 100 (was 2000)
+     *   100 is the largest pool the paper actually measured. Above it there is
+     *   no data at all, only the direction of the trend, so 2000 was not a
+     *   conservative setting -- it was twenty times outside every observation
+     *   that exists, at a fitted 0.37% precision. The store is not the surface
+     *   handed to the model (search() truncates, see below), so it is allowed to
+     *   sit at the top of the measured interval rather than at the retrieval
+     *   ceiling; what it is not allowed to do is grow into a region where the
+     *   curve has never been observed.
+     *
+     * SEARCH_RESULT_CEILING = 12 (was 100)
+     *   This one IS the surface handed to the model, so it is placed where
+     *   precision is still usable. The criterion is "at least half the best
+     *   precision the paper ever measured", i.e. 29.6% / 2 = 14.8%. Solving
+     *   96.20 * n^-0.7323 = 14.8 gives n = 12.88, floored to 12 -- a ceiling is
+     *   rounded down, never up past the point it was derived from. Fitted
+     *   precision at 12 is 15.6%, which is 4.7x the 3.3% measured at the old
+     *   cap of 100 and 1.5x the old default of 20.
+     *
+     * SEARCH_RESULT_DEFAULT = 5 (was 20)
+     *   5 is not an interpolation, it is the measured point where precision was
+     *   highest (29.6%). A caller who expresses no opinion about breadth gets
+     *   the best-measured surface; a caller who needs more can ask, up to the
+     *   point where precision halves. The old default of 20 sat at a fitted
+     *   10.7%, below that halving point already.
+     *
+     * None of this can stop an execution. search() is read-only, truncation is
+     * reported (`matched`, `truncated`, `limit_applied`) rather than silent,
+     * get() still returns any skill by ID, and pool eviction never drops the
+     * entry the current mutation just wrote -- so a learn always lands (LAW 1)
+     * and a human request always still resolves to an action (LAW 13).
+     */
+    private const MAX_SKILLS=100;
+    private const SEARCH_RESULT_CEILING=12;
+    private const SEARCH_RESULT_DEFAULT=5;
+    /** best_match() hands a recipe back only at or above this Wilson lower bound. */
+    public const REUSE_THRESHOLD=0.5;
     private const MAX_FAILURES_PER_SKILL=20;
     /** How long an archived skill stays in the index before it is dropped. */
     private const ARCHIVE_RETENTION_SECONDS=2592000; // 30 days.
@@ -36,6 +98,90 @@ final class PRSTUDIO_UC_Procedural_Skills {
         $lines[]='';$lines[]='## Steps';foreach($steps as $i=>$step){$label=is_array($step)?json_encode(self::clean($step),JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE):(string)$step;$lines[]=(string)($i+1).'. '.str_replace(array("\r","\n"),' ',(string)$label);}
         $lines[]='';$lines[]='## Verification';$lines[]='- Required: yes';$lines[]='- Last verified: '.(string)($skill['last_verified_gmt']??'');$lines[]='- Success count: '.(string)($skill['success_count']??0);$lines[]='- Confidence: '.(string)($skill['confidence']??0);
         @file_put_contents(self::skill_dir($id).'/SKILL.md',implode("\n",$lines)."\n",LOCK_EX);
+    }
+
+    /**
+     * Would best_match() actually hand this recipe back right now?
+     *
+     * This is the one honest definition of "useful" available here, and it is
+     * exactly what actual-use precision counts. An archived entry, an expired
+     * entry, or one whose Wilson bound is under the reuse bar will not be
+     * offered to a planner no matter how it is presented, so ranking it above a
+     * usable entry spends part of a small result surface on something that
+     * cannot be used. It is ranked down, never removed: get() still returns it
+     * by ID and a narrower query still finds it.
+     *
+     * @param array $skill Stored skill row.
+     * @param int   $now   Reference timestamp.
+     * @return bool Whether the skill is reusable as it stands.
+     */
+    private static function is_reusable(array $skill,int $now): bool {
+        if('archived'===(string)($skill['curated_state']??''))return false;
+        if(strtotime((string)($skill['expires_gmt']??''))<=$now)return false;
+        return (float)($skill['confidence']??0)>=self::REUSE_THRESHOLD;
+    }
+
+    /**
+     * Order two skills best-first, by evidence rather than by arrival time.
+     *
+     * Recency was the old key everywhere -- eviction sorted on
+     * `last_verified_gmt` alone -- which meant a recipe seen once five minutes
+     * ago (Wilson bound 0.21) outranked one confirmed twenty times last month
+     * (0.83). Under arXiv:2608.14036 that is the wrong direction twice over: it
+     * keeps the low-value entries that dilute the pool and discards the
+     * procedural anchors that carry 65.7% of the value. Confidence leads,
+     * success count breaks ties at equal bound, recency only breaks what is
+     * otherwise identical.
+     *
+     * @param array $a   First skill.
+     * @param array $b   Second skill.
+     * @param int   $now Reference timestamp.
+     * @return int Negative when $a should come first.
+     */
+    private static function compare_value(array $a,array $b,int $now): int {
+        $ra=self::is_reusable($a,$now)?1:0;$rb=self::is_reusable($b,$now)?1:0;
+        if($ra!==$rb)return $rb<=>$ra;
+        $ca=(float)($a['confidence']??0);$cb=(float)($b['confidence']??0);
+        if($ca!==$cb)return $cb<=>$ca;
+        $sa=(int)($a['success_count']??0);$sb=(int)($b['success_count']??0);
+        if($sa!==$sb)return $sb<=>$sa;
+        return strcmp((string)($b['last_verified_gmt']??''),(string)($a['last_verified_gmt']??''));
+    }
+
+    /**
+     * Hold the stored pool at MAX_SKILLS by retiring the least-evidenced entries.
+     *
+     * Three separate holes made the old 2000 ceiling weaker than it looked:
+     * only learn_verified_capability() enforced it at all, so
+     * learn_verified_browser_task() and observe_failure() could both grow the
+     * index without limit; and the enforcement that did exist sorted by recency,
+     * so it evicted proven procedures in favour of single-sample ones. All three
+     * writers now go through this.
+     *
+     * The entry the current mutation just wrote is never the one evicted. The
+     * write always lands and only some other, less-evidenced entry leaves, so a
+     * saturated store can still learn something new (LAW 1: the ceiling is a
+     * retention policy, not a mutation guard) instead of freezing until the
+     * expiry window turns over.
+     *
+     * @param array  $state      Store state, mutated in place.
+     * @param string $protect_id Skill written by the current mutation.
+     * @return string[] Evicted skill IDs.
+     */
+    private static function enforce_pool_ceiling(array &$state,string $protect_id=''): array {
+        $skills=is_array($state['skills']??null)?$state['skills']:array();
+        if(count($skills)<=self::MAX_SKILLS){$state['skills']=$skills;return array();}
+        $protected=null;
+        if(''!==$protect_id&&isset($skills[$protect_id])){$protected=$skills[$protect_id];unset($skills[$protect_id]);}
+        $now=time();
+        uasort($skills,static function($a,$b)use($now){return self::compare_value(is_array($a)?$a:array(),is_array($b)?$b:array(),$now);});
+        $keep=max(0,self::MAX_SKILLS-(null===$protected?0:1));
+        $evicted=array_keys(array_slice($skills,$keep,null,true));
+        $skills=array_slice($skills,0,$keep,true);
+        if(null!==$protected)$skills[$protect_id]=$protected;
+        $state['skills']=$skills;
+        if($evicted)$state['metrics']['pool_evicted']=(int)($state['metrics']['pool_evicted']??0)+count($evicted);
+        return array_map('strval',$evicted);
     }
 
     /** Learn only from independently verified capability completion. */
@@ -99,29 +245,69 @@ final class PRSTUDIO_UC_Procedural_Skills {
 
     public static function learn_verified_capability(string $capability,array $args,array $result,array $verification,string $job_id=''):array{
         if(empty($verification['ok']))return array('ok'=>false,'learned'=>false,'reason'=>'verification_required');$capability=self::key($capability,120);if(''===$capability)return array('ok'=>false,'learned'=>false,'reason'=>'capability_required');$id=self::skill_id('capability',$capability,$args);$fingerprint=self::fingerprint('capability',$capability,$args);
-        $r=self::mutate(static function(array &$state)use($id,$capability,$args,$result,$verification,$job_id,$fingerprint){$old=is_array($state['skills'][$id]??null)?$state['skills'][$id]:array();$count=(int)($old['success_count']??0)+1;$confidence=self::confidence($count,count((array)($old['failed_paths']??array())));$skill=array_merge($old,array('id'=>$id,'kind'=>'capability','name'=>$capability,'description'=>'Verified reusable procedure for capability '.$capability.'.','fingerprint'=>$fingerprint,'preconditions'=>array('suite_version'=>defined('PRSTUDIO_UC_VERSION')?PRSTUDIO_UC_VERSION:'','argument_keys'=>array_values(array_keys($args))),'procedure'=>array('steps'=>array(array('capability'=>$capability,'argument_shape'=>array_map(static fn($v)=>is_array($v)?'array':gettype($v),$args))),'verification_required'=>true),'last_result_signature'=>hash('sha256',PRSTUDIO_UC_Idempotency::canonical_json(self::clean($result))),'last_verifier'=>(string)($verification['verifier']??''),'last_job_id'=>$job_id,'success_count'=>$count,'confidence'=>round($confidence,3),'last_verified_gmt'=>gmdate('c'),'expires_gmt'=>gmdate('c',time()+90*86400),'failed_paths'=>array_values((array)($old['failed_paths']??array()))));$state['skills'][$id]=$skill;if(count($state['skills'])>self::MAX_SKILLS){uasort($state['skills'],static fn($a,$b)=>strcmp((string)($b['last_verified_gmt']??''),(string)($a['last_verified_gmt']??'')));$state['skills']=array_slice($state['skills'],0,self::MAX_SKILLS,true);}$state['metrics']['learned']=(int)($state['metrics']['learned']??0)+1;return array('ok'=>true,'learned'=>true,'skill'=>$skill);});if(is_array($r)&&is_array($r['skill']??null)){self::write_skill_md($r['skill']);PRSTUDIO_UC_Memory::movement('skill.learned',array('resource'=>$id,'capability'=>$capability,'outcome'=>'verified_procedure'));}return$r;
+        $r=self::mutate(static function(array &$state)use($id,$capability,$args,$result,$verification,$job_id,$fingerprint){$old=is_array($state['skills'][$id]??null)?$state['skills'][$id]:array();$count=(int)($old['success_count']??0)+1;$confidence=self::confidence($count,count((array)($old['failed_paths']??array())));$skill=array_merge($old,array('id'=>$id,'kind'=>'capability','name'=>$capability,'description'=>'Verified reusable procedure for capability '.$capability.'.','fingerprint'=>$fingerprint,'preconditions'=>array('suite_version'=>defined('PRSTUDIO_UC_VERSION')?PRSTUDIO_UC_VERSION:'','argument_keys'=>array_values(array_keys($args))),'procedure'=>array('steps'=>array(array('capability'=>$capability,'argument_shape'=>array_map(static fn($v)=>is_array($v)?'array':gettype($v),$args))),'verification_required'=>true),'last_result_signature'=>hash('sha256',PRSTUDIO_UC_Idempotency::canonical_json(self::clean($result))),'last_verifier'=>(string)($verification['verifier']??''),'last_job_id'=>$job_id,'success_count'=>$count,'confidence'=>round($confidence,3),'last_verified_gmt'=>gmdate('c'),'expires_gmt'=>gmdate('c',time()+90*86400),'failed_paths'=>array_values((array)($old['failed_paths']??array()))));$state['skills'][$id]=$skill;self::enforce_pool_ceiling($state,$id);$state['metrics']['learned']=(int)($state['metrics']['learned']??0)+1;return array('ok'=>true,'learned'=>true,'skill'=>$skill);});if(is_array($r)&&is_array($r['skill']??null)){self::write_skill_md($r['skill']);PRSTUDIO_UC_Memory::movement('skill.learned',array('resource'=>$id,'capability'=>$capability,'outcome'=>'verified_procedure'));}return$r;
     }
 
     /** Record failed paths so the next plan can avoid retrying the same dead end. */
     public static function observe_failure(string $kind,string $name,array $args,array $error):array{
         $name=self::key($name,120);$id=self::skill_id($kind,$name,$args);$code=self::key((string)($error['code']??'failure'),100);$sig=hash('sha256',$code.'|'.PRSTUDIO_UC_Idempotency::canonical_json(array_keys($args)));
-        return self::mutate(static function(array &$state)use($id,$kind,$name,$args,$code,$sig){$skill=is_array($state['skills'][$id]??null)?$state['skills'][$id]:array('id'=>$id,'kind'=>$kind,'name'=>$name,'description'=>'Procedure history for '.$name.'.','fingerprint'=>self::fingerprint($kind,$name,$args),'preconditions'=>array('suite_version'=>defined('PRSTUDIO_UC_VERSION')?PRSTUDIO_UC_VERSION:''),'procedure'=>array('steps'=>array()),'success_count'=>0,'confidence'=>0.0,'failed_paths'=>array());$fail=array_values((array)($skill['failed_paths']??array()));$exists=false;foreach($fail as $row){if(($row['signature']??'')===$sig){$exists=true;break;}}if(!$exists)$fail[]=array('signature'=>$sig,'error_code'=>$code,'observed_gmt'=>gmdate('c'));$skill['failed_paths']=array_slice($fail,-self::MAX_FAILURES_PER_SKILL);$state['skills'][$id]=$skill;$state['metrics']['failures_observed']=(int)($state['metrics']['failures_observed']??0)+1;return array('ok'=>true,'recorded'=>true,'skill_id'=>$id,'failure_signature'=>$sig);});
+        return self::mutate(static function(array &$state)use($id,$kind,$name,$args,$code,$sig){$skill=is_array($state['skills'][$id]??null)?$state['skills'][$id]:array('id'=>$id,'kind'=>$kind,'name'=>$name,'description'=>'Procedure history for '.$name.'.','fingerprint'=>self::fingerprint($kind,$name,$args),'preconditions'=>array('suite_version'=>defined('PRSTUDIO_UC_VERSION')?PRSTUDIO_UC_VERSION:''),'procedure'=>array('steps'=>array()),'success_count'=>0,'confidence'=>0.0,'failed_paths'=>array());$fail=array_values((array)($skill['failed_paths']??array()));$exists=false;foreach($fail as $row){if(($row['signature']??'')===$sig){$exists=true;break;}}if(!$exists)$fail[]=array('signature'=>$sig,'error_code'=>$code,'observed_gmt'=>gmdate('c'));$skill['failed_paths']=array_slice($fail,-self::MAX_FAILURES_PER_SKILL);$state['skills'][$id]=$skill;self::enforce_pool_ceiling($state,$id);$state['metrics']['failures_observed']=(int)($state['metrics']['failures_observed']??0)+1;return array('ok'=>true,'recorded'=>true,'skill_id'=>$id,'failure_signature'=>$sig);});
     }
 
     /** Learn a complete verified Browser Agent task including its successful step sequence. */
     public static function learn_verified_browser_task(array $task,array $result,array $verification):array{
         if(empty($verification['ok']))return array('ok'=>false,'learned'=>false,'reason'=>'verification_required');$action=self::key((string)($task['action']??'browser-task'),120);$args=is_array($task['arguments']??null)?$task['arguments']:array();$steps=array_values(array_filter((array)($args['steps']??array()),'is_array'));if(!$steps)$steps=array(array('action'=>$action,'arguments'=>array_keys($args)));$id=self::skill_id('browser',$action,$args);$fingerprint=self::fingerprint('browser',$action,$args);
-        $r=self::mutate(static function(array &$state)use($task,$result,$verification,$action,$args,$steps,$id,$fingerprint){$old=is_array($state['skills'][$id]??null)?$state['skills'][$id]:array();$count=(int)($old['success_count']??0)+1;$skill=array_merge($old,array('id'=>$id,'kind'=>'browser','name'=>$action,'description'=>'Verified Browser Agent procedure for '.$action.'.','fingerprint'=>$fingerprint,'preconditions'=>array('suite_version'=>defined('PRSTUDIO_UC_VERSION')?PRSTUDIO_UC_VERSION:'','expected_origin'=>$args['expectedOrigin']??$args['expected_origin']??''),'procedure'=>array('steps'=>self::clean(array_slice($steps,0,250)),'verification_required'=>true,'strict_tab_ownership'=>true),'last_result_signature'=>hash('sha256',PRSTUDIO_UC_Idempotency::canonical_json(self::clean($result))),'last_verifier'=>(string)($verification['verifier']??''),'last_task_id'=>(string)($task['task_uuid']??''),'success_count'=>$count,'confidence'=>round(self::confidence($count,count((array)($old['failed_paths']??array()))),3),'last_verified_gmt'=>gmdate('c'),'expires_gmt'=>gmdate('c',time()+30*86400),'failed_paths'=>array_values((array)($old['failed_paths']??array()))));$state['skills'][$id]=$skill;$state['metrics']['learned']=(int)($state['metrics']['learned']??0)+1;return array('ok'=>true,'learned'=>true,'skill'=>$skill);});if(is_array($r)&&is_array($r['skill']??null)){self::write_skill_md($r['skill']);PRSTUDIO_UC_Memory::movement('skill.browser_learned',array('resource'=>$id,'action'=>$action,'outcome'=>'verified_procedure'));}return$r;
+        $r=self::mutate(static function(array &$state)use($task,$result,$verification,$action,$args,$steps,$id,$fingerprint){$old=is_array($state['skills'][$id]??null)?$state['skills'][$id]:array();$count=(int)($old['success_count']??0)+1;$skill=array_merge($old,array('id'=>$id,'kind'=>'browser','name'=>$action,'description'=>'Verified Browser Agent procedure for '.$action.'.','fingerprint'=>$fingerprint,'preconditions'=>array('suite_version'=>defined('PRSTUDIO_UC_VERSION')?PRSTUDIO_UC_VERSION:'','expected_origin'=>$args['expectedOrigin']??$args['expected_origin']??''),'procedure'=>array('steps'=>self::clean(array_slice($steps,0,250)),'verification_required'=>true,'strict_tab_ownership'=>true),'last_result_signature'=>hash('sha256',PRSTUDIO_UC_Idempotency::canonical_json(self::clean($result))),'last_verifier'=>(string)($verification['verifier']??''),'last_task_id'=>(string)($task['task_uuid']??''),'success_count'=>$count,'confidence'=>round(self::confidence($count,count((array)($old['failed_paths']??array()))),3),'last_verified_gmt'=>gmdate('c'),'expires_gmt'=>gmdate('c',time()+30*86400),'failed_paths'=>array_values((array)($old['failed_paths']??array()))));$state['skills'][$id]=$skill;self::enforce_pool_ceiling($state,$id);$state['metrics']['learned']=(int)($state['metrics']['learned']??0)+1;return array('ok'=>true,'learned'=>true,'skill'=>$skill);});if(is_array($r)&&is_array($r['skill']??null)){self::write_skill_md($r['skill']);PRSTUDIO_UC_Memory::movement('skill.browser_learned',array('resource'=>$id,'action'=>$action,'outcome'=>'verified_procedure'));}return$r;
     }
 
     /** Return the best non-stale reusable recipe for this capability/action shape. */
     public static function best_match(string $kind,string $name,array $args):?array{
-        $id=self::skill_id($kind,self::key($name,120),$args);$skill=self::state_unlocked()['skills'][$id]??null;if(!is_array($skill)||strtotime((string)($skill['expires_gmt']??''))<=time()||(float)($skill['confidence']??0)<0.5)return null;return$skill;
+        $id=self::skill_id($kind,self::key($name,120),$args);$skill=self::state_unlocked()['skills'][$id]??null;if(!is_array($skill)||strtotime((string)($skill['expires_gmt']??''))<=time()||(float)($skill['confidence']??0)<self::REUSE_THRESHOLD)return null;return$skill;
     }
 
-    /** Search/list procedural skills using progressive disclosure. */
+    /**
+     * Search/list procedural skills using progressive disclosure.
+     *
+     * The retrieval surface, and the thing arXiv:2608.14036 measured directly.
+     * It used to accept `limit` up to 100 and default to 20 -- the 100 being
+     * precisely the pool size where actual-use precision was measured at 3.3%,
+     * i.e. ninety-seven of every hundred rows returned were never used. It is
+     * now capped at SEARCH_RESULT_CEILING and defaults to SEARCH_RESULT_DEFAULT;
+     * see the constants for the arithmetic behind both numbers.
+     *
+     * Two changes make the smaller surface carry more, not less:
+     *
+     *  - Rows are ordered by whether the planner could actually reuse them
+     *    first and by the Wilson bound second, so the twelve that survive
+     *    truncation are the twelve with the most evidence behind them. Sorting
+     *    on raw confidence alone let an expired or already-archived recipe with
+     *    a strong history occupy the top of the list while best_match() would
+     *    refuse it -- a result that is definitionally never used, which is the
+     *    exact quantity the paper's precision metric counts against you.
+     *  - Truncation is stated, never silent. `matched` is the true number of
+     *    hits, `truncated` says whether the cap bit, and `limit_requested` vs
+     *    `limit_applied` shows a caller that asked for more that it was clamped.
+     *    Nothing is excluded from the store or from reach: a narrower query, a
+     *    `kind` filter, or get() by ID still returns anything held (LAW 10).
+     *
+     * @param array $args query, kind, limit.
+     * @return array Ranked, capped result surface.
+     */
     public static function search(array $args):array{
-        $q=strtolower(trim((string)($args['query']??'')));$kind=self::key((string)($args['kind']??''),30);$limit=max(1,min(100,(int)($args['limit']??20)));$rows=array();foreach((array)(self::state_unlocked()['skills']??array()) as $skill){if($kind&&$kind!==(string)($skill['kind']??''))continue;$hay=strtolower((string)($skill['name']??'').' '.(string)($skill['description']??''));if($q&&!str_contains($hay,$q))continue;$rows[]=array('id'=>$skill['id'],'kind'=>$skill['kind'],'name'=>$skill['name'],'description'=>$skill['description'],'confidence'=>$skill['confidence'],'success_count'=>$skill['success_count'],'last_verified_gmt'=>$skill['last_verified_gmt']??'','expires_gmt'=>$skill['expires_gmt']??'','failed_path_count'=>count((array)($skill['failed_paths']??array())));}usort($rows,static fn($a,$b)=>(float)$b['confidence']<=>(float)$a['confidence']);return array('ok'=>true,'count'=>min(count($rows),$limit),'items'=>array_slice($rows,0,$limit),'progressive_disclosure'=>true,'version'=>self::VERSION,'component'=>'procedural_skills','component_version'=>self::VERSION,'suite_version'=>defined('PRSTUDIO_UC_VERSION')?PRSTUDIO_UC_VERSION:'');
+        $q=strtolower(trim((string)($args['query']??'')));$kind=self::key((string)($args['kind']??''),30);
+        $requested=isset($args['limit'])?(int)$args['limit']:self::SEARCH_RESULT_DEFAULT;
+        $limit=max(1,min(self::SEARCH_RESULT_CEILING,$requested));
+        $now=time();$rows=array();
+        foreach((array)(self::state_unlocked()['skills']??array()) as $skill){
+            if(!is_array($skill))continue;
+            if($kind&&$kind!==(string)($skill['kind']??''))continue;
+            $hay=strtolower((string)($skill['name']??'').' '.(string)($skill['description']??''));
+            if($q&&!str_contains($hay,$q))continue;
+            $rows[]=array('id'=>(string)($skill['id']??''),'kind'=>(string)($skill['kind']??''),'name'=>(string)($skill['name']??''),'description'=>(string)($skill['description']??''),'confidence'=>(float)($skill['confidence']??0),'success_count'=>(int)($skill['success_count']??0),'last_verified_gmt'=>(string)($skill['last_verified_gmt']??''),'expires_gmt'=>(string)($skill['expires_gmt']??''),'curated_state'=>(string)($skill['curated_state']??''),'reusable'=>self::is_reusable($skill,$now),'failed_path_count'=>count((array)($skill['failed_paths']??array())));
+        }
+        usort($rows,static function($a,$b)use($now){return self::compare_value($a,$b,$now);});
+        $matched=count($rows);$items=array_slice($rows,0,$limit);
+        return array('ok'=>true,'count'=>count($items),'matched'=>$matched,'truncated'=>$matched>count($items),'limit_requested'=>$requested,'limit_applied'=>$limit,'limit_ceiling'=>self::SEARCH_RESULT_CEILING,'limit_default'=>self::SEARCH_RESULT_DEFAULT,'ranked_by'=>'reusable_then_wilson_confidence','items'=>$items,'progressive_disclosure'=>true,'version'=>self::VERSION,'component'=>'procedural_skills','component_version'=>self::VERSION,'suite_version'=>defined('PRSTUDIO_UC_VERSION')?PRSTUDIO_UC_VERSION:'');
     }
     /** Activate one skill and return its complete procedural recipe. */
     public static function get(array $args){$id=self::key((string)($args['id']??''),100);$skill=self::state_unlocked()['skills'][$id]??null;if(!is_array($skill))return new WP_Error('procedural_skill_not_found','Skill not found.',array('status'=>404));return array('ok'=>true,'skill'=>$skill,'skill_md'=>is_readable(self::skill_dir($id).'/SKILL.md')?(string)file_get_contents(self::skill_dir($id).'/SKILL.md'):'','version'=>self::VERSION,'component'=>'procedural_skills','component_version'=>self::VERSION,'suite_version'=>defined('PRSTUDIO_UC_VERSION')?PRSTUDIO_UC_VERSION:'');}
@@ -145,7 +331,7 @@ final class PRSTUDIO_UC_Procedural_Skills {
             }
             $merge=array();foreach($groups as $group=>$ids){if(count($ids)<2)continue;usort($ids,static function($a,$b)use($state){$sa=$state['skills'][$a]??array();$sb=$state['skills'][$b]??array();$c=(float)($sb['confidence']??0)<=>(float)($sa['confidence']??0);return 0!==$c?$c:strcmp((string)($sb['last_verified_gmt']??''),(string)($sa['last_verified_gmt']??''));});$merge[]=array('group'=>$group,'preferred'=>$ids[0],'variants'=>$ids,'automatic_merge'=>false);}
             $exact_duplicates=array();foreach($fingerprints as $fp=>$ids){if(count($ids)>1)$exact_duplicates[]=array('fingerprint'=>$fp,'ids'=>$ids);}
-            $archived=array();$pruned=array();
+            $archived=array();$pruned=array();$ceiling_evicted=array();
             if($apply){
                 foreach(array_values(array_unique(array_merge($stale,$failed_only))) as $id){if(!isset($state['skills'][$id])||!is_array($state['skills'][$id]))continue;if('archived'===(string)($state['skills'][$id]['curated_state']??''))continue;$state['skills'][$id]['curated_state']='archived';$state['skills'][$id]['curated_gmt']=gmdate('c',$now);$state['skills'][$id]['invalidated_reason']=$state['skills'][$id]['invalidated_reason']??'skill_curator_stale_or_failed_only';$state['skills'][$id]['expires_gmt']=gmdate('c',$now-1);$archived[]=$id;}
                 // Archiving alone never reclaimed anything: an archived entry
@@ -161,9 +347,17 @@ final class PRSTUDIO_UC_Procedural_Skills {
                     if($curated>0&&($now-$curated)<$retention)continue;
                     unset($state['skills'][$id]);$pruned[]=(string)$id;
                 }
+                // A store written under the old 2000 ceiling stays oversized
+                // until something touches it. Learning trims one entry per
+                // write, which would take hundreds of writes to walk 2000 down
+                // to 100 -- and every search in between is served from a pool
+                // the paper measured at well under 1% actual-use precision.
+                // The curator brings it back in one pass, retiring the
+                // least-evidenced entries first.
+                $ceiling_evicted=self::enforce_pool_ceiling($state);
                 $state['metrics']['last_curated_gmt']=gmdate('c',$now);$state['metrics']['curated_runs']=(int)($state['metrics']['curated_runs']??0)+1;$state['metrics']['curated_archived']=(int)($state['metrics']['curated_archived']??0)+count($archived);$state['metrics']['curated_pruned']=(int)($state['metrics']['curated_pruned']??0)+count($pruned);
             }
-            return array('ok'=>true,'skipped'=>false,'apply'=>$apply,'analyzed'=>count((array)($state['skills']??array())),'stale_ids'=>$stale,'failed_only_ids'=>$failed_only,'archived_ids'=>$archived,'pruned_ids'=>$pruned,'pruned'=>count($pruned),'merge_candidates'=>$merge,'exact_duplicate_candidates'=>$exact_duplicates,'history_deleted'=>false,'automatic_merge'=>false,'version'=>self::VERSION,'component'=>'procedural_skills','component_version'=>self::VERSION,'suite_version'=>defined('PRSTUDIO_UC_VERSION')?PRSTUDIO_UC_VERSION:'');
+            return array('ok'=>true,'skipped'=>false,'apply'=>$apply,'analyzed'=>count((array)($state['skills']??array())),'stale_ids'=>$stale,'failed_only_ids'=>$failed_only,'archived_ids'=>$archived,'pruned_ids'=>$pruned,'pruned'=>count($pruned),'ceiling_evicted_ids'=>$ceiling_evicted,'ceiling_evicted'=>count($ceiling_evicted),'pool_ceiling'=>self::MAX_SKILLS,'over_ceiling'=>max(0,count((array)($state['skills']??array()))-self::MAX_SKILLS),'merge_candidates'=>$merge,'exact_duplicate_candidates'=>$exact_duplicates,'history_deleted'=>false,'automatic_merge'=>false,'version'=>self::VERSION,'component'=>'procedural_skills','component_version'=>self::VERSION,'suite_version'=>defined('PRSTUDIO_UC_VERSION')?PRSTUDIO_UC_VERSION:'');
         };
         if(!$apply){$state=self::state_unlocked();return$analyze($state);}
         return self::mutate($analyze);
@@ -185,6 +379,6 @@ final class PRSTUDIO_UC_Procedural_Skills {
             if('archived'===(string)($skill['curated_state']??'')){$archived++;continue;}
             if(strtotime((string)($skill['expires_gmt']??''))>$now)$valid++;else$stale++;
         }
-        return array('ok'=>true,'version'=>self::VERSION,'component'=>'procedural_skills','component_version'=>self::VERSION,'suite_version'=>defined('PRSTUDIO_UC_VERSION')?PRSTUDIO_UC_VERSION:'','skills'=>count((array)$state['skills']),'valid'=>$valid,'stale'=>$stale,'archived'=>$archived,'awaiting_curation'=>$stale,'metrics'=>$state['metrics'],'storage'=>'site_private_agent_skills','format'=>'SKILL.md+JSON-index','hidden_chain_of_thought_stored'=>false);
+        return array('ok'=>true,'version'=>self::VERSION,'component'=>'procedural_skills','component_version'=>self::VERSION,'suite_version'=>defined('PRSTUDIO_UC_VERSION')?PRSTUDIO_UC_VERSION:'','skills'=>count((array)$state['skills']),'valid'=>$valid,'stale'=>$stale,'archived'=>$archived,'awaiting_curation'=>$stale,'pool_ceiling'=>self::MAX_SKILLS,'over_ceiling'=>max(0,count((array)$state['skills'])-self::MAX_SKILLS),'retrieval_ceiling'=>self::SEARCH_RESULT_CEILING,'retrieval_default'=>self::SEARCH_RESULT_DEFAULT,'reuse_threshold'=>self::REUSE_THRESHOLD,'metrics'=>$state['metrics'],'storage'=>'site_private_agent_skills','format'=>'SKILL.md+JSON-index','hidden_chain_of_thought_stored'=>false);
     }
 }

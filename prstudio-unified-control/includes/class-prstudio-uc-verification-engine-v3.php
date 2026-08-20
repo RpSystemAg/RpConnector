@@ -39,7 +39,19 @@ final class PRSTUDIO_UC_Verification_Engine_V3 {
                 }
                 if($unverifiable)$ok=false;
             }
-            return array('ok'=>$ok,'verifier'=>'woocommerce_independent_readback','source'=>'woocommerce_crud_plus_wordpress_meta','independent'=>true,'evidence_hash'=>hash('sha256',json_encode($after)),'verified_at'=>gmdate('c'));
+            // A read-back proves the named fields hold the requested values. It
+            // says nothing about whether the plan that chose those values was
+            // made against this product or against a version of it that has
+            // since been superseded. When the executor observed that skew, the
+            // verifier must not paper over it with a green read-back: the
+            // effect it can confirm is narrower than the effect the caller
+            // intended. This lowers evidence only -- the gateway records a
+            // warning and the mutation stands.
+            $payload=is_array($result['result']??null)?$result['result']:(is_array($result)?$result:array());
+            $binding=is_array($payload['state_binding']??null)?$payload['state_binding']:array();
+            $superseded=array_key_exists('matched',$binding)&&false===$binding['matched'];
+            if($superseded)$ok=false;
+            return array('ok'=>$ok,'verifier'=>'woocommerce_independent_readback','source'=>'woocommerce_crud_plus_wordpress_meta','independent'=>true,'planned_state_bound'=>!empty($binding['bound']),'planned_state_superseded'=>$superseded,'evidence_hash'=>hash('sha256',json_encode($after)),'verified_at'=>gmdate('c'));
         }
         if('content.transaction.patch'===$id){
             $payload=is_array($result['result']??null)?$result['result']:$result;

@@ -37,6 +37,7 @@ import { candidateTabUrl, provisionalOwnershipState, migrateTabReplacementState,
 import { REMOTE_MAX_STEP_ATTEMPTS, canFreshRestart, isRetrySafeFailure, stepWatchdogMs, noProgressExceeded } from "./lib/remote-recovery.js";
 import { createObservationEnvelope, redactObservation } from "./lib/observation-security.js";
 import { migrateOneGuardLegacyState } from "./lib/legacy-one-guard-migration.js";
+import { parseUserUrl, describeUrlInput } from "./lib/url-input.js";
 import {
   LOCAL_STUDIO_VERSION,
   LOCAL_STUDIO_FEATURES,
@@ -4004,10 +4005,15 @@ function validateNavigationUrl(value) {
   if (raw === "about:blank" || raw.startsWith("about:blank?")) {
     throw codedError("about_blank_forbidden", "about:blank non è un fallback valido per il Browser Agent.");
   }
-  let parsed;
-  try { parsed = new URL(raw); } catch {
+  // A bare host is what people and models actually write. "google.com" used to
+  // die in new URL() with a raw TypeError, surfaced to the operator as an
+  // undifferentiated technical_error, which is how browser_open appeared to be
+  // broken while the connection itself was fine.
+  const input = parseUserUrl(raw);
+  if (!input) {
     throw codedError("url_invalid", `URL non valido: ${raw}`);
   }
+  const parsed = input.url;
   if (!["http:", "https:"].includes(parsed.protocol)) {
     throw codedError("url_protocol_forbidden", `Protocollo non consentito per una scheda agente: ${parsed.protocol}`);
   }
@@ -8204,7 +8210,14 @@ function pushBuffer(map, key, value, limit = 1000, maxBytes = EVENT_BUFFER_MAX_B
   map.set(key, values);
 }
 function normalizeSiteUrl(value) {
-  const url = new URL(String(value || "").trim());
+  // Same reason as validateNavigationUrl: "miosito.it" is what a person types.
+  // It used to throw a bare TypeError, and the side panel showed the operator
+  // "Errore: Invalid URL" for a missing "https://".
+  const input = parseUserUrl(value);
+  if (!input) {
+    throw codedError("site_url_invalid", `Indirizzo del sito non valido: ${describeUrlInput(value, null)}. Esempio: miosito.it oppure https://miosito.it`);
+  }
+  const url = input.url;
   if (url.username || url.password) throw codedError("site_credentials_forbidden", "L'URL di pairing non può contenere credenziali.");
   const loopback = ["localhost", "127.0.0.1", "[::1]", "::1"].includes(String(url.hostname || "").toLowerCase());
   if (url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) {
