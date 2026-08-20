@@ -1,97 +1,157 @@
 {
-  "_readme": [
-    "This file locks the development-only static-analysis dependencies to exact immutable upstream commits.",
-    "It is intentionally small: PHPStan is distributed as a self-contained package; the WordPress extension depends only on PHPStan and wordpress-stubs.",
-    "Generated for RpConnector assurance on 2026-08-19; update composer.json and this lock together."
-  ],
-  "content-hash": "9009a8209c35bfa2ea6ec2f2cb65749b",
-  "packages": [],
-  "packages-dev": [
-    {
-      "name": "php-stubs/wordpress-stubs",
-      "version": "v6.9.4",
-      "source": {
-        "type": "git",
-        "url": "https://github.com/php-stubs/wordpress-stubs.git",
-        "reference": "90a9412826b9944f93b10bf41d795b5fe68abcd5"
-      },
-      "dist": {
-        "type": "zip",
-        "url": "https://api.github.com/repos/php-stubs/wordpress-stubs/zipball/90a9412826b9944f93b10bf41d795b5fe68abcd5",
-        "reference": "90a9412826b9944f93b10bf41d795b5fe68abcd5",
-        "shasum": ""
-      },
-      "type": "library",
-      "license": ["MIT"],
-      "description": "WordPress function and class declaration stubs for static analysis.",
-      "homepage": "https://github.com/php-stubs/wordpress-stubs",
-      "keywords": ["phpstan", "static analysis", "wordpress"],
-      "time": "2026-05-01T20:36:01+00:00"
-    },
-    {
-      "name": "phpstan/phpstan",
-      "version": "2.2.7",
-      "source": {
-        "type": "git",
-        "url": "https://github.com/phpstan/phpstan.git",
-        "reference": "692db47b9dddb0487934e5236e77d48594aef921"
-      },
-      "dist": {
-        "type": "zip",
-        "url": "https://api.github.com/repos/phpstan/phpstan/zipball/692db47b9dddb0487934e5236e77d48594aef921",
-        "reference": "692db47b9dddb0487934e5236e77d48594aef921",
-        "shasum": ""
-      },
-      "require": {"php": "^7.4|^8.0"},
-      "conflict": {"phpstan/phpstan-shim": "*"},
-      "bin": ["phpstan", "phpstan.phar"],
-      "type": "library",
-      "autoload": {"files": ["bootstrap.php"]},
-      "license": ["MIT"],
-      "description": "PHPStan - PHP Static Analysis Tool",
-      "keywords": ["dev", "static analysis"],
-      "support": {
-        "docs": "https://phpstan.org/user-guide/getting-started",
-        "issues": "https://github.com/phpstan/phpstan/issues",
-        "security": "https://github.com/phpstan/phpstan/security/policy"
-      },
-      "time": "2026-07-29T17:39:00+00:00"
-    },
-    {
-      "name": "szepeviktor/phpstan-wordpress",
-      "version": "v2.0.3",
-      "source": {
-        "type": "git",
-        "url": "https://github.com/szepeviktor/phpstan-wordpress.git",
-        "reference": "aa722f037b2d034828cd6c55ebe9e5c74961927e"
-      },
-      "dist": {
-        "type": "zip",
-        "url": "https://api.github.com/repos/szepeviktor/phpstan-wordpress/zipball/aa722f037b2d034828cd6c55ebe9e5c74961927e",
-        "reference": "aa722f037b2d034828cd6c55ebe9e5c74961927e",
-        "shasum": ""
-      },
-      "require": {
-        "php": "^7.4 || ^8.0",
-        "php-stubs/wordpress-stubs": "^6.6.2",
-        "phpstan/phpstan": "^2.0"
-      },
-      "suggest": {"swissspidy/phpstan-no-private": "Detect usage of internal core functions, classes and methods"},
-      "type": "phpstan-extension",
-      "extra": {"phpstan": {"includes": ["extension.neon"]}},
-      "autoload": {"psr-4": {"SzepeViktor\\PHPStan\\WordPress\\": "src/"}},
-      "license": ["MIT"],
-      "description": "WordPress extensions for PHPStan",
-      "keywords": ["code analysis", "phpstan", "static analysis", "wordpress"],
-      "time": "2025-09-14T02:58:00+00:00"
-    }
-  ],
-  "aliases": [],
-  "minimum-stability": "stable",
-  "stability-flags": {},
-  "prefer-stable": true,
-  "prefer-lowest": false,
-  "platform": {},
-  "platform-dev": {},
-  "plugin-api-version": "2.6.0"
+    "_readme": [
+        "This file locks the dependencies of your project to a known state",
+        "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
+        "This file is @generated automatically"
+    ],
+    "content-hash": "f591e130b36025fe7f0bdde102a4bca0",
+    "packages": [],
+    "packages-dev": [
+        {
+            "name": "php-stubs/wordpress-stubs",
+            "version": "v6.9.4",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/php-stubs/wordpress-stubs.git",
+                "reference": "90a9412826b9944f93b10bf41d795b5fe68abcd5"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/php-stubs/wordpress-stubs/zipball/90a9412826b9944f93b10bf41d795b5fe68abcd5",
+                "reference": "90a9412826b9944f93b10bf41d795b5fe68abcd5",
+                "shasum": ""
+            },
+            "type": "library",
+            "license": [
+                "MIT"
+            ],
+            "description": "WordPress function and class declaration stubs for static analysis.",
+            "homepage": "https://github.com/php-stubs/wordpress-stubs",
+            "keywords": [
+                "phpstan",
+                "static analysis",
+                "wordpress"
+            ],
+            "time": "2026-05-01T20:36:01+00:00"
+        },
+        {
+            "name": "phpstan/phpstan",
+            "version": "2.2.8",
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/e285254e60f33c21902efef4a926ca0987c06804",
+                "reference": "e285254e60f33c21902efef4a926ca0987c06804",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^7.4|^8.0"
+            },
+            "conflict": {
+                "phpstan/phpstan-shim": "*"
+            },
+            "bin": [
+                "phpstan",
+                "phpstan.phar"
+            ],
+            "type": "library",
+            "autoload": {
+                "files": [
+                    "bootstrap.php"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Ondřej Mirtes"
+                },
+                {
+                    "name": "Markus Staab"
+                },
+                {
+                    "name": "Vincent Langlet"
+                }
+            ],
+            "description": "PHPStan - PHP Static Analysis Tool",
+            "keywords": [
+                "dev",
+                "static analysis"
+            ],
+            "support": {
+                "docs": "https://phpstan.org/user-guide/getting-started",
+                "forum": "https://github.com/phpstan/phpstan/discussions",
+                "issues": "https://github.com/phpstan/phpstan/issues",
+                "security": "https://github.com/phpstan/phpstan/security/policy",
+                "source": "https://github.com/phpstan/phpstan-src"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/ondrejmirtes",
+                    "type": "github"
+                },
+                {
+                    "url": "https://github.com/phpstan",
+                    "type": "github"
+                }
+            ],
+            "time": "2026-08-04T22:21:45+00:00"
+        },
+        {
+            "name": "szepeviktor/phpstan-wordpress",
+            "version": "v2.0.3",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/szepeviktor/phpstan-wordpress.git",
+                "reference": "aa722f037b2d034828cd6c55ebe9e5c74961927e"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/szepeviktor/phpstan-wordpress/zipball/aa722f037b2d034828cd6c55ebe9e5c74961927e",
+                "reference": "aa722f037b2d034828cd6c55ebe9e5c74961927e",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^7.4 || ^8.0",
+                "php-stubs/wordpress-stubs": "^6.6.2",
+                "phpstan/phpstan": "^2.0"
+            },
+            "suggest": {
+                "swissspidy/phpstan-no-private": "Detect usage of internal core functions, classes and methods"
+            },
+            "type": "phpstan-extension",
+            "extra": {
+                "phpstan": {
+                    "includes": [
+                        "extension.neon"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "SzepeViktor\\PHPStan\\WordPress\\": "src/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "WordPress extensions for PHPStan",
+            "keywords": [
+                "code analysis",
+                "phpstan",
+                "static analysis",
+                "wordpress"
+            ],
+            "time": "2025-09-14T02:58:00+00:00"
+        }
+    ],
+    "aliases": [],
+    "minimum-stability": "stable",
+    "stability-flags": {},
+    "prefer-stable": true,
+    "prefer-lowest": false,
+    "platform": {},
+    "platform-dev": {},
+    "plugin-api-version": "2.9.0"
 }
