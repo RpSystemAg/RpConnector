@@ -1697,12 +1697,22 @@ HTML;
      */
     private const SURFACE_ESSENTIAL = array(
         'prstudio_do','prstudio_capability_search','prstudio_capability_describe','prstudio_execute',
-        'prstudio_tool_manual','prstudio_health','prstudio_observe','prstudio_flow','prstudio_backlog',
+        // prstudio_backlog is out of the essential set to make room for
+        // prstudio_research_radar, which a test now requires to be advertised.
+        // Listing outstanding work is reporting; the surface is for acting, and
+        // it stays reachable through capability_search.
+        'prstudio_tool_manual','prstudio_health','prstudio_observe','prstudio_flow',
         // prstudio_intervention_record is out of the essential set: it is the
         // largest of the non-core entries and recording an intervention is
         // secondary to performing one. Reachable through capability_search.
         // Stated rather than left to the size ordering, which drops whatever is
         // biggest without regard to what it is for.
+        // prstudio_research_radar is required to be advertised by
+        // tests/php-tools-list-budget.php, and a non-essential tool has no such
+        // guarantee -- the rest of the surface competes for whatever the
+        // essentials leave. If it must always be there, it is essential, and
+        // saying so is what makes the requirement true rather than lucky.
+        'prstudio_research_radar',
         'prstudio_context_open','prstudio_job_get','prstudio_job_control',
         'browser_status','browser_task_control','browser_open','browser_screenshot','browser_snapshot',
         // The interaction primitives. Without these the Browser Agent can open a
@@ -1771,7 +1781,7 @@ HTML;
      * fails if this ever starts under-counting, which is the direction that
      * breaks LAW 9 silently.
      */
-    public const TOKEN_BYTES_RATIO = 4.59;
+    public const TOKEN_BYTES_RATIO = 4.58;
 
     /** Approximate a token count from encoded bytes. Deliberately conservative. */
     private static function approx_tokens( int $bytes ): int { return (int) ceil( $bytes / self::TOKEN_BYTES_RATIO ); }
