@@ -132,6 +132,33 @@ abstract class PRSTUDIO_UC_Domain_Abstract {
 		return $items;
 	}
 
+	/**
+	 * Resolve every direct intent phrase present in an objective through the
+	 * single bilingual prstudio_do catalogue. Composite requests may therefore
+	 * ground more than one typed tool without each domain owning another lexicon.
+	 *
+	 * @return array<string,bool>
+	 */
+	protected function grounded_tool_intents( string $objective ): array {
+		if ( ! class_exists( 'PRSTUDIO_UC_Do' ) || ! class_exists( 'PRSTUDIO_UC_Action_Lexicon' ) ) {
+			return array();
+		}
+		$catalogue = PRSTUDIO_UC_Do::catalogue();
+		$by_tool = (array) ( $catalogue['by_tool'] ?? array() );
+		$objective_text = ' ' . PRSTUDIO_UC_Action_Lexicon::normalize_text( $objective ) . ' ';
+		$matches = array();
+		foreach ( $by_tool as $tool_name => $aliases ) {
+			foreach ( (array) $aliases as $alias ) {
+				$phrase = PRSTUDIO_UC_Action_Lexicon::normalize_text( (string) $alias );
+				if ( '' !== $phrase && false !== strpos( $objective_text, ' ' . $phrase . ' ' ) ) {
+					$matches[ (string) $tool_name ] = true;
+					break;
+				}
+			}
+		}
+		return $matches;
+	}
+
 	/** @return array<int,array<string,mixed>> */
 	public function workflow( string $objective, array $arguments, array $catalog ): array {
 		$matches = $this->actions( $catalog, $objective, 5, false );

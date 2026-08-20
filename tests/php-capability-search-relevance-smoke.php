@@ -74,6 +74,7 @@ require PRSTUDIO_UC_DIR . 'includes/class-prstudio-agency.php';
 require PRSTUDIO_UC_DIR . 'includes/class-wpaib-mcp.php';
 require_once PRSTUDIO_UC_DIR . 'includes/orchestrator/class-prstudio-uc-domain-abstract.php';
 require_once PRSTUDIO_UC_DIR . 'includes/orchestrator/class-prstudio-uc-orchestrator.php';
+require_once PRSTUDIO_UC_DIR . 'includes/orchestrator/domains/class-prstudio-domain-browser.php';
 
 $passed = 0;
 
@@ -375,6 +376,44 @@ if ($it_domain_score < 1 || $it_domain_score !== $en_domain_score) {
 }
 ++ $passed;
 fwrite(STDOUT, "PASS domain actions and scoring preserve bilingual ranking and shape\n");
+
+/* -- Browser composite workflows consume the central bilingual catalogue --- */
+
+function browser_workflow_actions(string $objective, array $arguments = array()): array {
+    static $domain = null;
+    if (!$domain) { $domain = new PRSTUDIO_Domain_Browser(); }
+    return array_column($domain->workflow($objective, $arguments, array()), 'action');
+}
+
+$browser_workflow_pairs = array(
+    array('apri', 'open', array('url' => 'https://example.com/')),
+    array('naviga', 'navigate', array('url' => 'https://example.com/', 'tab_id' => 7)),
+    array('clicca', 'click', array('selector' => '#submit')),
+    array('compila', 'fill', array('selector' => '#email', 'value' => 'name@example.com')),
+    array('schermata', 'screenshot', array('url' => 'https://example.com/')),
+    array('scansiona sito', 'crawl', array('url' => 'https://example.com/')),
+    array('scansiona sitemap', 'crawl sitemap', array('url' => 'https://example.com/sitemap.xml')),
+    array('ispeziona', 'inspect', array()),
+    array('estrai', 'extract', array('selector' => 'main')),
+    array('prestazioni GSC', 'GSC performance', array()),
+    array(
+        'apri https://example.com/ e fai una schermata',
+        'open https://example.com/ and take a screenshot',
+        array(),
+    ),
+);
+foreach ($browser_workflow_pairs as [$italian_objective, $english_objective, $arguments]) {
+    $it_actions = browser_workflow_actions($italian_objective, $arguments);
+    $en_actions = browser_workflow_actions($english_objective, $arguments);
+    if (!$it_actions || $it_actions !== $en_actions) {
+        fail_relevance(
+            "browser workflow differs for '{$italian_objective}'/'{$english_objective}': "
+            . 'IT=' . implode(',', $it_actions) . ' EN=' . implode(',', $en_actions)
+        );
+    }
+    ++$passed;
+    fwrite(STDOUT, "PASS browser workflow {$italian_objective} == {$english_objective}\n");
+}
 
 /* -- Nonsense still finds nothing ------------------------------------------ */
 
