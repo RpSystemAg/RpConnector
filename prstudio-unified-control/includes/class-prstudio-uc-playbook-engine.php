@@ -72,6 +72,15 @@ final class PRSTUDIO_UC_Playbook_Engine {
 	}
 
 	public static function describe(): array {
-		$out=array();foreach(self::TYPES as $type){$plan=self::build($type,array('_describe_only'=>true));$out[$type]=array('version'=>self::VERSION,'steps'=>count($plan['steps']??array()),'plan_hash'=>$plan['hash']??'');}return $out;
+		$out=array();
+		foreach(self::TYPES as $type){
+			if('site_study'===$type){
+				$descriptor=array('version'=>self::VERSION,'type'=>'site_study','steps'=>array(array('id'=>'site_study_discovery','handler'=>'browser.action','read_only'=>true,'requires_browser'=>true,'action'=>'playwright_link_crawl')),'created_from'=>'deterministic_catalog');
+				$out[$type]=array('version'=>self::VERSION,'steps'=>1,'plan_hash'=>hash('sha256',PRSTUDIO_UC_Idempotency::canonical_json($descriptor)));
+				continue;
+			}
+			$plan=self::build($type,array());$out[$type]=array('version'=>self::VERSION,'steps'=>count($plan['steps']??array()),'plan_hash'=>$plan['hash']??'');
+		}
+		return$out;
 	}
 }
