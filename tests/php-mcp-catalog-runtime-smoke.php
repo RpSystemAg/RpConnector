@@ -12,11 +12,16 @@ try {
     fail('MCP tools() must execute without Throwable: ' . get_class($e) . ': ' . $e->getMessage());
 }
 if (!is_array($tools)) fail('tools() must return array');
-// 120: browser_find, plus browser_evaluate and browser_upload_file, which
-// close the last two gaps against the reference surface (see
-// tests/validate-reference-parity.py): discovery before action, so a click on an
-// unfamiliar page picks from ranked candidates instead of one silent guess.
-// This count is asserted so an inventory change is always deliberate.
+// 120: browser_find, browser_evaluate and browser_upload_file close the last
+// gaps against the reference browser surface (tests/validate-reference-parity.py).
+//
+// A concurrent change set this to 119 in anticipation of prstudio_research_radar
+// arriving with PR #8. That tool is not in the source yet -- grep finds no
+// occurrence -- so 119 would have failed on master for a tool that does not
+// exist. Whoever merges PR #8 raises this to 121 in the same commit.
+//
+// The count is asserted precisely so an inventory change is deliberate, and it
+// is what caught the collision.
 if (count($tools) !== 120) fail('expected 120 tools, got ' . count($tools));
 $names = [];
 foreach ($tools as $index => $tool) {
@@ -38,8 +43,6 @@ foreach ($tools as $index => $tool) {
 $json = json_encode(['jsonrpc'=>'2.0','id'=>1,'result'=>['tools'=>$tools]], JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
 if ($json === false) fail('catalog JSON encoding failed: ' . json_last_error_msg());
 if (strlen($json) > 1024*1024) fail('catalog exceeds 1 MiB response budget: ' . strlen($json));
-// Derive the number rather than restating it: a literal here drifted out of
-// step with the assertion above and reported a stale count on a passing run.
 pass('MCP tools() executes and returns ' . count($tools) . ' unique tools');
 pass('Every tool has valid object schemas and boolean annotations');
 pass('Catalog JSON encodes successfully (' . strlen($json) . ' bytes)');
