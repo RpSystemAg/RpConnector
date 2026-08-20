@@ -1,0 +1,407 @@
+{
+  "version": 1,
+  "source": {
+    "workflow": "Browser Agent tests",
+    "run_id": 32274258680,
+    "artifact_id": 9373536167,
+    "branch_head": "448f1eac0fa0cbb095be156a032145b8c07f7ccf",
+    "plugin_check_version": "2.1.0"
+  },
+  "total_errors": 359,
+  "errors": {
+    ".htaccess": {
+      "hidden_files": 1
+    },
+    "includes/class-prstudio-browser-runtime.php": {
+      "Generic.PHP.ForbiddenFunctions.Found": 2,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fclose": 4,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_readfile": 1
+    },
+    "includes/class-prstudio-uc-abilities.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-agency-action-executor.php": {
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fclose": 1,
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-agency-capabilities.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-agency-runtime.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-agency-state.php": {
+      "WordPress.WP.AlternativeFunctions.file_system_operations_chmod": 1,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fclose": 3,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fopen": 2,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_is_writable": 1,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_mkdir": 1,
+      "WordPress.WP.AlternativeFunctions.rename_rename": 1,
+      "WordPress.WP.AlternativeFunctions.unlink_unlink": 1
+    },
+    "includes/class-prstudio-uc-agent-model.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-anti-crash-attestation.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-artifacts.php": {
+      "WordPress.WP.AlternativeFunctions.file_system_operations_is_writable": 1,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_readfile": 1,
+      "WordPress.WP.AlternativeFunctions.rename_rename": 1,
+      "WordPress.WP.AlternativeFunctions.unlink_unlink": 5
+    },
+    "includes/class-prstudio-uc-autoload.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-backend-executability.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-browser-live.php": {
+      "PluginCheck.CodeAnalysis.WriteFile.PluginDirectoryWrite": 2,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_chmod": 1,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fclose": 1,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fopen": 1,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_mkdir": 1,
+      "WordPress.WP.AlternativeFunctions.rename_rename": 1,
+      "WordPress.WP.AlternativeFunctions.unlink_unlink": 4,
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-browser-orchestrator-v3.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-browser-protocol.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-business-intelligence.php": {
+      "WordPress.WP.AlternativeFunctions.file_system_operations_chmod": 1,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fclose": 2,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fopen": 1,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_mkdir": 1,
+      "WordPress.WP.AlternativeFunctions.rename_rename": 1,
+      "WordPress.WP.AlternativeFunctions.unlink_unlink": 1,
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-capability-registry.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-change-tracker.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-commerce-engine.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-complete-action-executor.php": {
+      "Generic.PHP.ForbiddenFunctions.Found": 1,
+      "PluginCheck.CodeAnalysis.WriteFile.PluginDirectoryWrite": 4,
+      "WordPress.Security.EscapeOutput.ExceptionNotEscaped": 3,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_chmod": 2,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fclose": 3,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_rmdir": 4,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_touch": 1,
+      "WordPress.WP.AlternativeFunctions.rename_rename": 7,
+      "WordPress.WP.AlternativeFunctions.unlink_unlink": 5,
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-content-transaction.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-database-backend.php": {
+      "WordPress.WP.AlternativeFunctions.rename_rename": 1,
+      "WordPress.WP.AlternativeFunctions.unlink_unlink": 1
+    },
+    "includes/class-prstudio-uc-database-engine-v3.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-do.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-editorial-autonomy.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-engineering-workbench.php": {
+      "Generic.PHP.ForbiddenFunctions.Found": 1,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fclose": 3,
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-enterprise-engine.php": {
+      "WordPress.WP.AlternativeFunctions.file_system_operations_chmod": 1,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fclose": 2,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fopen": 1,
+      "WordPress.WP.AlternativeFunctions.rename_rename": 1,
+      "WordPress.WP.AlternativeFunctions.unlink_unlink": 1,
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-evidence-engine.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-execution-gateway.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-execution-lanes.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-execution-router.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-file-engine.php": {
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fclose": 1,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fopen": 1,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fread": 1,
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-gc.php": {
+      "WordPress.WP.AlternativeFunctions.file_system_operations_rmdir": 2,
+      "WordPress.WP.AlternativeFunctions.unlink_unlink": 1,
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-gpt-actions-auth.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-gpt-rest.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-graph-engine.php": {
+      "PluginCheck.CodeAnalysis.Localhost.Found": 1,
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-gsc-provider.php": {
+      "WordPress.WP.AlternativeFunctions.file_system_operations_mkdir": 1,
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-health.php": {
+      "WordPress.WP.AlternativeFunctions.file_system_operations_is_writable": 1
+    },
+    "includes/class-prstudio-uc-http-engine.php": {
+      "PluginCheck.CodeAnalysis.Localhost.Found": 1,
+      "WordPress.WP.AlternativeFunctions.parse_url_parse_url": 7,
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-idempotency.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-impact-engine.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-interventions.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-legacy-capability-executor.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-log-orchestrator.php": {
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fclose": 3,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fopen": 2,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fwrite": 2,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_rmdir": 2,
+      "WordPress.WP.AlternativeFunctions.rename_rename": 1,
+      "WordPress.WP.AlternativeFunctions.unlink_unlink": 2
+    },
+    "includes/class-prstudio-uc-mcp-auth-v5.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-mcp-toolchain.php": {
+      "Generic.PHP.ForbiddenFunctions.Found": 2,
+      "WordPress.DB.RestrictedClasses.mysql__PDO": 11,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_chmod": 2,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fclose": 7,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fopen": 2,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fread": 2,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fwrite": 3,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_mkdir": 1,
+      "WordPress.WP.AlternativeFunctions.parse_url_parse_url": 1,
+      "WordPress.WP.AlternativeFunctions.rename_rename": 1,
+      "WordPress.WP.AlternativeFunctions.unlink_unlink": 13,
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-mcp-v5.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-memory.php": {
+      "WordPress.WP.AlternativeFunctions.file_system_operations_chmod": 1,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fclose": 3,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fopen": 2,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_is_writable": 1,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_mkdir": 1,
+      "WordPress.WP.AlternativeFunctions.parse_url_parse_url": 1,
+      "WordPress.WP.AlternativeFunctions.rename_rename": 4,
+      "WordPress.WP.AlternativeFunctions.unlink_unlink": 2,
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-migration-v3.php": {
+      "WordPress.WP.AlternativeFunctions.file_system_operations_chmod": 1,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_mkdir": 2,
+      "WordPress.WP.AlternativeFunctions.rename_rename": 1,
+      "WordPress.WP.AlternativeFunctions.unlink_unlink": 1,
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-migration-v4.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-mission-engine.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-motion.php": {
+      "PluginCheck.CodeAnalysis.Heredoc.NotAllowed": 1,
+      "PluginCheck.CodeAnalysis.Offloading.OffloadedContent": 1,
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-observability.php": {
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fclose": 2,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fopen": 1,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_mkdir": 1,
+      "WordPress.WP.AlternativeFunctions.rename_rename": 1,
+      "WordPress.WP.AlternativeFunctions.unlink_unlink": 1,
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-observe.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-ocr.php": {
+      "Generic.PHP.ForbiddenFunctions.Found": 1,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fclose": 2,
+      "WordPress.WP.AlternativeFunctions.unlink_unlink": 1
+    },
+    "includes/class-prstudio-uc-openapi.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-operational-twin.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-opportunity-engine.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-performance-budget.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-planner-v3.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-playbook-engine.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-procedural-skills.php": {
+      "WordPress.WP.AlternativeFunctions.file_system_operations_chmod": 1,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fclose": 2,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fopen": 1,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_mkdir": 2,
+      "WordPress.WP.AlternativeFunctions.rename_rename": 1,
+      "WordPress.WP.AlternativeFunctions.unlink_unlink": 1,
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-product-audit.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-publish-transaction.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-recovery-manager.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-render-source-resolver.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-risk-engine-v3.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-safety-runtime.php": {
+      "WordPress.WP.AlternativeFunctions.file_system_operations_chmod": 1,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fclose": 2,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fopen": 1,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_mkdir": 2,
+      "WordPress.WP.AlternativeFunctions.rename_rename": 1,
+      "WordPress.WP.AlternativeFunctions.unlink_unlink": 1,
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-schema-validator.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-search-console-browser.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-seo-autopilot.php": {
+      "WordPress.DB.PreparedSQL.NotPrepared": 8,
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-sequential-thinking.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-site-context.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-site-sentinel.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-snapshot-engine.php": {
+      "WordPress.WP.AlternativeFunctions.file_system_operations_chmod": 1,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_mkdir": 1,
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-social-intelligence.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-state-machine.php": {
+      "WordPress.Security.EscapeOutput.ExceptionNotEscaped": 2,
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-store.php": {
+      "PluginCheck.Security.DirectDB.UnescapedDBParameter": 4,
+      "WordPress.DB.PreparedSQL.NotPrepared": 12
+    },
+    "includes/class-prstudio-uc-turn.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-verification-engine-v3.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-verifier.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-wait-channel.php": {
+      "WordPress.WP.AlternativeFunctions.file_system_operations_is_writable": 2,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_mkdir": 2,
+      "WordPress.WP.AlternativeFunctions.rand_mt_rand": 2,
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-prstudio-uc-work-session.php": {
+      "WordPress.WP.AlternativeFunctions.file_system_operations_rmdir": 2,
+      "WordPress.WP.AlternativeFunctions.unlink_unlink": 4
+    },
+    "includes/class-prstudio-uc-write-token.php": {
+      "missing_direct_file_access_protection": 1
+    },
+    "includes/class-wpaib-adtribes.php": {
+      "WordPress.Security.EscapeOutput.ExceptionNotEscaped": 2
+    },
+    "includes/class-wpaib-audit.php": {
+      "WordPress.DB.PreparedSQL.NotPrepared": 3
+    },
+    "includes/class-wpaib-files.php": {
+      "Generic.PHP.ForbiddenFunctions.Found": 1,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_chmod": 1,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fclose": 4,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fopen": 2,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fread": 1,
+      "WordPress.WP.AlternativeFunctions.rename_rename": 1,
+      "WordPress.WP.AlternativeFunctions.unlink_unlink": 3
+    },
+    "includes/class-wpaib-media-upload-extension.php": {
+      "WordPress.WP.AlternativeFunctions.file_system_operations_chmod": 1,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fclose": 1,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fopen": 1,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fread": 1,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_fwrite": 1,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_is_writable": 1,
+      "WordPress.WP.AlternativeFunctions.unlink_unlink": 4
+    },
+    "includes/class-wpaib-rest.php": {
+      "WordPress.Security.EscapeOutput.OutputNotEscaped": 1,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_is_writable": 2,
+      "WordPress.WP.AlternativeFunctions.file_system_operations_rmdir": 2,
+      "WordPress.WP.AlternativeFunctions.unlink_unlink": 2
+    },
+    "readme.txt": {
+      "missing_readme_header_tested": 1
+    }
+  }
+}

@@ -11,9 +11,7 @@ LAW 11 — FULL TEST/EXECUTION SURFACE MUST EXECUTE AT 100 PERCENT.
 LAW 12 — BLOCKERS TRIGGER STUDY AND REMEDIATION; THEY NEVER AUTHORIZE BYPASS OR STOP.  
 LAW 13 — HUMAN INTENT MUST RESOLVE TO ACTION, NOT INTERNAL ENCYCLOPEDIA.
 
-An explicit rationale does not legalize an exclusion or a deferral. The only
-acceptable stopping condition is verified closure. No alternative path to
-completion exists.
+An explicit rationale does not legalize an exclusion or a deferral. The only acceptable stopping condition is verified closure. No alternative path to completion exists.
 
 ```text
 ANALYZE

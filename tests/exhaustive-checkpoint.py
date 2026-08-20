@@ -686,7 +686,7 @@ def build_items(surface):
         s=surface['actions'][f"{a['route']}::{a['action']}"];implemented=s['status'] in {'wordpress_native','database_native','browser_agent','web_stories_native','complete_native'}
         annotation_ok=not (_semantic_read_action(str(a.get('action',''))) and not bool(a.get('read_only')))
         annotation_ok=annotation_ok and not (bool(a.get('read_only')) and bool(a.get('destructive')))
-        q=public_question_map('control_action',implemented=implemented or guarded,guarded=guarded,read_only=bool(a.get('read_only')),destructive=bool(a.get('destructive')),annotations_valid=annotation_ok)
+        q=public_question_map('control_action',implemented=implemented,read_only=bool(a.get('read_only')),destructive=bool(a.get('destructive')),annotations_valid=annotation_ok)
         items.append({'id':f"{a['route']}::{a['action']}",'kind':'control_action','file':'prstudio-unified-control/connector/action-catalog.json','line':0,'loc':0,'implementation_status':s['status'],'questions':q,'evidence':s})
 
     # Capabilities. Legacy actions inherit action-surface status. Native/direct

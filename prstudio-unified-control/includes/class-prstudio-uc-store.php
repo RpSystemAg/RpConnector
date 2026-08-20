@@ -1089,7 +1089,15 @@ final class PRSTUDIO_UC_Store {
 		global $wpdb;if(''===$lease_token)return false;
 		// phpcs:ignore PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.NotPrepared -- table/column identifier only, from a fixed helper or the identifier() allowlist + SHOW TABLES check -- never external input; values are parameterized via $wpdb->prepare()
 		$updated=$wpdb->query($wpdb->prepare('UPDATE '.self::jobs_table()." SET lease_expires_gmt = %s, heartbeat_gmt = %s, updated_gmt = %s WHERE job_uuid = %s AND lease_token = %s AND status = 'RUNNING' AND lease_expires_gmt >= UTC_TIMESTAMP()",gmdate('Y-m-d H:i:s',time()+self::JOB_LEASE_SECONDS),self::now(),self::now(),$job_uuid,$lease_token));
-		return 1===(int)$updated;
+		if(false===$updated)return false;
+		if(1===(int)$updated)return true;
+		if(0!==(int)$updated)return false;
+		// DATETIME values have second precision, so an immediate heartbeat can match
+		// the owned row while changing no bytes. Re-check the exact ownership and
+		// live-lease predicate before interpreting affected_rows=0 as lost ownership.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.NotPrepared -- table identifier comes from a fixed helper and all values are parameterized.
+		$owned=$wpdb->get_var($wpdb->prepare('SELECT 1 FROM '.self::jobs_table()." WHERE job_uuid = %s AND lease_token = %s AND status = 'RUNNING' AND lease_expires_gmt >= UTC_TIMESTAMP() LIMIT 1",$job_uuid,$lease_token));
+		return '1'===(string)$owned;
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- intentional: bulk/admin database maintenance and job-queue operations documented as set-based by design (see PR-STUDIO final release notes -- e.g. 128-table optimize stays 2 SQL statements, not one WP_Query per table); object-cache and WP_Query overhead is inappropriate for this bulk/schema path.
 	}
 

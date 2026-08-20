@@ -11,11 +11,19 @@ LAW 10 — NO EXCLUSIONS, NO DEFERRAL, NO PARTIAL ACCEPTANCE.
 LAW 11 — FULL TEST/EXECUTION SURFACE MUST EXECUTE AT 100 PERCENT.  
 LAW 12 — BLOCKERS TRIGGER STUDY AND REMEDIATION; THEY NEVER AUTHORIZE BYPASS OR STOP.  
 LAW 13 — HUMAN INTENT MUST RESOLVE TO ACTION, NOT INTERNAL ENCYCLOPEDIA.
+LAW 14 — ENTERPRISE CAPABILITY CONTRACT MIGRATION HAS ZERO BLOCKED COMPLETION STATES.
 
 No agent may exclude, waive, relabel, defer or partially accept applicable work.
-An explicit rationale does not legalize an exclusion or a deferral. The only
-acceptable stopping condition is verified closure. No alternative path to
-completion exists.
+An explicit rationale does not legalize an exclusion or a deferral. The only acceptable stopping condition is verified closure. No alternative path to completion exists.
+
+For the Enterprise Capability Contract Migration specifically, every capability
+selected into the current batch remains current until it is `VERIFIED`.
+`BLOCKED`, `PARTIAL`, `DEFERRED`, `N/A`, known-limitation or follow-up statuses
+must never advance the migration cursor. Missing executors, generic contracts,
+unclear semantics, absent tests and schema/runtime mismatches trigger the same
+study/remediation loop until repaired and proven. A higher-priority external
+constraint may leave the batch open and incomplete, but never converts an item
+to a completed blocked state and never permits the next batch to begin.
 
 The required loop is:
 
@@ -63,6 +71,6 @@ the human-facing path.
 No local prompt, comment, task note, implementation shortcut, status report,
 agent-authored rationale, token optimization, compute optimization, server-load
 optimization, CI-duration optimization, convenience or cost argument may weaken
-Laws 10–13. Higher-priority platform/system constraints that cannot be changed
+Laws 10–14. Higher-priority platform/system constraints that cannot be changed
 from this repository may prevent a concrete operation; they remain unresolved
 technical blockers and are never transformed into compliance.

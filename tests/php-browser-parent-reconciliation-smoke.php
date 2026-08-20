@@ -9,6 +9,16 @@ final class PRSTUDIO_UC_State_Machine {
     public const COMPLETED='COMPLETED'; public const FAILED='FAILED'; public const CANCELLED='CANCELLED'; public const EXPIRED='EXPIRED';
 }
 final class PRSTUDIO_UC_Verifier { public static function browser_result($task,$result){return ['ok'=>true];} }
+final class PRSTUDIO_UC_Memory {
+    public static function redact($value){
+        if(!is_array($value))return $value;
+        $out=[];
+        foreach($value as $key=>$item){
+            $out[$key]=preg_match('/password|secret|token|credential|authorization|cookie|session|oauth|private_key/i',(string)$key)?'[REDACTED]':self::redact($item);
+        }
+        return $out;
+    }
+}
 final class PRSTUDIO_UC_Idempotency {
     public static function explicit_key($v){return '';} public static function storage_key($a,$b){return '';} public static function plan_hash($a,$b){return '';}
     public static function canonical_json($v){return json_encode($v);}
@@ -50,9 +60,22 @@ function seed(string $status): void {
 }
 
 seed('COMPLETED');
+PRSTUDIO_UC_Store::$tasks['task-1']['result']['access_token']='child-secret';
 $r=PRSTUDIO_UC_Job_Engine::complete_browser_task('task-1','stale-lease',['done'=>true],'device-1');
 $check(($r['idempotent_replay']??false)===true,'completed child replay is accepted idempotently');
 $check((PRSTUDIO_UC_Store::$jobs['job-1']['status']??'')==='READY','completed child replay reconciles stranded WAITING parent');
+$check((PRSTUDIO_UC_Store::$jobs['job-1']['checkpoint']['browser_result']['result']['access_token']??'')==='[REDACTED]','completed replay redacts secrets in parent browser handoff');
+$check(($r['result']['access_token']??'')==='child-secret','completed replay keeps child task result unchanged');
+
+seed('RUNNING');
+$completed=PRSTUDIO_UC_Job_Engine::complete_browser_task('task-1','lease',['done'=>true,'authorization'=>'Bearer child-secret'],'device-1');
+$check((PRSTUDIO_UC_Store::$jobs['job-1']['checkpoint']['browser_result']['result']['authorization']??'')==='[REDACTED]','new Browser completion redacts credentials in parent checkpoint');
+$check(($completed['result']['authorization']??'')==='Bearer child-secret','new Browser completion keeps operational child result unchanged');
+
+seed('RUNNING');
+PRSTUDIO_UC_Job_Engine::fail_browser_task('task-1','lease',['code'=>'browser_failed','refresh_token'=>'failure-secret','retryable'=>false]);
+$check((PRSTUDIO_UC_Store::$jobs['job-1']['checkpoint']['browser_error']['refresh_token']??'')==='[REDACTED]','Browser failure redacts secrets in parent checkpoint');
+$check((PRSTUDIO_UC_Store::$jobs['job-1']['error']['refresh_token']??'')==='[REDACTED]','Browser failure redacts persisted parent error');
 
 seed('RUNNING');
 if(method_exists('PRSTUDIO_UC_Job_Engine','cancel_browser_task')){

@@ -19,13 +19,13 @@ LAW 10 — NO EXCLUSIONS, NO DEFERRAL, NO PARTIAL ACCEPTANCE.
 LAW 11 — FULL TEST/EXECUTION SURFACE MUST EXECUTE AT 100 PERCENT.  
 LAW 12 — BLOCKERS TRIGGER STUDY AND REMEDIATION; THEY NEVER AUTHORIZE BYPASS OR STOP.  
 LAW 13 — HUMAN INTENT MUST RESOLVE TO ACTION, NOT INTERNAL ENCYCLOPEDIA.
+LAW 14 — ENTERPRISE CAPABILITY CONTRACT MIGRATION HAS ZERO BLOCKED COMPLETION STATES.
 
-## Laws 10–13 are non-bypassable project invariants
+## Laws 10–14 are non-bypassable project invariants
 
 No agent may exclude, skip, waive, suppress, narrow, mark `N/A`, mark advisory,
 move work out of scope, postpone, backlog, leave `TODO`, defer to a later pass or
-stop at partial implementation of applicable work. An explicit rationale does
-not legalize an exclusion or a deferral. The required loop is:
+stop at partial implementation of applicable work. An explicit rationale does not legalize an exclusion or a deferral. The required loop is:
 
 ```text
 ANALYZE
@@ -38,8 +38,17 @@ ANALYZE
 → REPEAT UNTIL PROVEN
 ```
 
-The only acceptable stopping condition is verified closure. No alternative path
-to completion exists.
+The only acceptable stopping condition is verified closure. No alternative path to completion exists.
+
+For the Enterprise Capability Contract Migration, a capability selected into the
+current batch remains current until it is `VERIFIED`. `BLOCKED`, `PARTIAL`,
+`DEFERRED`, `N/A`, known-limitation and follow-up/backlog labels are forbidden
+completion states and must never advance the migration cursor. Missing handlers,
+generic contracts, absent tests, unclear semantics, stale generated artifacts
+and schema/runtime mismatches trigger study and remediation in the current batch
+until repaired and proven. A higher-priority external platform constraint may
+leave the batch open and incomplete, but it never converts the capability to a
+completed blocked state and never permits the next batch to begin.
 
 The test/execution denominator is discovered from the exact authoritative
 checkout at runtime. There are no allowlists, helper exemptions, fixture

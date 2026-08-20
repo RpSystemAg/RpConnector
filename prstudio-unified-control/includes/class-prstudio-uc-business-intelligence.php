@@ -64,12 +64,86 @@ final class PRSTUDIO_UC_Business_Intelligence {
             $state=self::load_unlocked();
             $result=$callback($state);
             if(is_wp_error($result))return $result;
+            if(is_array($result)&&array_key_exists('changed',$result)&&false===$result['changed'])return $result;
             if(!self::atomic_write($state))return new WP_Error('business_state_write_failed','Unable to persist business intelligence state.',array('status'=>503,'retryable'=>true));
             return $result;
         } finally { @flock($fh,LOCK_UN);@fclose($fh); }
     }
     private static function state(): array { return self::load_unlocked(); }
     private static function bounded_number($value,float $min=-1000000000000.0,float $max=1000000000000.0): float { return max($min,min($max,(float)$value)); }
+
+    /** Stable JSON representation used only for deterministic identity/tie-breaking. */
+    private static function canonical_value($value) {
+        if(!is_array($value))return $value;
+        $is_list=true;if(function_exists('array_is_list')){$is_list=array_is_list($value);}else{$expected=0;foreach($value as $key=>$unused){if($key!==$expected){$is_list=false;break;}$expected++;}}
+        if($is_list){$out=array();foreach($value as $item)$out[]=self::canonical_value($item);return $out;}
+        $out=array();$keys=array_keys($value);sort($keys,SORT_STRING);foreach($keys as $key)$out[(string)$key]=self::canonical_value($value[$key]);return $out;
+    }
+    private static function canonical_json($value): string {
+        $json=json_encode(self::canonical_value($value),JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE|JSON_PRESERVE_ZERO_FRACTION);
+        return false===$json?'null':$json;
+    }
+    private static function bounded_text($value,int $max): string {
+        $text=sanitize_text_field((string)$value);
+        return function_exists('mb_substr')?mb_substr($text,0,$max,'UTF-8'):substr($text,0,$max);
+    }
+    private static function normalize_fact(array $fact) {
+        $key=self::bounded_text($fact['key']??'',190);$source=self::bounded_text($fact['source']??'',190);
+        if(''===$key)return new WP_Error('data_quality_fact_key_required','Each fact requires a non-empty key.',array('status'=>400));
+        if(''===$source)return new WP_Error('data_quality_source_required','Each fact requires a non-empty source.',array('status'=>400));
+        if(!array_key_exists('authority',$fact)||!is_numeric($fact['authority']))return new WP_Error('data_quality_authority_required','Each fact requires numeric authority.',array('status'=>400));
+        if(!array_key_exists('confidence',$fact)||!is_numeric($fact['confidence']))return new WP_Error('data_quality_confidence_required','Each fact requires numeric confidence.',array('status'=>400));
+        $observed=self::bounded_text($fact['observed_gmt']??'',40);$ts=''!==$observed?strtotime($observed):false;
+        if(false===$ts)return new WP_Error('data_quality_observed_gmt_invalid','Each fact requires a parseable observed_gmt timestamp.',array('status'=>400));
+        $value=self::clean($fact['value']??null);$authority=max(0.0,min(1.0,(float)$fact['authority']));$confidence=max(0.0,min(1.0,(float)$fact['confidence']));
+        $normalized=array('key'=>$key,'value'=>$value,'source'=>$source,'authority'=>round($authority,6),'observed_gmt'=>gmdate('c',(int)$ts),'confidence'=>round($confidence,6));
+        $normalized['_observed_ts']=(int)$ts;$normalized['_stable_hash']=hash('sha256',self::canonical_json(array_diff_key($normalized,array('_observed_ts'=>true,'_stable_hash'=>true))));
+        return $normalized;
+    }
+    private static function public_fact(array $fact): array { unset($fact['_observed_ts'],$fact['_stable_hash']);return $fact; }
+
+    /** Resolve contradictory supplied facts deterministically: authority, freshness, confidence, then stable tie-break. */
+    public static function data_quality_conflicts(array $args) {
+        $facts=array_values(array_filter((array)($args['facts']??array()),'is_array'));
+        if(!$facts)return new WP_Error('data_quality_facts_required','facts are required.',array('status'=>400));
+        if(count($facts)>500)return new WP_Error('data_quality_facts_limit','facts exceeds the bounded limit of 500.',array('status'=>400));
+        $groups=array();
+        foreach($facts as $fact){$normalized=self::normalize_fact($fact);if(is_wp_error($normalized))return $normalized;$groups[(string)$normalized['key']][]=$normalized;}
+        ksort($groups,SORT_STRING);$resolutions=array();$conflicts=0;
+        foreach($groups as $key=>$candidates){
+            usort($candidates,static function(array $a,array $b):int{
+                $cmp=$b['authority']<=>$a['authority'];if(0!==$cmp)return $cmp;
+                $cmp=$b['_observed_ts']<=>$a['_observed_ts'];if(0!==$cmp)return $cmp;
+                $cmp=$b['confidence']<=>$a['confidence'];if(0!==$cmp)return $cmp;
+                return strcmp((string)$a['_stable_hash'],(string)$b['_stable_hash']);
+            });
+            $winner=$candidates[0];$value_hashes=array();foreach($candidates as $candidate)$value_hashes[hash('sha256',self::canonical_json($candidate['value']))]=true;
+            $conflict=count($value_hashes)>1;if($conflict)$conflicts++;
+            $basis='identical';
+            if(count($candidates)>1){$runner=$candidates[1];if($winner['authority']!==$runner['authority'])$basis='authority';elseif($winner['_observed_ts']!==$runner['_observed_ts'])$basis='freshness';elseif($winner['confidence']!==$runner['confidence'])$basis='confidence';elseif($conflict)$basis='stable_tiebreak';}
+            $alternatives=array();foreach(array_slice($candidates,1) as $candidate)$alternatives[]=self::public_fact($candidate);
+            $resolutions[]=array('key'=>$key,'conflict'=>$conflict,'candidate_count'=>count($candidates),'winner'=>self::public_fact($winner),'alternatives'=>$alternatives,'resolution_basis'=>$basis);
+        }
+        return array('ok'=>true,'version'=>self::VERSION,'resolved_count'=>count($resolutions),'conflict_count'=>$conflicts,'resolutions'=>$resolutions);
+    }
+
+    /** Persist an immutable, bounded managerial decision record with deterministic idempotency. */
+    public static function decision_journal(array $args) {
+        $decision=self::bounded_text($args['decision']??'',4000);$rationale=self::bounded_text($args['rationale']??'',8000);$expected=self::bounded_text($args['expected_outcome']??'',4000);
+        if(''===$decision)return new WP_Error('business_decision_required','decision is required.',array('status'=>400));
+        if(''===$rationale)return new WP_Error('business_decision_rationale_required','rationale is required.',array('status'=>400));
+        if(''===$expected)return new WP_Error('business_expected_outcome_required','expected_outcome is required.',array('status'=>400));
+        $alternatives=array();foreach(array_slice((array)($args['alternatives']??array()),0,50) as $alternative){if(!is_string($alternative))return new WP_Error('business_decision_alternative_invalid','alternatives must contain strings.',array('status'=>400));$text=self::bounded_text($alternative,2000);if(''!==$text)$alternatives[]=$text;}
+        $evidence=array();foreach(array_slice((array)($args['evidence']??array()),0,100) as $item){if(!is_array($item))return new WP_Error('business_decision_evidence_invalid','evidence must contain objects.',array('status'=>400));$source=self::bounded_text($item['source']??'',190);$summary=self::bounded_text($item['summary']??'',4000);if(''===$source||''===$summary)return new WP_Error('business_decision_evidence_invalid','Each evidence item requires source and summary.',array('status'=>400));$row=array('source'=>$source,'summary'=>$summary);if(isset($item['reference']))$row['reference']=self::bounded_text($item['reference'],2048);if(isset($item['confidence'])){if(!is_numeric($item['confidence']))return new WP_Error('business_decision_evidence_confidence_invalid','Evidence confidence must be numeric.',array('status'=>400));$row['confidence']=round(max(0.0,min(1.0,(float)$item['confidence'])),6);}$evidence[]=$row;}
+        $core=self::clean(array('decision'=>$decision,'rationale'=>$rationale,'alternatives'=>$alternatives,'evidence'=>$evidence,'expected_outcome'=>$expected));$content_hash=hash('sha256',self::canonical_json($core));
+        $provided_id=self::bounded_text($args['decision_id']??'',96);$decision_id=''!==$provided_id?self::key($provided_id,96):'decision_'.substr($content_hash,0,24);
+        if(''===$decision_id)return new WP_Error('business_decision_id_invalid','decision_id is invalid.',array('status'=>400));
+        return self::mutate(static function(array &$state)use($decision_id,$core,$content_hash){
+            foreach((array)($state['decisions']??array()) as $row){if(!is_array($row)||$decision_id!==(string)($row['decision_id']??''))continue;if(hash_equals((string)($row['content_hash']??''),$content_hash))return array('ok'=>true,'version'=>self::VERSION,'created'=>false,'changed'=>false,'replayed'=>true,'decision'=>$row,'journal_count'=>count((array)$state['decisions']));return new WP_Error('business_decision_id_conflict','decision_id already refers to different immutable content.',array('status'=>409,'decision_id'=>$decision_id));}
+            $row=array_merge(array('decision_id'=>$decision_id),$core,array('content_hash'=>$content_hash,'decided_gmt'=>gmdate('c')));$state['decisions'][]=$row;if(count($state['decisions'])>self::MAX_DECISIONS)$state['decisions']=array_slice($state['decisions'],-self::MAX_DECISIONS);
+            return array('ok'=>true,'version'=>self::VERSION,'created'=>true,'changed'=>true,'replayed'=>false,'decision'=>$row,'journal_count'=>count($state['decisions']));
+        });
+    }
 
     /** Deterministic contribution-margin model. */
     public static function unit_economics(array $args) {

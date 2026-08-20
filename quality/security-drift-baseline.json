@@ -1,0 +1,67 @@
+{
+  "files": {
+    ".github/workflows/dast-security.yml": {
+      "present": "true",
+      "role": "authenticated DAST workflow",
+      "sha256": "2dca32aafd6104518da7e946ba014318bd6633bbc887aa5706ed51d87c84b8a3"
+    },
+    ".github/workflows/network-chaos.yml": {
+      "present": "true",
+      "role": "network chaos workflow",
+      "sha256": "97bccc1c15539a1fb48c55452a6ad082d6e713d7bd18ec13399ffb1614753997"
+    },
+    ".github/workflows/oauth-security-invariants.yml": {
+      "present": "true",
+      "role": "OAuth security invariants workflow",
+      "sha256": "89af1637c2bb757b200e0915ab95e167b4efed71a265f7e5383641de82cb7094"
+    },
+    ".github/workflows/security-drift-audit.yml": {
+      "present": "false",
+      "role": "this gate's own workflow",
+      "sha256": ""
+    },
+    "prstudio-unified-browser-agent/lib/observation-security.js": {
+      "present": "true",
+      "role": "browser observation redaction",
+      "sha256": "8e24a2d3ec78962b43949538e050a46774a21652568ceaf6e2626612523a55df"
+    },
+    "prstudio-unified-browser-agent/lib/policy.js": {
+      "present": "true",
+      "role": "browser action/cdp allowlists and auth-challenge lists",
+      "sha256": "0201a46ccec1777283f5120a1387017c52640062e3b729a4549dbc2564c9d078"
+    },
+    "prstudio-unified-browser-agent/lib/trap-page-policy.js": {
+      "present": "true",
+      "role": "trap-page containment policy (untrusted page input)",
+      "sha256": "1c3574358166cd89e5c97ea3e8089b9715eb8526b069abdd4f169faf8fa35473"
+    },
+    "prstudio-unified-control/includes/class-prstudio-uc-context-leak-gauge.php": {
+      "present": "true",
+      "role": "context-leakage gauges (blocking invariant)",
+      "sha256": "24c83be217d330a8e2fc8625c0d363f9a9d8d08801232633bd0889bd8aa95235"
+    },
+    "prstudio-unified-control/includes/class-prstudio-uc-memory.php": {
+      "present": "true",
+      "role": "MCP response redaction (Memory::redact)",
+      "sha256": "3da29d105ec173646207cd2455676536d56a06eccfca592ccc8150b6ac4de72e"
+    },
+    "psalm-taint.xml": {
+      "present": "true",
+      "role": "taint-analysis configuration",
+      "sha256": "eb69af98645306596c158b0fbcb2a5363475aa844f43a9d42225608cf028293c"
+    }
+  },
+  "gate_version": "1.0.0",
+  "generated_utc": "2026-08-19T14:52:48.828171Z",
+  "markers": {
+    "prstudio-unified-browser-agent/service-worker.js": {
+      "horizon.fallback": "present",
+      "trap_page.contained": "present"
+    },
+    "prstudio-unified-control/includes/class-prstudio-uc-mcp-v5.php": {
+      "PRSTUDIO_UC_Context_Leak_Gauge::blocking_verdict": "present",
+      "context_leak_blocked": "present",
+      "known_secrets_for_gauge": "present"
+    }
+  }
+}

@@ -151,9 +151,44 @@ if ( ! $advertised['tools'] ) {
 }
 
 echo "\n";
+
+// Research radar admission (2026-08-19): the radar tool is admitted to the
+// advertised surface after the essential routers, inside the same hard cap.
+// The full catalogue below is measured for context only.
+$radar_admitted = isset( $advertised_names['prstudio_research_radar'] );
+if ( ! $radar_admitted ) {
+    $failures[] = 'prstudio_research_radar was trimmed from tools/list; it must be admitted after the essential routers (Law 9 mechanism, not a budget raise).';
+}
+
+// Per-task provisioning profiles (Task-Aware Harness Provisioning): every
+// intent profile must stay inside the same hard cap and may only reference
+// tools that exist in the full catalogue.
+foreach ( PRSTUDIO_UC_MCP_V5::intent_profiles_for_test() as $intent => $profile ) {
+    $profile_result = PRSTUDIO_UC_MCP_V5::tools_for_intent( $intent );
+    if ( empty( $profile_result['valid'] ) ) {
+        $failures[] = "intent profile '{$intent}' resolved to no tools";
+    }
+    if ( ! $profile_result['within_budget'] ) {
+        $failures[] = sprintf( "intent profile '%s' emits ~%d tokens, over the %d hard cap", $intent, $profile_result['profile_tokens'], $profile_result['budget'] );
+    }
+    foreach ( $profile_result['profile_tools'] as $profile_tool ) {
+        if ( ! isset( $advertised_names[ $profile_tool ] ) && ! in_array( $profile_tool, array_keys( $per_tool ), true ) ) {
+            $failures[] = "intent profile '{$intent}' references unknown tool '{$profile_tool}'";
+        }
+    }
+}
+$research_profile = PRSTUDIO_UC_MCP_V5::tools_for_intent( 'research' );
+if ( ! in_array( 'prstudio_research_radar', $research_profile['profile_tools'], true ) ) {
+    $failures[] = 'the research intent profile must include prstudio_research_radar';
+}
+printf( "research intent profile: %d tool(s), ~%d tokens, within_budget=%s\n", count( $research_profile['profile_tools'] ), $research_profile['profile_tokens'], $research_profile['within_budget'] ? 'yes' : 'no' );
+
+echo "\n";
 if ( $failures ) {
     foreach ( $failures as $f ) { fwrite( STDERR, "FAIL {$f}\n" ); }
     exit( 1 );
 }
 printf( "PASS tools/list stays within the %d-token surface budget with every essential tool advertised\n", $budget );
+printf( "PASS prstudio_research_radar admitted after essential routers\n" );
+printf( "PASS per-task intent profiles stay within the %d-token hard cap\n", $budget );
 exit( 0 );

@@ -90,6 +90,21 @@ def main() -> int:
     enterprise = ENTERPRISE_WORKFLOW.read_text(encoding="utf-8", errors="replace")
     inventory = INVENTORY_TEST.read_text(encoding="utf-8", errors="replace")
 
+    # The forbidden-fragment block inside validate-test-inventory.py is DATA
+    # naming the mechanisms the inventory check forbids. Scanning the whole
+    # file for those literals self-matches the block itself (e.g. the
+    # "HELPERS =" entry), a false positive that made the constitution gate
+    # red on master. The enforcement logic below the block is what must be
+    # scanned for exception mechanisms, so the literal data block is excluded
+    # from the scan -- nothing is weakened, the same forbidden fragments are
+    # still asserted against the gate text.
+    inventory_checks = re.sub(
+        r"forbidden_gate_fragments = \(.*?\)\n",
+        "forbidden_gate_fragments = (/* data block, excluded from self-scan */)\n",
+        inventory,
+        flags=re.S,
+    )
+
     for forbidden in (
         "HELPERS =",
         "HELPERS:",
@@ -100,7 +115,7 @@ def main() -> int:
     ):
         if forbidden in gate:
             fail(f"execution gate contains exception mechanism {forbidden!r}")
-        if forbidden in inventory and forbidden != "test-inventory-baseline.json":
+        if forbidden in inventory_checks and forbidden != "test-inventory-baseline.json":
             fail(f"inventory contract contains exception mechanism {forbidden!r}")
 
     gate_requirements = (
@@ -134,7 +149,13 @@ def main() -> int:
         if fragment not in gate:
             fail(f"execution gate missing mechanical invariant {fragment!r}")
 
-    if "trace_texts.append(trace_text)" in gate:
+    # The required aggregation line is `successful_trace_texts.append(...)`;
+    # forbidding the bare substring `trace_texts.append(trace_text)` matched
+    # that required line itself (pre-existing false positive on master). The
+    # guard keeps its intent: any aggregation of traces that is NOT the
+    # successful one is the historical failed-process merge and stays
+    # forbidden.
+    if re.search(r"(?<!successful_)trace_texts\.append\(trace_text\)", gate):
         fail("failed-process trace aggregation was reintroduced")
     assert_failure_output_contract(gate)
 
