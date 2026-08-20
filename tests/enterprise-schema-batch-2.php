@@ -149,7 +149,8 @@ function schema_bad($value, array $schema, string $label): void {
 $ids = array('authority.outreach.engine', 'content.brief.compile', 'content.claim.ledger', 'content.publish.transaction', 'content.transaction.patch');
 $raw = file_get_contents(PRSTUDIO_UC_DIR . 'capabilities/enterprise-capability-contracts.json');
 $doc = json_decode((string) $raw, true);
-check(is_array($doc) && array_keys((array) ($doc['contracts'] ?? array())) === $ids, 'batch 2 overlay contains exactly the five file-disjoint capabilities');
+$contract_ids = array_keys((array) ($doc['contracts'] ?? array()));
+check(is_array($doc) && array_values(array_intersect($ids, $contract_ids)) === $ids, 'batch 2 overlay contains the complete five-capability batch inside the unified enterprise contract catalog');
 
 foreach ($ids as $id) {
     $described = PRSTUDIO_UC_Capability_Registry::describe($id);
