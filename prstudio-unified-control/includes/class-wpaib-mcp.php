@@ -655,7 +655,68 @@ final class WPAIB_MCP {
 		return $score;
 	}
 
+	/**
+	 * Shared bilingual matcher adapter. The legacy payload remains unchanged;
+	 * only ranking and language normalization come from the canonical index.
+	 */
 	private static function capability_matches( string $query, string $route_filter = '', int $limit = 10, bool $include_schema = false ): array {
+		if ( ! class_exists( 'PRSTUDIO_UC_Action_Lexicon' ) ) {
+			require_once __DIR__ . '/class-prstudio-uc-action-lexicon.php';
+		}
+		if ( ! class_exists( 'PRSTUDIO_UC_Action_Index' ) ) {
+			require_once __DIR__ . '/class-prstudio-uc-action-index.php';
+		}
+		if ( ! class_exists( 'PRSTUDIO_UC_Action_Index' ) ) {
+			return self::capability_matches_legacy( $query, $route_filter, $limit, $include_schema );
+		}
+
+		$route_path = '' !== trim( $route_filter ) ? self::route_path_from_input( $route_filter ) : null;
+		$route_scope = null !== $route_path ? $route_path : '*';
+		$limit = max( 1, min( 50, $limit ) );
+		$found = PRSTUDIO_UC_Action_Index::search_detailed( $query, $limit, '', $route_scope );
+		$catalog = self::route_catalog();
+		$matches = array();
+
+		foreach ( (array) ( $found['items'] ?? array() ) as $item ) {
+			$route = (string) ( $item['route'] ?? '' );
+			$action = (string) ( $item['action'] ?? '' );
+			if ( '' === $route || '' === $action || ! isset( $catalog[ $route ]['actions'][ $action ] ) ) {
+				continue;
+			}
+			$route_meta = (array) $catalog[ $route ];
+			$action_meta = (array) $route_meta['actions'][ $action ];
+			$schema = isset( $action_meta['input_schema'] ) && is_array( $action_meta['input_schema'] ) ? $action_meta['input_schema'] : array();
+			$properties = isset( $schema['properties'] ) && is_array( $schema['properties'] ) ? $schema['properties'] : array();
+			$match = array(
+				'tool_name' => (string) ( $item['tool_name'] ?? $action_meta['tool_name'] ?? '' ),
+				'route' => $route,
+				'action' => $action,
+				'route_tool' => (string) ( $route_meta['tool'] ?? '' ),
+				'title' => (string) ( $item['title'] ?? $action_meta['title'] ?? '' ),
+				'description' => (string) ( $item['description'] ?? $action_meta['description'] ?? '' ),
+				'read_only' => ! empty( $item['read_only'] ),
+				'destructive' => ! empty( $item['destructive'] ),
+				'parameters' => array_slice( array_keys( $properties ), 0, 40 ),
+				'score' => (int) ( $item['_score'] ?? 0 ),
+				'call' => array(
+					'tool' => 'rpconnector_action_call',
+					'arguments' => array( 'route' => $route, 'action' => $action ),
+				),
+			);
+			if ( $include_schema ) {
+				$match['input_schema'] = $schema;
+			}
+			$matches[] = $match;
+		}
+
+		return array(
+			'matches' => $matches,
+			'total_matches' => (int) ( $found['total_matches'] ?? count( $matches ) ),
+		);
+	}
+
+	/** Old scorer retained only as a fail-safe when the shared index is unavailable. */
+	private static function capability_matches_legacy( string $query, string $route_filter = '', int $limit = 10, bool $include_schema = false ): array {
 		$groups = self::search_groups( $query );
 		$phrase = trim( self::normalize_search_text( $query ) );
 		$phrase_action = str_replace( ' ', '_', $phrase );
