@@ -301,23 +301,58 @@ final class PRSTUDIO_UC_Action_Lexicon {
 	/** @var array<string,bool>|null */
 	private static ?array $stop_words = null;
 
-	/** Normalise human text and technical identifiers identically everywhere. */
-	public static function normalize_text( string $value ): string {
-		if ( function_exists( 'remove_accents' ) ) {
-			$value = remove_accents( $value );
-		} elseif ( function_exists( 'iconv' ) ) {
-			$ascii = @iconv( 'UTF-8', 'ASCII//TRANSLIT//IGNORE', $value );
-			if ( false !== $ascii ) {
-				$value = $ascii;
-			}
-		}
+	/**
+	 * Strip accents deterministically, on every platform.
+	 *
+	 * Public because two other normalisers need exactly this and had each grown
+	 * their own fragile version of it. The set of accented characters Italian
+	 * uses is small and closed, so a table is the right tool rather than a
+	 * fallback: it produces the same answer in CI, on Windows, and inside
+	 * WordPress, which is the property that matters when a vocabulary is
+	 * matched by exact word.
+	 *
+	 * @param string $value Raw text.
+	 * @return string Lowercased, unaccented.
+	 */
+	public static function fold_accents( string $value ): string {
 		$value = function_exists( 'mb_strtolower' ) ? mb_strtolower( $value, 'UTF-8' ) : strtolower( $value );
 		$value = strtr( $value, array(
-			'à' => 'a', 'á' => 'a', 'â' => 'a', 'ä' => 'a', 'è' => 'e', 'é' => 'e', 'ê' => 'e', 'ë' => 'e',
-			'ì' => 'i', 'í' => 'i', 'î' => 'i', 'ï' => 'i', 'ò' => 'o', 'ó' => 'o', 'ô' => 'o', 'ö' => 'o',
-			'ù' => 'u', 'ú' => 'u', 'û' => 'u', 'ü' => 'u', 'ç' => 'c', 'ñ' => 'n',
-			'À' => 'a', 'Á' => 'a', 'È' => 'e', 'É' => 'e', 'Ì' => 'i', 'Í' => 'i', 'Ò' => 'o', 'Ó' => 'o', 'Ù' => 'u', 'Ú' => 'u',
+			'à' => 'a', 'á' => 'a', 'â' => 'a', 'ã' => 'a', 'ä' => 'a', 'å' => 'a',
+			'è' => 'e', 'é' => 'e', 'ê' => 'e', 'ë' => 'e',
+			'ì' => 'i', 'í' => 'i', 'î' => 'i', 'ï' => 'i',
+			'ò' => 'o', 'ó' => 'o', 'ô' => 'o', 'õ' => 'o', 'ö' => 'o',
+			'ù' => 'u', 'ú' => 'u', 'û' => 'u', 'ü' => 'u',
+			'ç' => 'c', 'ñ' => 'n', 'ÿ' => 'y',
 		) );
+		if ( function_exists( 'remove_accents' ) ) {
+			$value = remove_accents( $value );
+		}
+		return $value;
+	}
+
+	/**
+	 * Normalise human text and technical identifiers identically everywhere.
+	 *
+	 * The accent map below is the whole mechanism, and it deliberately runs
+	 * before anything else touches the string.
+	 *
+	 * iconv's ASCII//TRANSLIT used to run first, and what it produces depends on
+	 * the platform's locale rather than on any specification. On the Windows
+	 * build this suite is developed against it renders "piè" as "pi`e" -- an
+	 * ASCII backtick, not the letter e -- so the map that follows found nothing
+	 * to fix, the backtick was stripped as punctuation, and "piè di pagina"
+	 * arrived as "pi di pagina". Every accented Italian word failed the same
+	 * way: velocità, visibilità, integrità, città, però, più. Worse, it failed
+	 * on one platform and not another, so the same input ranked differently in
+	 * CI than on the machine where the vocabulary was being written.
+	 *
+	 * An explicit table is not a workaround here, it is the correct tool: the
+	 * set of accented characters Italian actually uses is small, closed, and
+	 * known. WordPress's own remove_accents() is still applied afterwards for
+	 * anything outside it, but nothing depends on it being available.
+	 */
+	public static function normalize_text( string $value ): string {
+		$value = self::fold_accents( $value );
 		$value = str_replace( array( '_', '/', '\\', '-' ), ' ', $value );
 		$value = (string) preg_replace( '/[^a-z0-9]+/', ' ', $value );
 		return trim( (string) preg_replace( '/\s+/', ' ', $value ) );

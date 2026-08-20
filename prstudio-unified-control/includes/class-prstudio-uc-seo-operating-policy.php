@@ -1,5 +1,6 @@
 <?php
 if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
+require_once __DIR__ . '/class-prstudio-uc-action-lexicon.php';
 
 /**
  * Global SEO operating method with site-scoped runtime context.
@@ -52,8 +53,11 @@ final class PRSTUDIO_UC_SEO_Operating_Policy {
     public static function version(): string { return self::VERSION; }
 
     private static function normalize( string $text ): string {
-        $text = strtolower( trim( $text ) );
-        if ( function_exists( 'remove_accents' ) ) { $text = remove_accents( $text ); }
+        // Same fold as the lexicon and the capability registry. Without it,
+        // "migliora la visibilità" and "migliora la visibilita" are different
+        // objectives to this policy, and only one of them activates it -- which
+        // is a coin toss decided by whether the operator typed the accent.
+        $text = PRSTUDIO_UC_Action_Lexicon::fold_accents( trim( $text ) );
         $text = preg_replace( '/[^a-z0-9\s_\-\/]+/u', ' ', $text );
         return trim( (string) preg_replace( '/\s+/', ' ', (string) $text ) );
     }
