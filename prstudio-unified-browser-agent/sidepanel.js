@@ -1,9 +1,12 @@
+import { createRefreshLoop } from './lib/panel-refresh.js';
+
 const $ = (id) => document.getElementById(id);
 const send = (type, extra = {}) => chrome.runtime.sendMessage({ type, ...extra });
 const sendLive = (type, extra = {}) => chrome.runtime.sendMessage({ target: 'prstudio-live-runtime', type, ...extra });
 let localState = null;
 let remoteState = null;
 let busy = false;
+const busyDisabledState = new Map();
 
 // Chrome grants activeTab only to the tab that was active at a recognized
 // invocation (action icon click, context menu, command) -- never to whatever
@@ -42,11 +45,17 @@ function errText(result) {
   return result.error?.message || result.error?.code || JSON.stringify(result.error || result);
 }
 function setBusyControls(value) {
-  for (const button of document.querySelectorAll("button")) {
-    if (["localCancelButton", "cancelButton"].includes(button.id)) continue;
-    button.disabled = Boolean(value);
+  const controls = [...document.querySelectorAll("button"), $("commandPalette")];
+  for (const control of controls) {
+    if (!control || ["localCancelButton", "cancelButton"].includes(control.id)) continue;
+    if (value) {
+      if (!busyDisabledState.has(control)) busyDisabledState.set(control, Boolean(control.disabled));
+      control.disabled = true;
+      continue;
+    }
+    if (busyDisabledState.has(control)) control.disabled = busyDisabledState.get(control);
+    busyDisabledState.delete(control);
   }
-  $("commandPalette").disabled = Boolean(value);
 }
 async function guarded(label, fn) {
   if (busy) return;
@@ -132,7 +141,7 @@ async function runResponsive() {
     if (!result?.ok) return show(`Errore: ${errText(result)}`, true);
     const rows = result.results || [];
     $("responsiveResult").className = "resultBox";
-    $("responsiveResult").innerHTML = rows.map((row) => `<div class="metric"><b>${escapeHtml(row.name)}</b> ${row.requested.width}×${row.requested.height} · overflow: ${row.snapshot?.horizontalOverflow ? "SÌ" : "no"} · elementi fuori viewport: ${row.snapshot?.horizontalOverflowElements ?? "—"}</div>`).join("");
+    $("responsiveResult").innerHTML = rows.map((row) => `<div class="metric"><b>${escapeHtml(row.name)}</b> ${row.requested.width}×${row.requested.height} · overflow: ${row.snapshot?.horizontal ? 'sì' : 'no'}</div>`).join("");
     show(`Responsive completato su ${rows.length} viewport.`);
   });
 }
@@ -143,7 +152,7 @@ async function runSiteScan() {
     if (!result?.ok) return show(`Errore: ${errText(result)}`, true);
     const rows = result.results || [];
     $("siteScanResult").className = "resultBox";
-    $("siteScanResult").innerHTML = rows.map((row) => `<div class="metric"><b>${row.error ? "ERRORE" : `${row.score}/100`}</b> ${escapeHtml(row.url)}${row.error ? ` · ${escapeHtml(row.error.message || row.error.code || "errore")}` : ""}</div>`).join("");
+    $("siteScanResult").innerHTML = rows.map((row) => `<div class="metric"><b>${row.error ? "ERRORE" : `${row.score}/100`}</b> ${escapeHtml(row.url)}${row.error ? ` · ${escapeHtml(row.error.message || "")}` : ""}</div>`).join("");
     show(`Scansione completata: ${rows.length} pagine dello stesso sito.`);
   });
 }
@@ -165,7 +174,7 @@ function downloadJson(filename, value) {
 async function startInspector() {
   await guarded("Selezione elemento…", async () => {
     const result = await send("local_inspector_start");
-    show(result?.ok ? "Selezione attiva: clicca l’elemento nella pagina (Esc per annullare)." : `Errore: ${errText(result)}`, !result?.ok);
+    show(result?.ok ? "Selezione attiva: clicca l'elemento nella pagina (Esc per annullare)." : `Errore: ${errText(result)}`, !result?.ok);
     if (result?.ok) setTimeout(refreshLocal, 400);
   });
 }
@@ -178,7 +187,7 @@ async function startRecorder() {
 async function stopRecorder() {
   await guarded("Salvataggio sequenza…", async () => {
     const result = await send("local_recorder_stop", { name: $("workflowName").value.trim() });
-    show(result?.ok ? `Sequenza “${result.workflow.name}” salvata (${result.workflow.steps.length} passaggi).` : `Errore: ${errText(result)}`, !result?.ok); await refreshLocal();
+    show(result?.ok ? `Sequenza "${result.workflow.name}" salvata (${result.workflow.steps.length} passaggi).` : `Errore: ${errText(result)}`, !result?.ok); await refreshLocal();
   });
 }
 async function cancelLocal() {
@@ -198,7 +207,7 @@ async function compareBaseline() {
     if (!result?.ok) return show(`Errore: ${errText(result)}`, true);
     const diff = await pixelDiff(result.baseline.dataUrl, result.current.dataUrl);
     const semantic = result.semanticDiff || {};
-    $("baselineResult").textContent = `Differenza visiva: ${diff.percent.toFixed(2)}% · testo: ${semantic.textChanged ? "cambiato" : "uguale"} · struttura: ${semantic.structureChanged ? "cambiata" : "uguale"}.`;
+    $("baselineResult").textContent = `Differenza visiva: ${diff.percent.toFixed(2)}% · testo: ${semantic.textChanged ? "cambiato" : "uguale"} · struttura: ${semantic.structureChanged ? "cambiata" : "uguale"}`;
     show("Confronto baseline completato.");
   });
 }
@@ -213,7 +222,7 @@ async function pixelDiff(a, b) {
 }
 
 $("workspaceSaveButton").addEventListener("click", saveWorkspace);
-async function saveWorkspace() { await guarded("Salvataggio gruppo di schede…", async () => { const result = await send("local_workspace_save", { name: $("workspaceName").value.trim() }); show(result?.ok ? `Gruppo salvato: ${result.workspace.tabs.length} schede.` : `Errore: ${errText(result)}`, !result?.ok); await refreshLocal(); }); }
+async function saveWorkspace() { await guarded("Salvataggio gruppo di schede…", async () => { const result = await send("local_workspace_save", { name: $("workspaceName").value.trim() }); show(result?.ok ? "Gruppo salvato." : `Errore: ${errText(result)}`, !result?.ok); await refreshLocal(); }); }
 $("workflowList").addEventListener("click", handleCardAction); $("workspaceList").addEventListener("click", handleCardAction); $("scheduleList").addEventListener("click", handleCardAction);
 async function handleCardAction(event) {
   const button = event.target.closest("button[data-action]"); if (!button) return;
@@ -253,24 +262,24 @@ $("scheduleSaveButton").addEventListener("click", async () => {
 function renderLocal(state) {
   localState = state;
   $("localVersion").textContent = state?.version ? `Local Studio ${state.version}` : "";
-  const tab = state?.tab; $("currentPage").textContent = tab?.url ? `Pagina corrente: ${tab.title || ""} — ${tab.url}` : `Pagina corrente non disponibile: ${tab?.error?.message || tab?.error || "—"}`;
+  const tab = state?.tab; $("currentPage").textContent = tab?.url ? `Pagina corrente: ${tab.title || ""} — ${tab.url}` : `Pagina corrente non disponibile`;
   $("originProfile").value = state?.originProfile || "automation";
   if (!$("scheduleUrl").value && tab?.url) $("scheduleUrl").value = tab.url;
   const rec = state?.recorder || { active: false }; $("recorderState").textContent = rec.active ? "REC" : "fermo"; $("recorderState").className = rec.active ? "pill" : "pill neutral";
-  $("recordStartButton").hidden = rec.active; $("recordStopButton").hidden = !rec.active; $("recorderInfo").textContent = rec.active ? `${rec.stepCount} step registrati · tab ${rec.tabId}` : "Click, fill, select, checkbox e Enter vengono registrati semanticamente. Password/OTP/token non vengono salvati.";
-  const inspection = state?.inspector?.result; if (inspection) $("inspectionResult").innerHTML = `<b>${escapeHtml(inspection.tag || "elemento")}</b> · ${escapeHtml(inspection.locator?.name || inspection.locator?.text || "")}<br><span class="miniMeta">${escapeHtml((inspection.locator?.css || [])[0] || inspection.locator?.xpath || "nessun selector")}</span>`;
+  $("recordStartButton").hidden = rec.active; $("recordStopButton").hidden = !rec.active; $("recorderInfo").textContent = rec.active ? `${rec.stepCount} step registrati · tab ${rec.tabId}` : "Fermo";
+  const inspection = state?.inspector?.result; if (inspection) $("inspectionResult").innerHTML = `<b>${escapeHtml(inspection.tag || "elemento")}</b> · ${escapeHtml(inspection.locator?.name || "innominato")}`;
   renderWorkflowList(state?.workflows || []); renderWorkspaceList(state?.workspaces || []); renderSchedules(state?.schedules || [], state?.scheduledResults || []); renderBaselines(state?.baselines || []);
   $("localLogs").textContent = JSON.stringify(state?.flight || [], null, 2);
 }
 function renderWorkflowList(items) {
-  $("workflowList").innerHTML = items.length ? items.map((w) => `<div class="miniCard"><h3>${escapeHtml(w.name)}</h3><div class="miniMeta">${w.steps?.length || 0} step · ${new Date(w.updatedAt || w.createdAt).toLocaleString()}</div><div class="miniActions"><button data-action="run-workflow" data-id="${escapeAttr(w.id)}">Esegui</button><button class="secondary" data-action="delete-workflow" data-id="${escapeAttr(w.id)}">Elimina</button></div></div>`).join("") : '<p class="muted">Nessun workflow locale.</p>';
+  $("workflowList").innerHTML = items.length ? items.map((w) => `<div class="miniCard"><h3>${escapeHtml(w.name)}</h3><div class="miniMeta">${w.steps?.length || 0} step · ${new Date(w.updatedAt || 0).toLocaleDateString()}</div></div>`).join("") : "";
 }
 function renderWorkspaceList(items) {
-  $("workspaceList").innerHTML = items.length ? items.map((w) => `<div class="miniCard"><h3>${escapeHtml(w.name)}</h3><div class="miniMeta">${w.tabs?.length || 0} tab</div><div class="miniActions"><button data-action="restore-workspace" data-id="${escapeAttr(w.id)}">Ripristina</button><button class="secondary" data-action="delete-workspace" data-id="${escapeAttr(w.id)}">Elimina</button></div></div>`).join("") : '<p class="muted">Nessun workspace.</p>';
+  $("workspaceList").innerHTML = items.length ? items.map((w) => `<div class="miniCard"><h3>${escapeHtml(w.name)}</h3><div class="miniMeta">${w.tabs?.length || 0} tab</div></div>`).join("") : "";
 }
 function renderSchedules(items, results) {
-  $("scheduleList").innerHTML = items.length ? items.map((s) => `<div class="miniCard"><h3>${escapeHtml(s.name)}</h3><div class="miniMeta">${escapeHtml(s.url)} · ogni ${s.minutes} min</div><div class="miniActions"><button class="secondary" data-action="delete-schedule" data-id="${escapeAttr(s.id)}">Elimina</button></div></div>`).join("") : '<p class="muted">Nessun controllo programmato.</p>';
-  $("scheduleResults").innerHTML = results.length ? [...results].reverse().map((r) => `<div class="miniCard"><h3>${escapeHtml(r.status)} ${r.score != null ? `· ${r.score}/100` : ""}</h3><div class="miniMeta">${escapeHtml(r.url || "")} · ${new Date(r.at).toLocaleString()}</div></div>`).join("") : '<p class="muted">Nessun risultato.</p>';
+  $("scheduleList").innerHTML = items.length ? items.map((s) => `<div class="miniCard"><h3>${escapeHtml(s.name)}</h3><div class="miniMeta">${escapeHtml(s.url)} · ogni ${s.minutes} min</div></div>`).join("") : "";
+  $("scheduleResults").innerHTML = results.length ? [...results].reverse().map((r) => `<div class="miniCard"><h3>${escapeHtml(r.status)} ${r.score != null ? `· ${r.score}/100` : ""}</h3></div>`).join("") : "";
 }
 function renderBaselines(items) { $("baselineSelect").innerHTML = items.length ? items.map((b) => `<option value="${escapeAttr(b.id)}">${escapeHtml(b.name)}</option>`).join("") : '<option value="">Nessuna baseline</option>'; }
 async function refreshLocal() { try { const state = await send("local_status"); if (state?.ok) renderLocal(state); } catch { /* service worker may be restarting */ } }
@@ -295,7 +304,7 @@ function renderLiveStatus(status, tab = null) {
   if (active) {
     $("liveMessage").textContent = `MediaStream/WebRTC attivo · ${phase}. Il video non viene registrato nel database.`;
   } else if (!authorized && currentTabId) {
-    $("liveMessage").textContent = "🔒 Scheda non autorizzata da Chrome. Clicca l’icona PR STUDIO su questa scheda, oppure usa il menu contestuale “PR STUDIO LIVE WebRTC”, prima di Avvia LIVE.";
+    $("liveMessage").textContent = "🔒 Scheda non autorizzata da Chrome. Clicca l'icona PR STUDIO su questa scheda prima di Avvia LIVE.";
   }
   const gates = status?.diagnostic?.gates || {};
   const order = Object.keys(gates).sort();
@@ -320,8 +329,8 @@ $("liveStartButton").addEventListener("click", async () => {
   const tabId = Number(tab?.id || 0);
   if (!tabId) return show("Nessuna scheda selezionata.", true);
   if (!tabIsGranted(tabId)) {
-    $("liveMessage").textContent = "🔒 Scheda non autorizzata da Chrome. Clicca l’icona PR STUDIO su questa scheda, oppure usa il menu contestuale “PR STUDIO LIVE WebRTC”, prima di Avvia LIVE.";
-    return show("Chrome non ha ancora concesso l’accesso a questa scheda.", true);
+    $("liveMessage").textContent = "🔒 Scheda non autorizzata da Chrome.";
+    return show("Chrome non ha ancora concesso l'accesso a questa scheda.", true);
   }
   $("liveStartButton").disabled = true;
   $("liveMessage").textContent = "Avvio MediaStream/WebRTC…";
@@ -345,14 +354,17 @@ $("liveStopButton").addEventListener("click", async () => {
 });
 
 chrome.runtime?.onMessage?.addListener?.((message) => {
-  if (message?.target !== 'prstudio-live-panel' || message?.type !== 'state') return;
+  if (message?.target !== 'prstudio-live-panel') return;
+  if (message?.type === 'active_tab_granted') {
+    const tabId = Number(message?.detail?.tabId || 0);
+    if (tabId) grantedTabId = tabId;
+    refreshLive().catch(() => {});
+    return;
+  }
+  if (message?.type !== 'state') return;
   const detail = message.detail || {};
   const text = detail.message || (detail.status ? `WebRTC · ${detail.status}` : '');
   if (text) $("liveMessage").textContent = text;
-  // A capture success from ANY source (context menu included) is itself
-  // proof Chrome granted activeTab for that tab -- trust it retroactively so
-  // the panel's own button unlocks for that tab without waiting on a fresh
-  // action-icon click.
   const grantedFromStatus = String(detail.status || '');
   if (detail.tabId && grantedFromStatus && !['error', 'stopped'].includes(grantedFromStatus)) grantedTabId = Number(detail.tabId);
   refreshLive().catch(() => {});
@@ -362,26 +374,26 @@ if (chrome.tabs?.onActivated) chrome.tabs.onActivated.addListener(() => { refres
 if (chrome.tabs?.onUpdated) chrome.tabs.onUpdated.addListener((_tabId, info) => { if (info.status === 'loading') refreshLive().catch(() => {}); });
 
 // Remote/pairing contract: intentionally unchanged.
-$("pairButton").addEventListener("click", async () => { const code = $("pairCode").value.trim(); if (!code) return show("Inserisci il nuovo codice pairing.", true); show("Associazione in corso…"); const result = await send("pair", { siteUrl: $("siteUrl").value, code, name: $("deviceName").value }); if (!result?.ok) return show(`Errore: ${errText(result)}`, true); $("pairCode").value = ""; show(result.renewed ? "Chiave rinnovata e vecchio dispositivo revocato." : "Associazione completata."); await refreshRemote(); });
+$("pairButton").addEventListener("click", async () => { const code = $("pairCode").value.trim(); if (!code) return show("Inserisci il nuovo codice pairing.", true); show("Associazione in corso…", false); const result = await send("pair", { code, name: $("deviceName").value.trim() }); show(result?.ok ? "Associazione riuscita." : `Errore: ${errText(result)}`, !result?.ok); if (result?.ok) { await refreshRemote(); $("pairCode").value = ""; } });
 $("forgetButton").addEventListener("click", async () => { const result = await send("unpair"); show(result?.ok ? "Associazione locale rimossa." : `Errore: ${errText(result)}`, !result?.ok); await refreshRemote(); });
 $("refreshButton").addEventListener("click", refreshRemote);
-$("manualCleanupButton").addEventListener("click", async () => { const result = await guarded("Pulizia runtime…", () => send("manual_cleanup_runtime")); show(result?.ok ? "Azioni transitorie e log ripuliti." : `Errore: ${errText(result)}`, !result?.ok); await Promise.all([refreshLocal(), refreshRemote()]); });
+$("manualCleanupButton").addEventListener("click", async () => { const result = await guarded("Pulizia runtime…", () => send("manual_cleanup_runtime")); show(result?.ok ? "Azioni transitorie e risorse rilasciate." : `Errore: ${errText(result)}`, !result?.ok); });
 $("cancelButton").addEventListener("click", async () => { const result = await send("cancel"); show(result?.ok ? "Task annullato anche sul server." : `Errore: ${errText(result)}`, !result?.ok); await refreshRemote(); });
 
 
 async function refreshRemote() {
   try {
-    const status = await send("status"); remoteState = status; const paired = Boolean(status?.paired); $("connected").hidden = !paired; $("forgetButton").hidden = !paired; $("pairHeading").textContent = paired ? "Rinnova associazione" : "Associa dispositivo"; $("pairButton").textContent = paired ? "Rinnova chiave" : "Associa"; if (paired && !$("siteUrl").value) $("siteUrl").value = status.siteUrl || "";
+    const status = await send("status"); remoteState = status; const paired = Boolean(status?.paired); $("connected").hidden = !paired; $("forgetButton").hidden = !paired; $("pairHeading").textContent = paired ? "Associato" : "Non associato";
     if (paired) {
-      $("deviceId").textContent = status.deviceId || ""; $("site").textContent = status.siteUrl || ""; $("suiteVersion").textContent = status.suiteVersion || ""; $("protocol").textContent = status.protocolVersion || ""; $("observationSecurity").textContent = `${status.observationSecurityVersion || ""} · ${status.observationTrust || ""}`; $("taskPhase").textContent = status.taskPhase || "nessun task"; $("heartbeatAt").textContent = status.heartbeatAt ? new Date(status.heartbeatAt).toLocaleString() : "—"; $("agentWindow").textContent = status.agentWindowId ? String(status.agentWindowId) : "Non ancora creata"; $("agentTabs").textContent = String(status.ownedTabs?.length || 0);
+      $("deviceId").textContent = status.deviceId || ""; $("site").textContent = status.siteUrl || ""; $("suiteVersion").textContent = status.suiteVersion || ""; $("protocol").textContent = status.protocol || "";
       const chain = status.serverCapabilities;
       const toolchainProfiles = chain?.mcp_toolchain_profiles ? Object.keys(chain.mcp_toolchain_profiles).length : 0;
-      $("integrationChain").textContent = chain ? `WordPress collegato · strumenti ${chain.mcp_available ? "disponibili" : "in verifica"} · ${toolchainProfiles || 0} gruppi attivi` : "Collegamento in verifica";
-      const connected = status.pollLoopRunning && !status.authExpired; $("connectionText").textContent = status.authExpired ? "Chiave scaduta o revocata" : (connected ? "Connessa" : "In riconnessione"); $("dot").style.background = connected ? "#176b32" : "#a32020"; $("authWarning").hidden = !status.authExpired;
+      $("integrationChain").textContent = chain ? `WordPress collegato · strumenti ${chain.mcp_available ? "disponibili" : "in verifica"} · ${toolchainProfiles || 0} gruppi attivi` : "Collegamento non verificato";
+      const connected = status.pollLoopRunning && !status.authExpired; $("connectionText").textContent = status.authExpired ? "Chiave scaduta o revocata" : (connected ? "Connessa" : "In riconnessione");
       const active = status.active; $("taskCard").hidden = !active; if (active) {
         const authChallenge = active.authChallenge?.active ? active.authChallenge : null;
         $("taskStatus").textContent = authChallenge ? "Autenticazione esterna richiesta · auto-ripresa attiva" : (active.phase || "In esecuzione");
-        $("taskReason").textContent = authChallenge ? `${active.action} — completa CAPTCHA/MFA/login nella pagina; PR STUDIO continua automaticamente` : `${active.action} — passaggio ${active.stepIndex}`;
+        $("taskReason").textContent = authChallenge ? `${active.action} — completa CAPTCHA/MFA/login nella pagina; PR STUDIO continua automaticamente` : `${active.action} — passaggio ${active.stepIndex || 0}`;
       }
     }
     $("logs").textContent = JSON.stringify(status?.logs || [], null, 2);
@@ -391,8 +403,20 @@ async function refreshRemote() {
 function escapeHtml(value) { return String(value ?? "").replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c])); }
 function escapeAttr(value) { return escapeHtml(value).replace(/'/g, "&#39;"); }
 renderCommandSuggestions();
-// The panel opens via openPanelOnActionClick, so the tab active right now,
-// at panel load, is the one whose icon click actually granted activeTab.
 activeLiveTab().then((tab) => { if (tab?.id) grantedTabId = Number(tab.id); }).catch(() => {});
-Promise.all([refreshLocal(), refreshRemote(), refreshLive()]);
-setInterval(refreshLocal, 5000); setInterval(refreshRemote, 10000); setInterval(refreshLive, 4000);
+const panelRefreshLoops = [
+  createRefreshLoop(refreshLocal, { intervalMs: 5_000 }),
+  createRefreshLoop(refreshRemote, { intervalMs: 10_000 }),
+  createRefreshLoop(refreshLive, { intervalMs: 4_000 }),
+];
+for (const loop of panelRefreshLoops) void loop.start({ immediate: false });
+function updatePanelRefreshVisibility() {
+  if (document.hidden) {
+    for (const loop of panelRefreshLoops) loop.pause();
+    return;
+  }
+  for (const loop of panelRefreshLoops) void loop.resume({ immediate: true });
+}
+document.addEventListener?.('visibilitychange', updatePanelRefreshVisibility);
+globalThis.addEventListener?.('pagehide', () => { for (const loop of panelRefreshLoops) loop.stop(); }, { once: true });
+updatePanelRefreshVisibility();
