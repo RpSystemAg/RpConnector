@@ -2,22 +2,11 @@ import { createRefreshLoop } from './lib/panel-refresh.js';
 
 const $ = (id) => document.getElementById(id);
 const send = (type, extra = {}) => chrome.runtime.sendMessage({ type, ...extra });
-const sendLive = (type, extra = {}) => chrome.runtime.sendMessage({ target: 'prstudio-live-runtime', type, ...extra });
 let localState = null;
 let remoteState = null;
 let busy = false;
 const busyDisabledState = new Map();
 
-// Chrome grants activeTab only to the tab that was active at a recognized
-// invocation (action icon click, context menu, command) -- never to whatever
-// tab happens to be focused when a side-panel button is pressed later. This
-// panel opens via openPanelOnActionClick, so the tab active at panel-load is
-// the one genuinely granted; a later tabCapture success (e.g. via the PR
-// STUDIO LIVE WebRTC context menu on another tab) re-proves a grant for that
-// tab too. Tracking this lets the UI disable "Avvia LIVE" and explain why
-// *before* the user hits the Chrome error, instead of only after.
-let grantedTabId = 0;
-function tabIsGranted(tabId) { return grantedTabId > 0 && Number(tabId || 0) === grantedTabId; }
 
 const COMMANDS = [
   ["audit", "Analizza pagina", () => runHealth()],
@@ -285,93 +274,6 @@ function renderBaselines(items) { $("baselineSelect").innerHTML = items.length ?
 async function refreshLocal() { try { const state = await send("local_status"); if (state?.ok) renderLocal(state); } catch { /* service worker may be restarting */ } }
 
 
-async function activeLiveTab() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  return tab || null;
-}
-
-function renderLiveStatus(status, tab = null) {
-  const active = Boolean(status?.active);
-  $("liveBadge").textContent = active ? "LIVE" : "OFF";
-  $("liveBadge").className = active ? "pill" : "pill neutral";
-  const currentTabId = Number(tab?.id || 0);
-  const authorized = active || tabIsGranted(currentTabId);
-  $("liveStartButton").disabled = active || !authorized;
-  $("liveStopButton").disabled = !active;
-  const shownTab = tab || status?.captures?.find((x) => Number(x.tabId) === Number(status?.tabId));
-  $("liveTarget").textContent = shownTab?.title ? `Scheda LIVE: ${shownTab.title}` : (status?.tabId ? `Scheda LIVE: ${status.tabId}` : "Scheda LIVE: —");
-  const phase = status?.phase || status?.captures?.[0]?.connectionState || "pronto";
-  if (active) {
-    $("liveMessage").textContent = `MediaStream/WebRTC attivo · ${phase}. Il video non viene registrato nel database.`;
-  } else if (!authorized && currentTabId) {
-    $("liveMessage").textContent = "🔒 Scheda non autorizzata da Chrome. Clicca l'icona PR STUDIO su questa scheda prima di Avvia LIVE.";
-  }
-  const gates = status?.diagnostic?.gates || {};
-  const order = Object.keys(gates).sort();
-  $("liveDiagnostic").textContent = order.length ? order.map((key) => {
-    const row = gates[key];
-    const detail = row?.detail && Object.keys(row.detail).length ? ` · ${JSON.stringify(row.detail)}` : "";
-    return `${row?.ok ? "PASS" : "FAIL"} ${key}${detail}`;
-  }).join("\n") : "Self-test non ancora eseguito.";
-}
-
-async function refreshLive() {
-  try {
-    const tab = await activeLiveTab();
-    const tabId = Number(tab?.id || 0);
-    const status = await sendLive('live_status', { tabId });
-    if (status?.ok) renderLiveStatus(status, tab);
-  } catch { /* worker restart */ }
-}
-
-$("liveStartButton").addEventListener("click", async () => {
-  const tab = await activeLiveTab();
-  const tabId = Number(tab?.id || 0);
-  if (!tabId) return show("Nessuna scheda selezionata.", true);
-  if (!tabIsGranted(tabId)) {
-    $("liveMessage").textContent = "🔒 Scheda non autorizzata da Chrome.";
-    return show("Chrome non ha ancora concesso l'accesso a questa scheda.", true);
-  }
-  $("liveStartButton").disabled = true;
-  $("liveMessage").textContent = "Avvio MediaStream/WebRTC…";
-  const result = await sendLive('live_start', { tabId, source: 'side_panel_after_action' }).catch((error) => ({ ok: false, error: { message: error?.message || String(error) } }));
-  if (!result?.ok) {
-    $("liveMessage").textContent = result?.error?.message || "Avvio LIVE fallito.";
-    show(`LIVE: ${result?.error?.message || errText(result)}`, true);
-  } else {
-    grantedTabId = tabId;
-    $("liveMessage").textContent = `Sessione WebRTC ${String(result.sessionId || '').slice(0, 8)}… in negoziazione.`;
-  }
-  await refreshLive();
-});
-
-$("liveStopButton").addEventListener("click", async () => {
-  const tab = await activeLiveTab();
-  const status = await sendLive('live_status', { tabId: Number(tab?.id || 0) });
-  const tabId = Number(status?.tabId || tab?.id || 0);
-  if (tabId) await sendLive('live_stop', { tabId, reason: 'side_panel_stop' }).catch(() => {});
-  await refreshLive();
-});
-
-chrome.runtime?.onMessage?.addListener?.((message) => {
-  if (message?.target !== 'prstudio-live-panel') return;
-  if (message?.type === 'active_tab_granted') {
-    const tabId = Number(message?.detail?.tabId || 0);
-    if (tabId) grantedTabId = tabId;
-    refreshLive().catch(() => {});
-    return;
-  }
-  if (message?.type !== 'state') return;
-  const detail = message.detail || {};
-  const text = detail.message || (detail.status ? `WebRTC · ${detail.status}` : '');
-  if (text) $("liveMessage").textContent = text;
-  const grantedFromStatus = String(detail.status || '');
-  if (detail.tabId && grantedFromStatus && !['error', 'stopped'].includes(grantedFromStatus)) grantedTabId = Number(detail.tabId);
-  refreshLive().catch(() => {});
-});
-
-if (chrome.tabs?.onActivated) chrome.tabs.onActivated.addListener(() => { refreshLive().catch(() => {}); });
-if (chrome.tabs?.onUpdated) chrome.tabs.onUpdated.addListener((_tabId, info) => { if (info.status === 'loading') refreshLive().catch(() => {}); });
 
 // Remote/pairing contract: intentionally unchanged.
 $("pairButton").addEventListener("click", async () => { const code = $("pairCode").value.trim(); if (!code) return show("Inserisci il nuovo codice pairing.", true); show("Associazione in corso…", false); const result = await send("pair", { siteUrl: $("siteUrl").value.trim(), code, name: $("deviceName").value.trim() }); if (!result?.ok) return show(`Errore: ${errText(result)}`, true); $("pairCode").value = ""; show(result.renewed ? "Chiave rinnovata e vecchio dispositivo revocato." : "Associazione completata."); await refreshRemote(); });
@@ -403,11 +305,9 @@ async function refreshRemote() {
 function escapeHtml(value) { return String(value ?? "").replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c])); }
 function escapeAttr(value) { return escapeHtml(value).replace(/'/g, "&#39;"); }
 renderCommandSuggestions();
-activeLiveTab().then((tab) => { if (tab?.id) grantedTabId = Number(tab.id); }).catch(() => {});
 const panelRefreshLoops = [
   createRefreshLoop(refreshLocal, { intervalMs: 5_000 }),
   createRefreshLoop(refreshRemote, { intervalMs: 10_000 }),
-  createRefreshLoop(refreshLive, { intervalMs: 4_000 }),
 ];
 for (const loop of panelRefreshLoops) void loop.start({ immediate: false });
 function updatePanelRefreshVisibility() {
