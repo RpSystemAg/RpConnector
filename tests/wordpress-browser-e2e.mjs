@@ -282,13 +282,23 @@ try {
 
   const pluginAdminUrl = `${wpUrl}/wp-admin/tools.php?page=prstudio-unified-browser`;
   await navigate(cdp, wpSessionId, pluginAdminUrl);
-  const adminTitle = await evaluate(cdp, wpSessionId, `document.querySelector('.prstudio-dashboard h1')?.textContent?.trim() || ''`);
-  if (!adminTitle.startsWith('PR STUDIO Suite')) {
-    throw new Error(`PR STUDIO admin page did not render; title=${JSON.stringify(adminTitle)}`);
+  const adminState = await evaluate(cdp, wpSessionId, `(() => {
+    const root = document.querySelector('.prstudio-connect');
+    const title = root?.querySelector('h1')?.textContent?.trim() || '';
+    return {
+      title,
+      hasChatGPT: Boolean([...root?.querySelectorAll('h2') || []].some((node) => node.textContent.includes('Collega ChatGPT'))),
+      hasChrome: Boolean([...root?.querySelectorAll('h2') || []].some((node) => node.textContent.includes('Collega Chrome'))),
+      hasPairingForm: Boolean([...document.querySelectorAll('input[name="action"]')].some((input) => input.value === 'prstudio_uc_pairing_code')),
+      hasLegacyHistory: /Browser collegati|Attività recenti|Cronologia dispositivi revocati|Manutenzione runtime/.test(root?.textContent || ''),
+    };
+  })()`);
+  if (!adminState?.title?.startsWith('PR STUDIO — Collegamenti') || !adminState.hasChatGPT || !adminState.hasChrome || !adminState.hasPairingForm || adminState.hasLegacyHistory) {
+    throw new Error(`P32 PR STUDIO minimal admin did not render correctly: ${JSON.stringify(adminState)}`);
   }
-  evidence.admin_title = adminTitle;
+  evidence.admin_title = adminState.title;
   await screenshot(cdp, wpSessionId, '01-prstudio-admin.png');
-  pass('PR STUDIO admin dashboard rendered in real Chrome', { message: adminTitle });
+  pass('P32 minimal PR STUDIO connection page rendered in real Chrome', { message: adminState.title });
 
   const pairingSubmitted = await evaluate(cdp, wpSessionId, `(() => {
     const action = [...document.querySelectorAll('input[name="action"]')]
@@ -303,10 +313,7 @@ try {
   const pairingCode = await waitForExpression(
     cdp,
     wpSessionId,
-    `(() => {
-      const notice = [...document.querySelectorAll('.notice')].find((node) => node.textContent.includes('Codice pairing:'));
-      return notice?.querySelector('code')?.textContent?.trim() || '';
-    })()`,
+    `document.querySelector('#prstudio-pair-code')?.textContent?.trim() || ''`,
     'WordPress pairing code',
     15000,
   );
@@ -315,13 +322,12 @@ try {
   }
   evidence.pairing_code_length = String(pairingCode).length;
   await evaluate(cdp, wpSessionId, `(() => {
-    const notice = [...document.querySelectorAll('.notice')].find((node) => node.textContent.includes('Codice pairing:'));
-    const code = notice?.querySelector('code');
+    const code = document.querySelector('#prstudio-pair-code');
     if (code) code.textContent = '[REDACTED]';
     return true;
   })()`);
   await screenshot(cdp, wpSessionId, '02-pairing-code-redacted.png');
-  pass('Pairing code generated through WordPress UI', { message: `length ${String(pairingCode).length}, screenshot redacted` });
+  pass('Pairing code generated through P32 WordPress UI', { message: `length ${String(pairingCode).length}, screenshot redacted` });
 
   const extensionTarget = await cdp.send('Target.createTarget', { url: `chrome-extension://${extensionId}/sidepanel.html` });
   extensionSessionId = await attachPage(cdp, extensionTarget.targetId);
@@ -411,25 +417,22 @@ try {
   await screenshot(cdp, extensionSessionId, '04-browser-agent-audit.png');
   pass('Browser Agent executed a real audit against WordPress', { message: auditMessage });
 
+  // P32 intentionally does not expose device/session history in wp-admin. The
+  // workflow's independent WordPress oracle verifies the paired device in the
+  // Store after this script returns; here we prove the UI stays pairing-only.
   await cdp.send('Target.activateTarget', { targetId: wpTargetId });
   await navigate(cdp, wpSessionId, pluginAdminUrl);
-  const deviceRow = await waitForExpression(
-    cdp,
-    wpSessionId,
-    `(() => {
-      const wanted = ${JSON.stringify(deviceName)};
-      const rows = [...document.querySelectorAll('table.prstudio-grid tbody tr')];
-      const row = rows.find((candidate) => candidate.textContent.includes(wanted));
-      if (!row) return '';
-      const text = row.textContent.replace(/\\s+/g, ' ').trim();
-      return /Online/i.test(text) ? text : '';
-    })()`,
-    'paired device visible as Online in WordPress',
-    20000,
-  );
-  evidence.wordpress_device_row = deviceRow;
-  await screenshot(cdp, wpSessionId, '05-wordpress-device-online.png');
-  pass('WordPress independently shows the paired Chrome device online', { message: deviceRow.slice(0, 180) });
+  const adminAfterPair = await evaluate(cdp, wpSessionId, `(() => ({
+    title: document.querySelector('.prstudio-connect h1')?.textContent?.trim() || '',
+    hasDeviceGrid: Boolean(document.querySelector('table.prstudio-grid')),
+    text: document.querySelector('.prstudio-connect')?.textContent || '',
+  }))()`);
+  if (!adminAfterPair?.title?.startsWith('PR STUDIO — Collegamenti') || adminAfterPair.hasDeviceGrid || /Browser collegati|Cronologia dispositivi revocati|Attività recenti/.test(adminAfterPair.text || '')) {
+    throw new Error(`P32 admin exposed operational history after pairing: ${JSON.stringify(adminAfterPair)}`);
+  }
+  evidence.wordpress_admin_after_pair = { title: adminAfterPair.title, history_visible: false };
+  await screenshot(cdp, wpSessionId, '05-wordpress-pairing-only.png');
+  pass('WordPress admin remains pairing-only after Chrome connection');
 
   evidence.ok = true;
   evidence.finished_at = new Date().toISOString();
