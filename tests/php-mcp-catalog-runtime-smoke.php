@@ -12,10 +12,12 @@ try {
     fail('MCP tools() must execute without Throwable: ' . get_class($e) . ': ' . $e->getMessage());
 }
 if (!is_array($tools)) fail('tools() must return array');
-// 118 since browser_find was added: discovery before action, so a click on an
+// 120: browser_find, plus browser_evaluate and browser_upload_file, which
+// close the last two gaps against the reference surface (see
+// tests/validate-reference-parity.py): discovery before action, so a click on an
 // unfamiliar page picks from ranked candidates instead of one silent guess.
 // This count is asserted so an inventory change is always deliberate.
-if (count($tools) !== 118) fail('expected 118 tools, got ' . count($tools));
+if (count($tools) !== 120) fail('expected 120 tools, got ' . count($tools));
 $names = [];
 foreach ($tools as $index => $tool) {
     if (!is_array($tool)) fail("tool {$index} is not array");

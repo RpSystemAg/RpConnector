@@ -2475,6 +2475,18 @@ async function executeStep(state, step) {
       return { tabId, closed: true };
     }
     case "list_tabs": {
+      // Bringing a tab to the front is listed with the tabs rather than given a
+      // tool of its own, the way the reference groups it. It matters more than
+      // it looks: a tab that is not in the foreground has no compositor
+      // surface, so this is the direct answer when a capture needs one.
+      if (step.activate) {
+        const target = await resolveTabId(state, step);
+        await assertOwnedTab(target);
+        await chrome.tabs.update(target, { active: true });
+        const tab = await chrome.tabs.get(target);
+        await chrome.windows.update(tab.windowId, { focused: false }).catch(() => {});
+        return { tabId: target, activated: true, windowId: tab.windowId };
+      }
       const laneId = String(state?.arguments?._prstudio_lane_id || "");
       const all = await listOwnedTabs();
       const tabs = laneId ? all.filter((tab) => String(tab?.laneId || "") === laneId) : all;
@@ -2601,6 +2613,19 @@ async function executeStep(state, step) {
     }
     case "scroll": {
       const tabId = await resolveTabId(state, step);
+      // A reference means "put this element where I can see it", which is a
+      // different request from "move the page by this much". The click path has
+      // always scrolled its target into view before dispatching; nothing let a
+      // caller ask for that on its own, so reading or photographing something
+      // below the fold had no reliable way to bring it up.
+      if (step.targetRef || step.target_ref || step.selector || step.role || step.name || step.label) {
+        await attachDebugger(tabId);
+        const located = await locateViaAccessibilityCdp(tabId, domRuntimeArgs(step, "scroll"));
+        if (located?.element) {
+          return { tabId, scrolledIntoView: true, element: located.element, point: located.point || null };
+        }
+        return { tabId, scrolledIntoView: false, reason: "target_not_located" };
+      }
       if (step.progressive || step.to === "bottom") return progressiveScroll(tabId, { restore: false });
       const dimensions = await pageDimensions(tabId);
       const commands = pointerSequence([{ type: "wheel", x: Math.round(dimensions.viewportWidth / 2), y: Math.round(dimensions.viewportHeight / 2), deltaX: Number(step.x || 0), deltaY: Number(step.y || 0) }]);
@@ -2624,7 +2649,7 @@ async function executeStep(state, step) {
       const tabId = await resolveTabId(state, step);
       const deadlineAt = Date.now() + SCREENSHOT_STEP_TIMEOUT_MS;
       const captureDeadlineAt = Math.min(deadlineAt - SCREENSHOT_UPLOAD_TIMEOUT_MS, Date.now() + SCREENSHOT_CAPTURE_TIMEOUT_MS);
-      const image = await captureScreenshot(tabId, Boolean(step.fullPage), Boolean(step.lazyLoad), { format: step.format, quality: step.quality, maxPixels: step.maxPixels || step.max_pixels, deadlineAt: captureDeadlineAt });
+      const image = await captureScreenshot(tabId, Boolean(step.fullPage), Boolean(step.lazyLoad), { region: step.region || null, scale: Number(step.scale || 0) || 0, format: step.format, quality: step.quality, maxPixels: step.maxPixels || step.max_pixels, deadlineAt: captureDeadlineAt });
       return {
         tabId, artifact: await storeScreenshotArtifact(image, state, null, { deadlineAt }), width: image.width, height: image.height,
         requestedWidth: image.requestedWidth, requestedHeight: image.requestedHeight, fullPage: Boolean(step.fullPage),
@@ -5184,11 +5209,24 @@ async function captureScreenshot(tabId, fullPage = false, lazyLoad = false, opti
       ? "png"
       : (fullPage && pixels >= SCREENSHOT_LARGE_PIXEL_THRESHOLD ? "jpeg" : "png");
   const quality = Math.max(35, Math.min(92, Number(options.quality || 82)));
+  // An explicit region is the reference "zoom": photograph this rectangle,
+  // optionally magnified, instead of the whole viewport. It wins over the
+  // full-page and perception clips because the caller named it.
+  const requestedRegion = options.region && Number.isFinite(Number(options.region.width)) && Number.isFinite(Number(options.region.height))
+    ? {
+        x: Math.max(0, Number(options.region.x || 0)),
+        y: Math.max(0, Number(options.region.y || 0)),
+        width: Math.max(1, Number(options.region.width)),
+        height: Math.max(1, Number(options.region.height)),
+        scale: Math.max(0.1, Math.min(4, Number(options.scale || 1))),
+      }
+    : null;
   const base = { format, fromSurface: true, captureBeyondViewport: Boolean(fullPage) };
   if (format === "jpeg") base.quality = quality;
   const perception = Boolean(options.perception);
   const scale = perception ? Math.min(1, PERCEPTION_MAX_DIMENSION / Math.max(plannedWidth, plannedHeight), Math.sqrt(maxPixels / Math.max(1, plannedWidth * plannedHeight))) : 1;
-  if (fullPage || perception) base.clip = { x: 0, y: 0, width: plannedWidth, height: plannedHeight, scale };
+  if (requestedRegion) base.clip = requestedRegion;
+  else if (fullPage || perception) base.clip = { x: 0, y: 0, width: plannedWidth, height: plannedHeight, scale };
   // Built by lib/screenshot-candidates.js so the chain and the test that
   // guards it cannot drift. The property that matters is that the chain ends
   // with a renderer capture: a tab created with active:false has no compositor
@@ -5197,7 +5235,7 @@ async function captureScreenshot(tabId, fullPage = false, lazyLoad = false, opti
     format,
     quality,
     fullPage: Boolean(fullPage),
-    clip: (fullPage || perception) ? { x: 0, y: 0, width: plannedWidth, height: plannedHeight, scale } : null,
+    clip: requestedRegion || ((fullPage || perception) ? { x: 0, y: 0, width: plannedWidth, height: plannedHeight, scale } : null),
   });
   const captured = await captureScreenshotWithFallback(tabId, compatible, { deadlineAt });
   const actualFormat = captured.actualFormat === "jpeg" ? "jpeg" : "png";
