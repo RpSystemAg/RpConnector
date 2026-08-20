@@ -1,1 +1,2 @@
 One-time trigger for consolidating all residual pull requests into master and replacing fragmented PR/push checks with the Unified full-suite control.
+Retry: load the refined public contract class in the standalone smoke test and preserve bare-host Browser URL normalization.
