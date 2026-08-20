@@ -33,6 +33,7 @@ export const RUNTIME_CONTRACT_ACTIONS = Object.freeze([
   "playwright_download_wait",
   "playwright_drag_and_drop",
   "playwright_export_trace",
+  "playwright_find_elements",
   "playwright_form_smoke_test",
   "playwright_generate_test",
   "playwright_launch_chrome",

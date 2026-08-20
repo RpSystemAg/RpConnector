@@ -12,7 +12,10 @@ try {
     fail('MCP tools() must execute without Throwable: ' . get_class($e) . ': ' . $e->getMessage());
 }
 if (!is_array($tools)) fail('tools() must return array');
-if (count($tools) !== 117) fail('expected 117 tools, got ' . count($tools));
+// 118 since browser_find was added: discovery before action, so a click on an
+// unfamiliar page picks from ranked candidates instead of one silent guess.
+// This count is asserted so an inventory change is always deliberate.
+if (count($tools) !== 118) fail('expected 118 tools, got ' . count($tools));
 $names = [];
 foreach ($tools as $index => $tool) {
     if (!is_array($tool)) fail("tool {$index} is not array");

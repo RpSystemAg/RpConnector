@@ -898,6 +898,7 @@ HTML;
         $tools[]=self::tool('browser_reload','Reload browser tab','Use this to reload the selected Browser tab.',self::obj($tab),self::annotations(false,false,false,true));
         $tools[]=self::tool('browser_wait','Wait in browser','Use this to wait for a selector, URL or load state without re-navigating.',self::obj(array_merge($selector,array('mode'=>self::str('selector, url or load.',array('enum'=>array('selector','url','load'))),'url'=>self::str('Expected URL/pattern.'),'state'=>self::str('Load state.'),'timeout_ms'=>self::integer('',1,120000))),array('mode')),self::annotations(true,false,true,true));
         $tools[]=self::tool('browser_snapshot','Browser interactive snapshot','Visual-first controlled-tab observation: bounded perception screenshot plus DOM/AX targets and explicit screenshot-to-CDP coordinate context.',self::obj(array_merge($selector,array('viewer_only'=>self::bool('Render the current browser_snapshot frame without autonomous widget polling.')))),self::annotations(true,false,true,true));
+        $tools[]=self::tool('browser_find','Find elements by description','Ask which elements match a plain description of what you are looking for, and get back the candidates with their roles, accessible names and a reusable target_ref. Read them, choose, then act with that target_ref. Use this before clicking on an unfamiliar page: a catalogue returns two dozen buttons whose names differ only by product, and picking from a list is reliable where a single silent guess is not.',self::obj(array_merge($tab,array('query'=>self::str('Plain description of the element, for example: add to cart button for the first product.'),'role'=>self::str('Optional ARIA role filter, for example button or link.'),'limit'=>self::number('How many candidates to return. Default 20.')))),self::annotations(true,false,true,false));
         $tools[]=self::tool('browser_dom','Browser DOM snapshot','Use this for a structured live DOM snapshot from the personal Browser.',self::obj($tab),self::annotations(true,false,true,true));
         $tools[]=self::tool('browser_accessibility','Browser accessibility tree','Use this for the live accessibility tree and semantic controls.',self::obj($tab),self::annotations(true,false,true,true));
         $tools[]=self::tool('browser_click','Browser click','Use this to click a visible/semantic target exactly as a human operator would.',self::obj($selector),self::annotations(false,false,false,true));
@@ -1398,6 +1399,7 @@ HTML;
             case 'browser_reload': return self::browser_dispatch('playwright_reload',$args);
             case 'browser_wait': return self::browser_wait($args);
             case 'browser_batch': return self::browser_dispatch('playwright_flow',array('steps'=>(array)($args['steps']??array()),'tab_id'=>$args['tab_id']??null));
+            case 'browser_find': return self::browser_dispatch('playwright_find_elements',$args);
             case 'browser_snapshot': return self::browser_dispatch('playwright_observation_bundle',array_merge($args,array('includeScreenshot'=>true,'detail'=>'compact','sync_wait_seconds'=>15)));
             case 'browser_dom': return self::browser_dispatch('playwright_dom_snapshot',$args);
             case 'browser_accessibility': return self::browser_dispatch('playwright_accessibility_snapshot',$args);
@@ -1582,6 +1584,10 @@ HTML;
         // capability_search costs a lookup the model has no reason to make when
         // the surface it can see appears to be observation-only.
         'browser_click','browser_type','browser_press','browser_scroll','browser_navigate','browser_batch',
+        // Discovery before action. Ranking candidates and letting the caller pick
+        // is what makes a click on an unfamiliar page reliable; a single silent
+        // guess is not correctable because nothing else is ever shown.
+        'browser_find',
         'wordpress_content_transaction','procedural_skill_search','procedural_skill_get',
     );
 
@@ -1612,14 +1618,14 @@ HTML;
      * literal 4 in the assembler and another literal 4 in the budget test.
      *
      * Measured 19 Aug 2026 on the surface this server emits: o200k_base and
-     * cl100k_base agree at 4.64-4.81. 4.4 keeps about a five percent margin
+     * cl100k_base agree at 4.64-4.81. 4.5 keeps about a four percent margin
      * below the lowest observed ratio, so the estimate stays conservative.
      *
      * tests/validate-tools-list-real-tokens.py tokenizes the emitted surface and
      * fails if this ever starts under-counting, which is the direction that
      * breaks LAW 9 silently.
      */
-    public const TOKEN_BYTES_RATIO = 4.4;
+    public const TOKEN_BYTES_RATIO = 4.5;
 
     /** Approximate a token count from encoded bytes. Deliberately conservative. */
     private static function approx_tokens( int $bytes ): int { return (int) ceil( $bytes / self::TOKEN_BYTES_RATIO ); }

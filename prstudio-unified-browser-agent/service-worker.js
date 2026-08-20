@@ -32,7 +32,7 @@ import { RUNTIME_CONTRACT_ACTIONS, hasRuntimeContractAction, isSensitiveRuntimeC
 import { normalizeGscDimensions, unsupportedGscDimensions, gscDimensionAliases, headerMatchesGscDimension, labelMatchesGscDimension, inferGscDimensionFromHeaders, validateGscDimensionRows, shouldNavigateSearchConsole, mergeGscDimensionCollections, normalizeGscProperty, gscPropertyMatches, gscPropertyLabels } from "./lib/gsc-session.js";
 import { DEBUGGER_PROTOCOL_CANDIDATES, attachWithProtocolFallback } from "./lib/cdp-protocol.js";
 import { pointerSequence, dragSequence, keyboardSequence } from "./lib/native-input.js";
-import { bestSemanticTarget } from "./lib/semantic-ranking.js";
+import { bestSemanticTarget, rankSemanticTargets } from "./lib/semantic-ranking.js";
 import { candidateTabUrl, provisionalOwnershipState, migrateTabReplacementState, tabBindingCompatibility } from "./lib/tab-ownership.js";
 import { REMOTE_MAX_STEP_ATTEMPTS, canFreshRestart, isRetrySafeFailure, stepWatchdogMs, noProgressExceeded } from "./lib/remote-recovery.js";
 import { createObservationEnvelope, redactObservation } from "./lib/observation-security.js";
@@ -2611,6 +2611,14 @@ async function executeStep(state, step) {
       const tree = await cdp(tabId, "Accessibility.getFullAXTree", {});
       return { tabId, nodes: tree.nodes || [], nodeCount: tree.nodes?.length || 0 };
     }
+    case "find_elements": {
+      // Ask what matches, instead of being handed one silent guess. The refs
+      // returned here are the same targetRef the click path resolves, so the
+      // model reads the candidates, picks, and acts on that exact element.
+      const tabId = await resolveTabId(state, step);
+      await attachDebugger(tabId);
+      return { tabId, ...(await findElementCandidates(tabId, step)) };
+    }
     case "screenshot": {
       const tabId = await resolveTabId(state, step);
       const deadlineAt = Date.now() + SCREENSHOT_STEP_TIMEOUT_MS;
@@ -2893,7 +2901,14 @@ async function cdpAxNodes(tabId, sessionId = "", frameId = "") {
   } catch { return []; }
 }
 
-async function locateViaAccessibilityCdp(tabId, args = {}) {
+// Every addressable element on the page, across every frame, as scoreable
+// descriptors each carrying a stable targetRef.
+//
+// Extracted from locateViaAccessibilityCdp so the resolver and the candidate
+// listing share one collection. Two independent walks of the accessibility
+// tree would eventually disagree about what exists, and offering the model an
+// element that the click path cannot then resolve is worse than offering none.
+async function collectAxCandidates(tabId) {
   const hasSemantic = Boolean(args.role || args.name || args.text || args.label);
   if (!hasSemantic) return null;
   await attachDebuggerIfNeeded(tabId);
@@ -2914,6 +2929,87 @@ async function locateViaAccessibilityCdp(tabId, args = {}) {
     const nodes = await cdpAxNodes(tabId, sessionId, "");
     for (const node of nodes) if (!node?.ignored && node?.backendDOMNodeId) candidates.push(axDescriptor(node, sessionId));
   }
+  return candidates;
+}
+
+
+/**
+ * List the elements that match a description, instead of silently choosing one.
+ *
+ * WHY THIS EXISTS
+ * ---------------
+ * locateViaAccessibilityCdp ranks every element on the page and returns the top
+ * one, and returns null when its score falls below 75. The model never sees the
+ * alternatives and never sees the score. So a resolver that picked the wrong
+ * element and a resolver that found nothing are indistinguishable from outside,
+ * and neither is correctable: there is nothing to correct it with.
+ *
+ * The reference tooling works the other way round. You ask for "the add to cart
+ * button for the first product", you get back the candidates with their roles
+ * and accessible names, you read them, you pick, and you act on that reference.
+ * On a real catalogue page that returns two dozen buttons whose names differ
+ * only by product, and choosing correctly is trivial for a reader and a coin
+ * flip for a scorer.
+ *
+ * The pieces were already here. axDescriptor emits a stable targetRef,
+ * scoreTarget gives an exact targetRef match 1000 points, and
+ * rankSemanticTargets already takes a limit. What was missing was any way to
+ * ask.
+ *
+ * The 75-point floor is deliberately NOT applied. A weak match the model can
+ * see and reject is strictly better than a null it cannot interpret.
+ *
+ * @param {number} tabId Tab to search.
+ * @param {object} args query/role/name/text/label/limit.
+ * @returns {Promise<object>} Candidates with refs, ordered best first.
+ */
+async function findElementCandidates(tabId, args = {}) {
+  const phrase = String(args.query || "").trim().slice(0, 400);
+  const limit = Math.max(1, Math.min(20, Number(args.limit || 20)));
+
+  // A natural-language phrase is matched against every lexical field, because a
+  // person describing "the add to cart button" may be naming the accessible
+  // name, the visible text or the label, and does not know which.
+  const query = {
+    role: String(args.role || "").toLowerCase(),
+    name: String(args.name || phrase || ""),
+    text: String(args.text || phrase || ""),
+    label: String(args.label || phrase || ""),
+    intendedAction: String(args.intended_action || args.intendedAction || "click"),
+  };
+
+  const candidates = await collectAxCandidates(tabId);
+  // Rank one past the limit so "there are more" is a fact rather than a guess.
+  const ranked = rankSemanticTargets(candidates, query, { limit: limit + 1 });
+  const truncated = ranked.length > limit;
+  const shown = ranked.slice(0, limit);
+
+  return {
+    query: phrase,
+    scanned: candidates.length,
+    returned: shown.length,
+    truncated,
+    // Mirrors what the reference tool tells a caller: narrow the description
+    // rather than paging, because the ranking is only meaningful near the top.
+    guidance: truncated
+      ? "More elements matched than are shown. Describe the target more specifically rather than asking for more results."
+      : "",
+    elements: shown.map((row) => ({
+      target_ref: String(row?.target?.targetRef || ""),
+      role: String(row?.target?.role || ""),
+      name: String(row?.target?.accessibleName || ""),
+      text: String(row?.target?.text || "").slice(0, 200),
+      label: String(row?.target?.label || "").slice(0, 200),
+      clickable: Boolean(row?.target?.clickable),
+      editable: Boolean(row?.target?.contentEditable),
+      disabled: Boolean(row?.target?.disabled),
+      score: Number(row?.score || 0),
+    })),
+  };
+}
+
+async function locateViaAccessibilityCdp(tabId, args = {}) {
+  const candidates = await collectAxCandidates(tabId);
   if (!candidates.length) return null;
   const query = { role: args.role || "", name: args.name || "", text: args.text || "", label: args.label || "", intendedAction: args.intendedAction || "click" };
   const best = bestSemanticTarget(candidates, query);
