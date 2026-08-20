@@ -16,7 +16,7 @@ foreach ($tools as $tool) {
 }
 
 $targets = array(
-    'agency_status','browser_launch','browser_live_status','browser_open','browser_screenshot',
+    'agency_status','browser_launch','browser_open','browser_screenshot',
     'browser_snapshot','browser_status','browser_task_control','engineering_repo_map','engineering_status',
     'procedural_skill_get','procedural_skill_invalidate','procedural_skill_search','procedural_skill_status',
     'prstudio_backlog','prstudio_capability_describe','prstudio_capability_search','prstudio_context_close',
@@ -30,6 +30,7 @@ foreach ($targets as $name) {
     expect_contract(isset($by_name[$name]), "missing refined public tool {$name}");
     expect_contract(strlen((string)$by_name[$name]['description']) >= 45, "{$name} needs a discriminating model-facing description");
 }
+expect_contract(!isset($by_name['browser_live_status']), 'removed Browser LIVE status tool must stay absent from the public catalog');
 
 foreach (array('agency_status','engineering_status','procedural_skill_status','prstudio_context_status','sequential_thinking_status') as $name) {
     expect_contract(($by_name[$name]['inputSchema']['additionalProperties'] ?? null) === false, "{$name} must reject unknown input");
@@ -99,6 +100,7 @@ $json = json_encode($tools, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
 expect_contract($json !== false, 'refined catalog must JSON encode');
 expect_contract(strlen((string)$json) < 1024 * 1024, 'refined full catalog must remain below the 1 MiB hard response budget');
 
-pass_contract('All 36 requested public ChatGPT/MCP contracts are present and refined');
+pass_contract('All 35 requested public ChatGPT/MCP contracts are present and refined');
+pass_contract('Removed Browser LIVE public tooling remains absent');
 pass_contract('Dynamic envelopes remain dynamic only where runtime-selected schemas require it');
 pass_contract('Conditional, enum, annotation, and ingest contracts match runtime behavior');
