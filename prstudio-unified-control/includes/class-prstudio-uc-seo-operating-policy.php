@@ -71,13 +71,14 @@ final class PRSTUDIO_UC_SEO_Operating_Policy {
             '/\bseo\b/',
             '/\bgoogle search console\b/', '/\bsearch console\b/', '/\bgsc\b/',
             '/\bahrefs\b/', '/\bsemrush\b/', '/\bscreaming frog\b/', '/\bserps?\b/',
-            '/\bkeyword(?:s| research| map| mapping)?\b/', '/\bsearch intent\b/',
+            '/\bkeyword(?:s| research| map| mapping)?\b/', '/\bsearch intent\b/', '/\bintento di ricerca\b/',
             '/\borganic (?:search|traffic|visibility|ranking|rankings|landing page|landing pages|content)\b/',
-            '/\bindex(?:ing|ability|able)?\b/', '/\bcrawlability\b/', '/\bcanonical\b/',
-            '/\binternal link(?:ing|s)?\b/', '/\bbacklink(?:s| analysis)?\b/',
-            '/\bcannibali[sz]ation\b/', '/\bcontent gap\b/',
+            '/\bricerca organica\b/', '/\btraffico organico\b/', '/\bvisibilita organica\b/', '/\bposizionamento organico\b/',
+            '/\bindex(?:ing|ability|able)?\b/', '/\bindicizzazione\b/', '/\bindicizzabilita\b/', '/\bcrawlability\b/', '/\bcanonical\b/',
+            '/\binternal link(?:ing|s)?\b/', '/\blink interni\b/', '/\bbacklink(?:s| analysis)?\b/',
+            '/\bcannibali[sz]ation\b/', '/\bcannibalizzazione\b/', '/\bcontent gap\b/', '/\bgap (?:di )?contenut[oi]\b/',
             '/\bmeta title\b/', '/\bmeta description\b/', '/\bseo metadata\b/',
-            '/\bseo audit\b/', '/\bseo schema\b/', '/\bschema markup\b/',
+            '/\bseo audit\b/', '/\baudit seo\b/', '/\bseo schema\b/', '/\bschema markup\b/',
             '/\bsearch ranking(?:s)?\b/', '/\borganic ranking(?:s)?\b/',
         );
         foreach ( $positive as $pattern ) {
@@ -86,8 +87,8 @@ final class PRSTUDIO_UC_SEO_Operating_Policy {
 
         // Content/media activates only when the objective itself states an
         // organic-search purpose; generic editorial/social work stays unchanged.
-        if ( preg_match( '/\b(article|guide|content|hero|image|media|landing page)\b/', $text )
-            && preg_match( '/\b(search|organic|rank|ranking|index)\b/', $text ) ) {
+        if ( preg_match( '/\b(article|articolo|guide|guida|content|contenuto|hero|image|immagine|media|landing page)\b/', $text )
+            && preg_match( '/\b(search|ricerca|organic|organica|organico|rank|ranking|index|indicizzazione)\b/', $text ) ) {
             return true;
         }
         return false;
