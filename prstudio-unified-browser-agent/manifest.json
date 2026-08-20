@@ -70,6 +70,8 @@
         "https://*/*"
       ],
       "js": [
+        "lib/reconnect-backoff.js",
+        "lib/runtime-dirty-notifier.js",
         "page-runtime.js"
       ],
       "run_at": "document_start",

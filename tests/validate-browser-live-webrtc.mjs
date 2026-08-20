@@ -21,6 +21,9 @@ for (const permission of ['activeTab','tabCapture','offscreen','contextMenus']) 
 assert.match(worker, /openPanelOnActionClick:\s*true/);
 assert.match(worker, /liveSetupMenus\(\)/);
 assert.match(worker, /liveHandleContextMenu/);
+assert.match(worker, /chrome\.action\?\.onClicked/);
+assert.match(worker, /type:\s*["']active_tab_granted["']/);
+assert.match(worker, /files:\s*\[["']lib\/reconnect-backoff\.js["'],\s*["']lib\/runtime-dirty-notifier\.js["'],\s*["']page-runtime\.js["']\]/);
 assert.match(live, /chrome\.tabCapture\.getMediaStreamId\(\{\s*targetTabId/);
 assert.match(live, /chrome\.offscreen\.createDocument/);
 assert.match(live, /offscreenCreationPromise/);

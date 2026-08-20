@@ -1,6 +1,8 @@
 # Changelog
 ## 1.0.0
 
+- Added bounded exponential reconnect backoff for document-start page-runtime ports, preventing every frame from retrying at a fixed 100 ms cadence while the MV3 worker is unavailable. DOM invalidation messages are coalesced to one per dirty epoch and synchronized at the next runtime request, so animation-heavy pages no longer keep the worker alive with redundant per-mutation traffic.
+- Side Panel status refreshes are now visibility-aware and single-flight; slow requests cannot accumulate overlapping refreshes, and existing disabled control state is preserved across guarded actions.
 - Replaced the Core Web Vitals Performance.getMetrics surrogate with a document_start PerformanceObserver collector following web-vitals 6.0.1 metric semantics for LCP, CLS and INP.
 - Added BFCache and browser-supported soft-navigation metric segmentation.
 - Renamed the legacy Lighthouse-compatible audit provider to devtools_quality_audit; it does not claim to execute Lighthouse.

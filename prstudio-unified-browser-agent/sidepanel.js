@@ -1,9 +1,12 @@
+import { createRefreshLoop } from './lib/panel-refresh.js';
+
 const $ = (id) => document.getElementById(id);
 const send = (type, extra = {}) => chrome.runtime.sendMessage({ type, ...extra });
 const sendLive = (type, extra = {}) => chrome.runtime.sendMessage({ target: 'prstudio-live-runtime', type, ...extra });
 let localState = null;
 let remoteState = null;
 let busy = false;
+const busyDisabledState = new Map();
 
 // Chrome grants activeTab only to the tab that was active at a recognized
 // invocation (action icon click, context menu, command) -- never to whatever
@@ -42,11 +45,17 @@ function errText(result) {
   return result.error?.message || result.error?.code || JSON.stringify(result.error || result);
 }
 function setBusyControls(value) {
-  for (const button of document.querySelectorAll("button")) {
-    if (["localCancelButton", "cancelButton"].includes(button.id)) continue;
-    button.disabled = Boolean(value);
+  const controls = [...document.querySelectorAll("button"), $("commandPalette")];
+  for (const control of controls) {
+    if (!control || ["localCancelButton", "cancelButton"].includes(control.id)) continue;
+    if (value) {
+      if (!busyDisabledState.has(control)) busyDisabledState.set(control, Boolean(control.disabled));
+      control.disabled = true;
+      continue;
+    }
+    if (busyDisabledState.has(control)) control.disabled = busyDisabledState.get(control);
+    busyDisabledState.delete(control);
   }
-  $("commandPalette").disabled = Boolean(value);
 }
 async function guarded(label, fn) {
   if (busy) return;
@@ -345,7 +354,14 @@ $("liveStopButton").addEventListener("click", async () => {
 });
 
 chrome.runtime?.onMessage?.addListener?.((message) => {
-  if (message?.target !== 'prstudio-live-panel' || message?.type !== 'state') return;
+  if (message?.target !== 'prstudio-live-panel') return;
+  if (message?.type === 'active_tab_granted') {
+    const tabId = Number(message?.detail?.tabId || 0);
+    if (tabId) grantedTabId = tabId;
+    refreshLive().catch(() => {});
+    return;
+  }
+  if (message?.type !== 'state') return;
   const detail = message.detail || {};
   const text = detail.message || (detail.status ? `WebRTC · ${detail.status}` : '');
   if (text) $("liveMessage").textContent = text;
@@ -394,5 +410,19 @@ renderCommandSuggestions();
 // The panel opens via openPanelOnActionClick, so the tab active right now,
 // at panel load, is the one whose icon click actually granted activeTab.
 activeLiveTab().then((tab) => { if (tab?.id) grantedTabId = Number(tab.id); }).catch(() => {});
-Promise.all([refreshLocal(), refreshRemote(), refreshLive()]);
-setInterval(refreshLocal, 5000); setInterval(refreshRemote, 10000); setInterval(refreshLive, 4000);
+const panelRefreshLoops = [
+  createRefreshLoop(refreshLocal, { intervalMs: 5_000 }),
+  createRefreshLoop(refreshRemote, { intervalMs: 10_000 }),
+  createRefreshLoop(refreshLive, { intervalMs: 4_000 }),
+];
+for (const loop of panelRefreshLoops) void loop.start({ immediate: false });
+function updatePanelRefreshVisibility() {
+  if (document.hidden) {
+    for (const loop of panelRefreshLoops) loop.pause();
+    return;
+  }
+  for (const loop of panelRefreshLoops) void loop.resume({ immediate: true });
+}
+document.addEventListener?.('visibilitychange', updatePanelRefreshVisibility);
+globalThis.addEventListener?.('pagehide', () => { for (const loop of panelRefreshLoops) loop.stop(); }, { once: true });
+updatePanelRefreshVisibility();

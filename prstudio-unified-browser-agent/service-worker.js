@@ -283,6 +283,20 @@ chrome.contextMenus?.onClicked?.addListener((info, tab) => {
   liveHandleContextMenu(info, tab).catch(logError);
 });
 
+// action.onClicked is a real activeTab invocation (there is no action popup).
+// If the global Side Panel was already open, its document is reused and cannot
+// infer that the user clicked the icon on a different tab, so forward the exact
+// granted target instead of authorizing whichever tab happens to be active.
+chrome.action?.onClicked?.addListener((tab) => {
+  const tabId = Number(tab?.id || 0);
+  if (!tabId) return;
+  chrome.runtime.sendMessage({
+    target: "prstudio-live-panel",
+    type: "active_tab_granted",
+    detail: { tabId, status: "action_granted" },
+  }).catch(() => {});
+});
+
 chrome.tabCapture?.onStatusChanged?.addListener((info) => {
   liveOnCaptureStatusChanged(info).catch(logError);
 });
@@ -2313,7 +2327,10 @@ async function ensurePageRuntime(tabId, frameId = 0) {
     if (pong?.ok) return true;
   } catch { /* content script may predate this extension build */ }
   try {
-    await chrome.scripting.executeScript({ target: { tabId: id, frameIds: [fid] }, files: ["page-runtime.js"] });
+    await chrome.scripting.executeScript({
+      target: { tabId: id, frameIds: [fid] },
+      files: ["lib/reconnect-backoff.js", "lib/runtime-dirty-notifier.js", "page-runtime.js"],
+    });
     const pong = await chrome.tabs.sendMessage(id, { channel: "prstudio-page-runtime", kind: "ping" }, { frameId: fid });
     return Boolean(pong?.ok);
   } catch {

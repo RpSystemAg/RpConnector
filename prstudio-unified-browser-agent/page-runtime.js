@@ -7,6 +7,16 @@
   const mutationSubscribers = new Set();
   let domVersion = 1;
   let port = null;
+  const reconnectBackoff = globalThis.__PRSTUDIO_RECONNECT_BACKOFF_V1__?.create?.({
+    baseDelayMs: 250,
+    maxDelayMs: 10_000,
+    stableConnectionMs: 5_000,
+    jitterRatio: 0.2,
+  });
+  const dirtyNotifier = globalThis.__PRSTUDIO_RUNTIME_DIRTY_NOTIFIER_V1__?.create?.((message) => {
+    if (!port) throw new Error('page_runtime_port_unavailable');
+    port.postMessage(message);
+  });
 
   const matchesInteractive = (node) => node?.nodeType === 1 && node.matches?.(INTERACTIVE_SELECTOR);
   const scanNode = (node) => {
@@ -26,7 +36,8 @@
   const emitMutation = () => {
     domVersion += 1;
     for (const listener of [...mutationSubscribers]) queueMicrotask(listener);
-    try { port?.postMessage({ type: 'dom_mutation', domVersion, url: location.href }); } catch { /* port reconnects below */ }
+    if (dirtyNotifier) dirtyNotifier.notify(domVersion, location.href);
+    else try { port?.postMessage({ type: 'dom_mutation', domVersion, url: location.href }); } catch { /* port reconnects below */ }
   };
   const observer = new MutationObserver((records) => {
     for (const record of records) {
@@ -668,17 +679,29 @@ async function domExecutor(action, args) {
   const connect = () => {
     try {
       port = chrome.runtime.connect({ name: 'prstudio-page-runtime' });
+      reconnectBackoff?.markConnected();
+      dirtyNotifier?.reset();
       port.onMessage.addListener((message = {}) => {
+        reconnectBackoff?.markActivity();
         if (message?.type !== 'runtime_request' || !message.id) return;
+        dirtyNotifier?.synchronize(domVersion, location.href);
         handle(message.payload || {}).then((result) => {
           try { port.postMessage({ type: 'runtime_response', id: message.id, ok: true, result }); } catch { /* disconnected */ }
         }).catch((error) => {
           try { port.postMessage({ type: 'runtime_response', id: message.id, ok: false, error: String(error?.message || error), message: String(error?.message || error) }); } catch { /* disconnected */ }
         });
       });
-      port.onDisconnect.addListener(() => { port = null; setTimeout(connect, 100); });
+      port.onDisconnect.addListener(() => {
+        port = null;
+        if (reconnectBackoff) reconnectBackoff.schedule(connect);
+        else setTimeout(connect, 250);
+      });
       port.postMessage({ type: 'runtime_ready', domVersion, url: location.href, frameTop: window === window.top });
-    } catch { setTimeout(connect, 250); }
+    } catch {
+      port = null;
+      if (reconnectBackoff) reconnectBackoff.schedule(connect);
+      else setTimeout(connect, 250);
+    }
   };
   connect();
 })();
