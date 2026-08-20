@@ -469,195 +469,23 @@ final class WPAIB_MCP {
 		return array_merge( $primary, array( $search, $index, $call ) );
 	}
 
-	private static function normalize_search_text( string $value ): string {
-		$value = strtolower( $value );
-		$value = strtr( $value, array( 'à' => 'a', 'á' => 'a', 'è' => 'e', 'é' => 'e', 'ì' => 'i', 'í' => 'i', 'ò' => 'o', 'ó' => 'o', 'ù' => 'u', 'ú' => 'u' ) );
-		$value = (string) preg_replace( '/[^a-z0-9]+/', ' ', $value );
-		return ' ' . trim( $value ) . ' ';
-	}
-
-	private static function search_synonyms(): array {
-		return array(
-			'prodotto' => array( 'product' ), 'prodotti' => array( 'product' ), 'articolo' => array( 'post', 'product' ), 'articoli' => array( 'post' ),
-			'pagina' => array( 'page' ), 'pagine' => array( 'page' ), 'contenuto' => array( 'content', 'post' ), 'contenuti' => array( 'content', 'post' ),
-			'prezzo' => array( 'price' ), 'prezzi' => array( 'price' ), 'sconto' => array( 'sale', 'coupon' ), 'saldo' => array( 'sale' ),
-			'titolo' => array( 'title' ), 'descrizione' => array( 'description' ), 'immagine' => array( 'image', 'media' ), 'immagini' => array( 'image', 'media' ),
-			'foto' => array( 'image', 'media' ), 'file' => array( 'file' ), 'cartella' => array( 'directory', 'folder' ),
-			'utente' => array( 'user' ), 'utenti' => array( 'user' ), 'cliente' => array( 'customer' ), 'clienti' => array( 'customer' ),
-			'ordine' => array( 'order' ), 'ordini' => array( 'order' ), 'coupon' => array( 'coupon' ), 'buono' => array( 'coupon' ),
-			'categoria' => array( 'category', 'term', 'taxonomy' ), 'categorie' => array( 'category', 'term', 'taxonomy' ),
-			'tag' => array( 'tag', 'term' ), 'tassonomia' => array( 'taxonomy', 'term' ),
-			'commento' => array( 'comment' ), 'commenti' => array( 'comment' ), 'recensione' => array( 'review', 'comment' ),
-			'menu' => array( 'menu' ), 'widget' => array( 'widget' ), 'tema' => array( 'theme' ), 'temi' => array( 'theme' ),
-			'plugin' => array( 'plugin' ), 'estensione' => array( 'plugin' ), 'modello' => array( 'template' ), 'template' => array( 'template' ),
-			'stile' => array( 'style', 'css' ), 'stili' => array( 'style', 'css' ), 'aspetto' => array( 'style', 'theme' ),
-			'magazzino' => array( 'stock', 'inventory' ), 'giacenza' => array( 'stock', 'inventory' ), 'scorte' => array( 'stock', 'inventory' ),
-			'spedizione' => array( 'shipping' ), 'pagamento' => array( 'payment' ), 'fattura' => array( 'invoice' ), 'iva' => array( 'tax' ), 'tasse' => array( 'tax' ),
-			'impostazione' => array( 'setting', 'option' ), 'impostazioni' => array( 'setting', 'option' ), 'opzione' => array( 'option', 'setting' ),
-			'backup' => array( 'backup' ), 'ripristino' => array( 'restore' ), 'ripristina' => array( 'restore' ),
-			'cache' => array( 'cache' ), 'svuota' => array( 'purge', 'flush', 'clear' ), 'pulisci' => array( 'purge', 'clean' ),
-			'redirect' => array( 'redirect' ), 'reindirizzamento' => array( 'redirect' ), 'sitemap' => array( 'sitemap' ),
-			'ricerca' => array( 'search' ), 'cerca' => array( 'search' ), 'trova' => array( 'search', 'find' ), 'sostituisci' => array( 'replace' ),
-			'crea' => array( 'create', 'add' ), 'creare' => array( 'create' ), 'aggiungi' => array( 'add', 'create' ), 'nuovo' => array( 'create' ), 'nuova' => array( 'create' ),
-			'aggiorna' => array( 'update', 'set' ), 'modifica' => array( 'update', 'edit', 'set' ), 'cambia' => array( 'update', 'set', 'change' ), 'imposta' => array( 'set', 'update' ),
-			'elimina' => array( 'delete', 'remove' ), 'cancella' => array( 'delete', 'remove' ), 'rimuovi' => array( 'remove', 'delete' ), 'cestina' => array( 'trash', 'delete' ),
-			'elenca' => array( 'list' ), 'elenco' => array( 'list' ), 'lista' => array( 'list' ), 'mostra' => array( 'get', 'list' ), 'leggi' => array( 'get', 'read' ),
-			'carica' => array( 'upload', 'import' ), 'esporta' => array( 'export' ), 'importa' => array( 'import' ), 'duplica' => array( 'duplicate', 'clone' ),
-			'attiva' => array( 'activate', 'enable' ), 'disattiva' => array( 'deactivate', 'disable' ), 'installa' => array( 'install' ), 'disinstalla' => array( 'uninstall' ),
-			'pubblica' => array( 'publish' ), 'bozza' => array( 'draft' ), 'programma' => array( 'schedule' ),
-			'log' => array( 'log' ), 'registro' => array( 'log' ), 'errori' => array( 'error', 'log' ), 'errore' => array( 'error', 'log' ),
-			'sicurezza' => array( 'security' ), 'permessi' => array( 'permission' ), 'database' => array( 'database' ), 'tabella' => array( 'table' ),
-			'sito' => array( 'site', 'frontend' ), 'homepage' => array( 'home', 'frontend' ), 'velocita' => array( 'performance' ), 'prestazioni' => array( 'performance' ),
-			'manutenzione' => array( 'maintenance' ), 'cron' => array( 'cron' ), 'pianificazione' => array( 'cron', 'schedule' ),
-			'storia' => array( 'story' ), 'storie' => array( 'story' ), 'stories' => array( 'story' ),
-			'parola' => array( 'keyword' ), 'chiave' => array( 'keyword' ), 'posizionamento' => array( 'seo', 'rank' ),
-			'quanti' => array( 'list', 'count' ), 'quante' => array( 'list', 'count' ), 'quali' => array( 'list' ), 'chi' => array( 'list', 'get' ),
-			'vedi' => array( 'get', 'list' ), 'visualizza' => array( 'get', 'list' ), 'guarda' => array( 'get', 'list' ), 'dammi' => array( 'get', 'list' ),
-			'controlla' => array( 'check', 'status' ), 'verifica' => array( 'verify', 'check', 'status' ), 'stato' => array( 'status' ), 'diagnostica' => array( 'diagnostics', 'health' ),
-			'amministratore' => array( 'admin', 'user', 'role' ), 'amministratori' => array( 'admin', 'user', 'role' ), 'ruolo' => array( 'role' ), 'ruoli' => array( 'role' ),
-			'libreria' => array( 'library', 'media' ), 'galleria' => array( 'gallery', 'media' ), 'allegato' => array( 'attachment', 'media' ), 'allegati' => array( 'attachment', 'media' ),
-			'testo' => array( 'text', 'content' ), 'link' => array( 'link', 'url' ), 'collegamento' => array( 'link', 'url' ), 'collegamenti' => array( 'link', 'url' ),
-			'variazione' => array( 'variation' ), 'variazioni' => array( 'variation' ), 'attributo' => array( 'attribute' ), 'attributi' => array( 'attribute' ),
-			'rimborso' => array( 'refund' ), 'nota' => array( 'note' ), 'email' => array( 'email' ), 'notifica' => array( 'notification', 'email' ),
-			'lingua' => array( 'language', 'locale' ), 'traduzione' => array( 'translation' ), 'valuta' => array( 'currency' ),
-			'homepage' => array( 'home', 'frontend' ), 'header' => array( 'header' ), 'footer' => array( 'footer' ), 'intestazione' => array( 'header' ), 'piè' => array( 'footer' ),
-			'robots' => array( 'robots' ), 'canonico' => array( 'canonical' ), 'schema' => array( 'schema' ), 'breadcrumb' => array( 'breadcrumb' ),
-		);
-	}
-
-	private static function search_index(): array {
-		static $index = null;
-		if ( null !== $index ) {
-			return $index;
-		}
-		$index = array();
-		foreach ( self::route_catalog() as $path => $route ) {
-			foreach ( $route['actions'] as $action_name => $meta ) {
-				$schema = isset( $meta['input_schema'] ) && is_array( $meta['input_schema'] ) ? $meta['input_schema'] : array();
-				$properties = isset( $schema['properties'] ) && is_array( $schema['properties'] ) ? $schema['properties'] : array();
-				$index[] = array(
-					'tool_name' => (string) $meta['tool_name'],
-					'route' => $path,
-					'route_tool' => (string) $route['tool'],
-					'action' => (string) $action_name,
-					'title' => (string) ( $meta['title'] ?? '' ),
-					'description' => (string) ( $meta['description'] ?? '' ),
-					'read_only' => ! empty( $meta['read_only'] ),
-					'destructive' => ! empty( $meta['destructive'] ),
-					'parameters' => array_slice( array_keys( $properties ), 0, 40 ),
-					'input_schema' => $schema,
-					'action_text' => self::normalize_search_text( (string) $action_name ),
-					'action_words' => array_values( array_filter( explode( ' ', trim( self::normalize_search_text( (string) $action_name ) ) ) ) ),
-					'route_text' => self::normalize_search_text( (string) $route['slug'] ),
-					'name_text' => self::normalize_search_text( (string) $meta['tool_name'] . ' ' . (string) $route['slug'] ),
-					'free_text' => self::normalize_search_text( (string) ( $meta['title'] ?? '' ) . ' ' . (string) ( $meta['description'] ?? '' ) ),
-				);
-			}
-		}
-		return $index;
-	}
-
-	/**
-	 * Gruppi di ricerca: ogni parola della richiesta genera un gruppo con i
-	 * suoi sinonimi, così una parola italiana e la sua traduzione contano una
-	 * volta sola nella copertura della query.
-	 */
-	private static function search_groups( string $query ): array {
-		$normalized = trim( self::normalize_search_text( $query ) );
-		if ( '' === $normalized ) {
-			return array();
-		}
-		$stop = array_fill_keys( array( 'il', 'lo', 'la', 'le', 'gli', 'un', 'uno', 'una', 'di', 'del', 'dei', 'delle', 'della', 'da', 'dal', 'in', 'con', 'su', 'sul', 'sulla', 'nel', 'nella', 'per', 'tra', 'fra', 'che', 'come', 'ci', 'sono', 'the', 'of', 'to', 'and', 'or', 'on', 'for', 'with', 'mi', 'me', 'my', 'voglio', 'vorrei', 'devo', 'puoi', 'fammi', 'fai', 'tutti', 'tutte', 'questo', 'questa', 'sito', 'wordpress', 'woocommerce' ), true );
-		$synonyms = self::search_synonyms();
-		$groups = array();
-		$seen = array();
-		foreach ( explode( ' ', $normalized ) as $part ) {
-			if ( strlen( $part ) < 2 || isset( $stop[ $part ] ) || isset( $seen[ $part ] ) ) {
-				continue;
-			}
-			$seen[ $part ] = true;
-			$group = array( $part );
-			if ( isset( $synonyms[ $part ] ) ) {
-				foreach ( (array) $synonyms[ $part ] as $extra ) {
-					$group[] = (string) $extra;
-				}
-			}
-			$groups[] = array_values( array_unique( $group ) );
-		}
-		return $groups;
-	}
-
-	private static function words_match( string $token, string $word ): bool {
-		if ( $token === $word ) {
-			return true;
-		}
-		$length = min( strlen( $token ), strlen( $word ) );
-		if ( $length < 4 ) {
-			return false;
-		}
-		if ( 0 === strncmp( $token, $word, $length ) ) {
-			return true;
-		}
-		return $length >= 6 && 0 === strncmp( $token, $word, 5 );
-	}
-
-	private static function score_token( string $token, string $haystack, int $weight ): int {
-		if ( false !== strpos( $haystack, ' ' . $token . ' ' ) ) {
-			return $weight;
-		}
-		if ( strlen( $token ) >= 4 && false !== strpos( $haystack, $token ) ) {
-			return (int) max( 1, floor( $weight / 2 ) );
-		}
-		if ( strlen( $token ) >= 6 && false !== strpos( $haystack, substr( $token, 0, 5 ) ) ) {
-			return (int) max( 1, floor( $weight / 3 ) );
-		}
-		return 0;
-	}
-
-	/**
-	 * Punteggio di un'azione: peso del campo in cui la parola compare, più
-	 * copertura della richiesta e precisione del nome dell'azione. La
-	 * precisione evita che una variante lunga batta l'azione esatta.
-	 */
-	private static function score_entry( array $groups, array $entry ): int {
-		if ( ! $groups ) {
-			return 0;
-		}
-		$score = 0;
-		$matched_groups = 0;
-		$covered_words = array();
-		foreach ( $groups as $group ) {
-			$best = 0;
-			foreach ( $group as $token ) {
-				$best = max(
-					$best,
-					self::score_token( $token, $entry['action_text'], 18 ),
-					self::score_token( $token, $entry['route_text'], 14 ),
-					self::score_token( $token, $entry['name_text'], 6 ),
-					self::score_token( $token, $entry['free_text'], 3 )
-				);
-				foreach ( $entry['action_words'] as $position => $word ) {
-					if ( self::words_match( $token, (string) $word ) ) {
-						$covered_words[ $position ] = true;
-					}
-				}
-			}
-			if ( $best > 0 ) {
-				++$matched_groups;
-				$score += $best;
-			}
-		}
-		if ( 0 === $matched_groups ) {
-			return 0;
-		}
-		$score += (int) round( 40 * $matched_groups / count( $groups ) );
-		$score += (int) round( 30 * count( $covered_words ) / max( 1, count( $entry['action_words'] ) ) );
-		return $score;
-	}
-
 	/**
 	 * Shared bilingual matcher adapter. The legacy payload remains unchanged;
 	 * only ranking and language normalization come from the canonical index.
+	 *
+	 * This class used to carry its own copy of the whole matcher -- an
+	 * italian->english synonym table, a stop-word list, a token scorer and a
+	 * `phrase_action` bonus that added 300 points when the query, joined with
+	 * underscores, equalled the action name. That bonus only ever fired for
+	 * English: "publish content" became publish_content, while "pubblica
+	 * contenuto" became pubblica_contenuto, which names no action anywhere in
+	 * the catalog. Two matchers meant two rankings under one version number,
+	 * and nothing at runtime compared them. There is now one matcher, so the
+	 * question cannot be asked twice and answered differently.
+	 *
+	 * When the shared index is genuinely unavailable this fails closed with an
+	 * empty result rather than reaching for a second opinion: an empty list is
+	 * a visible fault, whereas a divergent list is a silent one.
 	 */
 	private static function capability_matches( string $query, string $route_filter = '', int $limit = 10, bool $include_schema = false ): array {
 		if ( ! class_exists( 'PRSTUDIO_UC_Action_Lexicon' ) ) {
@@ -667,7 +495,7 @@ final class WPAIB_MCP {
 			require_once __DIR__ . '/class-prstudio-uc-action-index.php';
 		}
 		if ( ! class_exists( 'PRSTUDIO_UC_Action_Index' ) ) {
-			return self::capability_matches_legacy( $query, $route_filter, $limit, $include_schema );
+			return array( 'matches' => array(), 'total_matches' => 0 );
 		}
 
 		$route_path = '' !== trim( $route_filter ) ? self::route_path_from_input( $route_filter ) : null;
@@ -713,73 +541,6 @@ final class WPAIB_MCP {
 			'matches' => $matches,
 			'total_matches' => (int) ( $found['total_matches'] ?? count( $matches ) ),
 		);
-	}
-
-	/** Old scorer retained only as a fail-safe when the shared index is unavailable. */
-	private static function capability_matches_legacy( string $query, string $route_filter = '', int $limit = 10, bool $include_schema = false ): array {
-		$groups = self::search_groups( $query );
-		$phrase = trim( self::normalize_search_text( $query ) );
-		$phrase_action = str_replace( ' ', '_', $phrase );
-		$route_path = '' !== trim( $route_filter ) ? self::route_path_from_input( $route_filter ) : null;
-		$limit = max( 1, min( 50, $limit ) );
-
-		$scored = array();
-		foreach ( self::search_index() as $entry ) {
-			if ( null !== $route_path && $entry['route'] !== $route_path ) {
-				continue;
-			}
-			$score = self::score_entry( $groups, $entry );
-			if ( '' !== $phrase_action && ( $entry['action'] === $phrase_action || $entry['tool_name'] === $phrase_action || $entry['tool_name'] === 'rpconnector_' . $phrase_action ) ) {
-				$score += 300;
-			}
-			if ( $score <= 0 ) {
-				continue;
-			}
-			if ( $entry['read_only'] ) {
-				$score += 1;
-			}
-			$scored[] = array( 'score' => $score, 'entry' => $entry );
-		}
-
-		usort( $scored, static function ( $left, $right ) {
-			if ( $left['score'] !== $right['score'] ) {
-				return $right['score'] <=> $left['score'];
-			}
-			$left_length = strlen( (string) $left['entry']['action'] );
-			$right_length = strlen( (string) $right['entry']['action'] );
-			if ( $left_length !== $right_length ) {
-				return $left_length <=> $right_length;
-			}
-			return strcmp( (string) $left['entry']['tool_name'], (string) $right['entry']['tool_name'] );
-		} );
-
-		$total = count( $scored );
-		$matches = array();
-		foreach ( array_slice( $scored, 0, $limit ) as $item ) {
-			$entry = $item['entry'];
-			$match = array(
-				'tool_name' => $entry['tool_name'],
-				'route' => $entry['route'],
-				'action' => $entry['action'],
-				'route_tool' => $entry['route_tool'],
-				'title' => $entry['title'],
-				'description' => $entry['description'],
-				'read_only' => $entry['read_only'],
-				'destructive' => $entry['destructive'],
-				'parameters' => $entry['parameters'],
-				'score' => (int) $item['score'],
-				'call' => array(
-					'tool' => 'rpconnector_action_call',
-					'arguments' => array( 'route' => $entry['route'], 'action' => $entry['action'] ),
-				),
-			);
-			if ( $include_schema ) {
-				$match['input_schema'] = $entry['input_schema'];
-			}
-			$matches[] = $match;
-		}
-
-		return array( 'matches' => $matches, 'total_matches' => $total );
 	}
 
 	private static function capability_search( array $args ): array {
