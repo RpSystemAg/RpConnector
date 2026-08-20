@@ -12,10 +12,10 @@ try {
     fail('MCP tools() must execute without Throwable: ' . get_class($e) . ': ' . $e->getMessage());
 }
 if (!is_array($tools)) fail('tools() must return array');
-// 118 since browser_find was added: discovery before action, so a click on an
-// unfamiliar page picks from ranked candidates instead of one silent guess.
-// This count is asserted so an inventory change is always deliberate.
-if (count($tools) !== 118) fail('expected 118 tools, got ' . count($tools));
+// The consolidated catalogue intentionally contains 119 tools: browser_find is
+// already on master and PR #8 adds prstudio_research_radar. Keep the count
+// explicit so future inventory changes remain deliberate.
+if (count($tools) !== 119) fail('expected 119 tools, got ' . count($tools));
 $names = [];
 foreach ($tools as $index => $tool) {
     if (!is_array($tool)) fail("tool {$index} is not array");
@@ -36,8 +36,6 @@ foreach ($tools as $index => $tool) {
 $json = json_encode(['jsonrpc'=>'2.0','id'=>1,'result'=>['tools'=>$tools]], JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
 if ($json === false) fail('catalog JSON encoding failed: ' . json_last_error_msg());
 if (strlen($json) > 1024*1024) fail('catalog exceeds 1 MiB response budget: ' . strlen($json));
-// Derive the number rather than restating it: a literal here drifted out of
-// step with the assertion above and reported a stale count on a passing run.
 pass('MCP tools() executes and returns ' . count($tools) . ' unique tools');
 pass('Every tool has valid object schemas and boolean annotations');
 pass('Catalog JSON encodes successfully (' . strlen($json) . ' bytes)');
