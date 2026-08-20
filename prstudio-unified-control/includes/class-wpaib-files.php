@@ -602,10 +602,18 @@ final class WPAIB_Files {
 			$dir
 		);
 
-		if (
-			! $tmp
-			|| false === file_put_contents( $tmp, $content, LOCK_EX )
-		) {
+		if ( ! $tmp ) {
+			return new WP_Error(
+				'wpaib_write_failed',
+				'Scrittura temporanea non riuscita.',
+				array( 'status' => 500 )
+			);
+		}
+
+		if ( false === file_put_contents( $tmp, $content, LOCK_EX ) ) {
+			// wp_tempnam() has already created the file. Never leave a failed
+			// staging attempt behind in the destination directory.
+			@unlink( $tmp );
 			return new WP_Error(
 				'wpaib_write_failed',
 				'Scrittura temporanea non riuscita.',

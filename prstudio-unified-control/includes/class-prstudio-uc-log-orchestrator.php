@@ -17,18 +17,29 @@ final class PRSTUDIO_UC_Log_Orchestrator {
 	private const MAX_STREAM_BYTES = 8388608;
 	private const MAX_DEPTH = 8;
 	private const POINTER = 'CURRENT';
+	private static bool $root_ready = false;
+	private static array $indexed_sources = array();
 
 	public static function root(): string {
 		return trailingslashit( WP_CONTENT_DIR ) . 'prstudio-unified-private/logs';
 	}
 
 	private static function ensure_root(): void {
+		if ( self::$root_ready ) { return; }
 		$root = self::root();
 		if ( ! is_dir( $root ) ) { wp_mkdir_p( $root ); }
 		if ( is_dir( $root ) ) {
-			@file_put_contents( $root . '/index.php', "<?php\n// Silence is golden.\n" );
-			@file_put_contents( $root . '/.htaccess', "Options -Indexes\n<IfModule mod_authz_core.c>\nRequire all denied\n</IfModule>\n" );
-			@file_put_contents( $root . '/web.config', "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<configuration><system.webServer><security><authorization><remove users=\"*\" roles=\"\" verbs=\"\"/><add accessType=\"Deny\" users=\"*\"/></authorization></security></system.webServer></configuration>\n" );
+			$guards = array(
+				'index.php' => "<?php\n// Silence is golden.\n",
+				'.htaccess' => "Options -Indexes\n<IfModule mod_authz_core.c>\nRequire all denied\n</IfModule>\n",
+				'web.config' => "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<configuration><system.webServer><security><authorization><remove users=\"*\" roles=\"\" verbs=\"\"/><add accessType=\"Deny\" users=\"*\"/></authorization></security></system.webServer></configuration>\n",
+			);
+			foreach ( $guards as $name => $contents ) {
+				$path = $root . '/' . $name;
+				$current = is_readable( $path ) ? @file_get_contents( $path ) : false;
+				if ( $contents !== $current ) { self::atomic_write( $path, $contents ); }
+			}
+			self::$root_ready = true;
 		}
 	}
 
@@ -115,6 +126,45 @@ final class PRSTUDIO_UC_Log_Orchestrator {
 		return $ok;
 	}
 
+	/**
+	 * Keep the source catalogue unique without creating one index write per log.
+	 *
+	 * The source stream itself is intentionally append-only, but its catalogue is
+	 * a set: a source_id maps to exactly one relative path in a generation.  The
+	 * old implementation appended that same mapping on every event, so a hot
+	 * source grew index.ndjson at the same rate as all three log streams.  The
+	 * lock covers the read/check/append sequence across PHP workers; the in-memory
+	 * set avoids rereading the catalogue for subsequent events in this request.
+	 */
+	private static function index_source( string $dir, string $source_id, string $source ): void {
+		$key = $dir . '|' . $source_id;
+		if ( isset( self::$indexed_sources[ $key ] ) ) { return; }
+		$index = $dir . '/files/index.ndjson';
+		$lock = @fopen( $dir . '/files/.index.lock', 'c+' );
+		if ( ! is_resource( $lock ) || ! @flock( $lock, LOCK_EX ) ) {
+			if ( is_resource( $lock ) ) { @fclose( $lock ); }
+			return;
+		}
+		try {
+			$found = false;
+			foreach ( @file( $index, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES ) ?: array() as $line ) {
+				$row = json_decode( (string) $line, true );
+				if ( is_array( $row ) && hash_equals( $source_id, (string) ( $row['source_id'] ?? '' ) ) ) {
+					$found = true;
+					break;
+				}
+			}
+			if ( ! $found ) {
+				$line = wp_json_encode( array( 'source_id'=>$source_id, 'source_file'=>$source ), JSON_UNESCAPED_SLASHES ) . "\n";
+				if ( ! self::append( $index, $line ) ) { return; }
+			}
+			self::$indexed_sources[ $key ] = true;
+		} finally {
+			@flock( $lock, LOCK_UN );
+			@fclose( $lock );
+		}
+	}
+
 	public static function log( string $component, string $event, array $context = array(), string $level = 'info', string $source_file = '' ): void {
 		$id = self::generation_id();
 		$dir = self::ensure_generation( $id );
@@ -131,8 +181,7 @@ final class PRSTUDIO_UC_Log_Orchestrator {
 		self::append( $dir . '/components/' . $component . '.ndjson', $line );
 		if ( '' !== $source_id ) {
 			self::append( $dir . '/files/' . $source_id . '.ndjson', $line );
-			$index = $dir . '/files/index.ndjson';
-			self::append( $index, wp_json_encode( array( 'source_id'=>$source_id, 'source_file'=>$source ), JSON_UNESCAPED_SLASHES ) . "\n" );
+			self::index_source( $dir, $source_id, $source );
 		}
 	}
 
@@ -154,14 +203,22 @@ final class PRSTUDIO_UC_Log_Orchestrator {
 		self::ensure_root();
 		$lock_path = self::root() . '/.rotate.lock'; $lock = @fopen( $lock_path, 'c+' );
 		if ( ! is_resource( $lock ) || ! flock( $lock, LOCK_EX ) ) { if ( is_resource($lock) ) @fclose($lock); return array( 'rotated'=>false, 'reason'=>'lock_failed' ); }
-		$old = is_readable( self::root() . '/' . self::POINTER ) ? trim( (string) file_get_contents( self::root() . '/' . self::POINTER ) ) : '';
-		$new = 'g_' . gmdate( 'Ymd\THis\Z' ) . '_' . substr( hash( 'sha256', wp_generate_uuid4() ), 0, 8 );
-		self::ensure_generation( $new ); self::atomic_write( self::root() . '/' . self::POINTER, $new . "\n" );
-		$deleted = 0;
-		foreach ( glob( self::root() . '/g_*' ) ?: array() as $path ) {
-			if ( is_dir( $path ) && basename( $path ) !== $new && self::remove_tree( $path ) ) { $deleted++; }
+		try {
+			$old = is_readable( self::root() . '/' . self::POINTER ) ? trim( (string) file_get_contents( self::root() . '/' . self::POINTER ) ) : '';
+			$new = 'g_' . gmdate( 'Ymd\THis\Z' ) . '_' . substr( hash( 'sha256', wp_generate_uuid4() ), 0, 8 );
+			self::ensure_generation( $new );
+			if ( ! self::atomic_write( self::root() . '/' . self::POINTER, $new . "\n" ) ) {
+				self::remove_tree( trailingslashit( self::root() ) . $new );
+				return array( 'rotated'=>false, 'reason'=>'pointer_write_failed' );
+			}
+			$deleted = 0;
+			foreach ( glob( self::root() . '/g_*' ) ?: array() as $path ) {
+				if ( is_dir( $path ) && basename( $path ) !== $new && self::remove_tree( $path ) ) { $deleted++; }
+			}
+		} finally {
+			flock( $lock, LOCK_UN );
+			@fclose( $lock );
 		}
-		flock( $lock, LOCK_UN ); @fclose( $lock );
 		self::log( 'orchestrator', 'generation.rotated', array( 'previous'=>$old, 'reason'=>$reason, 'work_id'=>$work_id, 'old_generations_deleted'=>$deleted ), 'info', __FILE__ );
 		return array( 'rotated'=>true, 'generation'=>$new, 'previous'=>$old, 'old_generations_deleted'=>$deleted );
 	}

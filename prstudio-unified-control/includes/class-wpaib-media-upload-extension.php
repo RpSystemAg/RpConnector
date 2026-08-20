@@ -519,8 +519,11 @@ if ( ! class_exists( 'WPAIB_Media_Upload_Extension', false ) ) {
 					$temp_path = (string) $session['temp_path'];
 					if ( is_file( $temp_path ) ) {
 						clearstatcache( true, $temp_path );
-						$session['received'] = (int) @filesize( $temp_path );
-						self::save_session( $session );
+						$received = (int) @filesize( $temp_path );
+						if ( $received !== (int) ( $session['received'] ?? 0 ) ) {
+							$session['received'] = $received;
+							self::save_session( $session );
+						}
 					}
 
 					return self::success_response(
