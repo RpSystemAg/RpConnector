@@ -290,6 +290,13 @@ final class PRSTUDIO_UC_Procedural_Skills {
      *    Nothing is excluded from the store or from reach: a narrower query, a
      *    `kind` filter, or get() by ID still returns anything held (LAW 10).
      *
+     * Search intent is normalized through the shared IT/EN action lexicon. A
+     * pair such as `istantanea` / `snapshot` therefore resolves to the same
+     * concept set before the evidence ranking runs, so both languages receive
+     * the same rows in the same order. Technical identifiers containing `.`,
+     * `:`, `_` or `-` keep exact substring semantics and never get broadened by
+     * natural-language concepts.
+     *
      * @param array $args query, kind, limit.
      * @return array Ranked, capped result surface.
      */
@@ -297,17 +304,39 @@ final class PRSTUDIO_UC_Procedural_Skills {
         $q=strtolower(trim((string)($args['query']??'')));$kind=self::key((string)($args['kind']??''),30);
         $requested=isset($args['limit'])?(int)$args['limit']:self::SEARCH_RESULT_DEFAULT;
         $limit=max(1,min(self::SEARCH_RESULT_CEILING,$requested));
+        if(!class_exists('PRSTUDIO_UC_Action_Lexicon')){
+            $lexicon_path=__DIR__.'/class-prstudio-uc-action-lexicon.php';
+            if(is_readable($lexicon_path))require_once $lexicon_path;
+        }
+        $lexicon_ready=class_exists('PRSTUDIO_UC_Action_Lexicon');
+        $technical_query=''!==$q&&1===preg_match('/[._:-]/',$q);
+        $query_normalized=$lexicon_ready?PRSTUDIO_UC_Action_Lexicon::normalize_text($q):trim(str_replace(array('_','-'),' ',$q));
+        $query_concepts=(!$technical_query&&$lexicon_ready)?PRSTUDIO_UC_Action_Lexicon::query_concepts($q):array();
+        $query_keys=($lexicon_ready&&$query_concepts)?PRSTUDIO_UC_Action_Lexicon::concept_keys($query_concepts):array();
         $now=time();$rows=array();
         foreach((array)(self::state_unlocked()['skills']??array()) as $skill){
             if(!is_array($skill))continue;
             if($kind&&$kind!==(string)($skill['kind']??''))continue;
             $hay=strtolower((string)($skill['name']??'').' '.(string)($skill['description']??''));
-            if($q&&!str_contains($hay,$q))continue;
+            $match=''===$q;
+            if(!$match&&$technical_query)$match=str_contains($hay,$q);
+            if(!$match&&$query_concepts){
+                $candidate_concepts=PRSTUDIO_UC_Action_Lexicon::query_concepts($hay);
+                $candidate_keys=PRSTUDIO_UC_Action_Lexicon::concept_keys($candidate_concepts);
+                $match=PRSTUDIO_UC_Action_Lexicon::equivalent($candidate_concepts,$query_concepts)
+                    ||PRSTUDIO_UC_Action_Lexicon::covers($candidate_concepts,$query_concepts)
+                    ||0<count(array_intersect($query_keys,$candidate_keys));
+            }
+            if(!$match&&!$technical_query&&''!==$q){
+                $hay_normalized=$lexicon_ready?PRSTUDIO_UC_Action_Lexicon::normalize_text($hay):trim(str_replace(array('_','-'),' ',$hay));
+                $match=str_contains($hay,$q)||(''!==$query_normalized&&str_contains($hay_normalized,$query_normalized));
+            }
+            if(!$match)continue;
             $rows[]=array('id'=>(string)($skill['id']??''),'kind'=>(string)($skill['kind']??''),'name'=>(string)($skill['name']??''),'description'=>(string)($skill['description']??''),'confidence'=>(float)($skill['confidence']??0),'success_count'=>(int)($skill['success_count']??0),'last_verified_gmt'=>(string)($skill['last_verified_gmt']??''),'expires_gmt'=>(string)($skill['expires_gmt']??''),'curated_state'=>(string)($skill['curated_state']??''),'reusable'=>self::is_reusable($skill,$now),'failed_path_count'=>count((array)($skill['failed_paths']??array())));
         }
         usort($rows,static function($a,$b)use($now){return self::compare_value($a,$b,$now);});
         $matched=count($rows);$items=array_slice($rows,0,$limit);
-        return array('ok'=>true,'count'=>count($items),'matched'=>$matched,'truncated'=>$matched>count($items),'limit_requested'=>$requested,'limit_applied'=>$limit,'limit_ceiling'=>self::SEARCH_RESULT_CEILING,'limit_default'=>self::SEARCH_RESULT_DEFAULT,'ranked_by'=>'reusable_then_wilson_confidence','items'=>$items,'progressive_disclosure'=>true,'version'=>self::VERSION,'component'=>'procedural_skills','component_version'=>self::VERSION,'suite_version'=>defined('PRSTUDIO_UC_VERSION')?PRSTUDIO_UC_VERSION:'');
+        return array('ok'=>true,'count'=>count($items),'matched'=>$matched,'truncated'=>$matched>count($items),'limit_requested'=>$requested,'limit_applied'=>$limit,'limit_ceiling'=>self::SEARCH_RESULT_CEILING,'limit_default'=>self::SEARCH_RESULT_DEFAULT,'ranked_by'=>'reusable_then_wilson_confidence','items'=>$items,'progressive_disclosure'=>true,'query_normalized'=>$query_normalized,'bilingual_lexicon'=>$lexicon_ready,'version'=>self::VERSION,'component'=>'procedural_skills','component_version'=>self::VERSION,'suite_version'=>defined('PRSTUDIO_UC_VERSION')?PRSTUDIO_UC_VERSION:'');
     }
     /** Activate one skill and return its complete procedural recipe. */
     public static function get(array $args){$id=self::key((string)($args['id']??''),100);$skill=self::state_unlocked()['skills'][$id]??null;if(!is_array($skill))return new WP_Error('procedural_skill_not_found','Skill not found.',array('status'=>404));return array('ok'=>true,'skill'=>$skill,'skill_md'=>is_readable(self::skill_dir($id).'/SKILL.md')?(string)file_get_contents(self::skill_dir($id).'/SKILL.md'):'','version'=>self::VERSION,'component'=>'procedural_skills','component_version'=>self::VERSION,'suite_version'=>defined('PRSTUDIO_UC_VERSION')?PRSTUDIO_UC_VERSION:'');}

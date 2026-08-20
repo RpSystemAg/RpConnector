@@ -95,6 +95,42 @@ try {
     ok(!empty($failure['recorded']),'procedural skill records failed path');
     $search=PRSTUDIO_UC_Procedural_Skills::search(['query'=>'demo.action']);
     ok(1===(int)$search['count'] && 1===(int)$search['items'][0]['failed_path_count'],'progressive skill search includes failed-path count');
+
+    // LAW 15: learned-procedure discovery is one functional surface in Italian
+    // and English. Populate technical browser recipe names, then compare the
+    // complete ordered result IDs for equivalent natural-language queries.
+    $browserFixtures=[
+        'playwright_locator_snapshot','playwright_dom_snapshot','playwright_fill',
+        'playwright_reload','playwright_go_back','playwright_go_forward',
+        'playwright_select_option','playwright_screenshot_page','playwright_content',
+        'playwright_click','playwright_scroll','playwright_check',
+    ];
+    foreach($browserFixtures as $i=>$action){
+        $fixture=PRSTUDIO_UC_Procedural_Skills::learn_verified_browser_task(
+            ['action'=>$action,'arguments'=>[],'task_uuid'=>'fixture-'.($i+1)],
+            ['ok'=>true],
+            ['ok'=>true,'verifier'=>'fixture']
+        );
+        ok(!empty($fixture['learned']),'procedural browser fixture learns '.$action);
+    }
+    $skillIds=static function(string $query):array{
+        $result=PRSTUDIO_UC_Procedural_Skills::search(['query'=>$query,'kind'=>'browser','limit'=>12]);
+        return array_map(static fn(array $row):string=>(string)($row['id']??''),(array)($result['items']??[]));
+    };
+    $skillPairs=[
+        ['istantanea','snapshot'],['compila','fill'],['ricarica','reload'],
+        ['indietro','back'],['avanti','forward'],['seleziona','select'],
+        ['schermata','screenshot'],['pagina','page'],['contenuto','content'],
+        ['clicca','click'],['scorri','scroll'],['spunta','check'],
+    ];
+    foreach($skillPairs as [$italian,$english]){
+        $it=$skillIds($italian);$en=$skillIds($english);
+        ok($it===$en && []!==$it,sprintf('procedural skill order agrees IT/EN: "%s" / "%s"',$italian,$english));
+    }
+    $technical=$skillIds('playwright_locator_snapshot');
+    ok(1===count($technical) && str_contains($technical[0],'playwright_locator_snapshot'),'technical procedural-skill identifier keeps exact lookup semantics');
+    ok([]===$skillIds('xyzzy quux'),'nonsense procedural-skill query returns no accidental row');
+
     // One verified success no longer qualifies a recipe for reuse. Confidence is
     // a Wilson lower bound over successes and observed failure modes, so a
     // single sample scores ~0.09 against a 0.5 reuse bar. See
@@ -120,5 +156,5 @@ try {
     $providerSource=(string)file_get_contents($inc.'class-prstudio-uc-gsc-provider.php');
     ok(str_contains($providerSource,'intentionally Browser-only for live Search Console work')&&!str_contains($providerSource,'private static function api('),'GSC provider runtime remains Browser-only without the removed API implementation');
 
-    fwrite(STDOUT,"PHP new capabilities smoke: 27 assertions passed\n");
+    fwrite(STDOUT,"PHP new capabilities smoke: all assertions passed\n");
 } finally { cleanup($test_root); }
