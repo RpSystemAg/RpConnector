@@ -244,6 +244,14 @@ final class PRSTUDIO_UC_Action_Lexicon {
 		'tab tabs'                       => 'scheda schede linguetta linguette',
 		'revision revisions'             => 'revisione revisioni',
 		'metadata meta'                  => 'metadato metadati',
+		// The two nouns every SEO instruction is built from, and the two that
+		// were missing. "imposta descrizione seo" and "imposta titolo seo
+		// returned zero rows each while "set SEO description" and "set SEO
+		// title" returned six, because descrizione/titolo bound to nothing and
+		// fell through to the unknown-word plural guess (descriziones), which
+		// the English-indexed catalog has no token for.
+		'title titles'                   => 'titolo titoli',
+		'description descriptions'       => 'descrizione descrizioni',
 		'cron'                           => 'cron',
 		'job jobs'                       => 'lavoro lavori processo processi task',
 		'version'                        => 'versione versioni',
