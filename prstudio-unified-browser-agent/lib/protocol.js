@@ -330,7 +330,10 @@ export function actionToSteps(action, args = {}) {
     playwright_wait_for_load_state: [{ type: "wait_load", tabId: tabArg(args), state: args.state || args.load_state || "complete", timeoutMs: boundedTimeout(args.timeout, 30000, 120000), selector: args.selector || args.ready_selector || "" }],
     playwright_wait_for_url: [{ type: "wait_url", tabId: tabArg(args), url: args.url || args.pattern || "", timeoutMs: boundedTimeout(args.timeout, 30000, 120000) }],
     playwright_wait_for_selector: [{ type: "wait_selector", ...s, timeoutMs: boundedTimeout(args.timeout, 30000, 120000) }],
-    playwright_click: [{ type: "click", ...s, risk: args.risk }],
+    // button and clickCount reach the input layer, which has always supported
+    // them. Without this a right click (context menu) and a triple click
+    // (select a field's whole value before replacing it) were unreachable.
+    playwright_click: [{ type: "click", ...s, risk: args.risk, button: args.button || "left", clickCount: args.click_count || args.clickCount || 1 }],
     playwright_double_click: [{ type: "click", ...s, clickCount: 2, risk: args.risk }],
     playwright_hover: [{ type: "hover", ...s }],
     playwright_focus: [{ type: "focus", ...s }],

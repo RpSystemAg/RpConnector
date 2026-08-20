@@ -3395,9 +3395,15 @@ async function runNativeElementAction(tabId, action, step = {}) {
     return { tabId, action, element: located.element, point, ...dispatched };
   }
   if (action === "click") {
-    const clickCount = Math.max(1, Math.min(3, Number(step.clickCount || 1)));
-    const dispatched = await dispatchNativeCommands(tabId, pointerSequence([{ type: "click", ...point, clickCount }]), nativeSessionId);
-    return { tabId, action, element: located.element, point, clickCount, ...dispatched };
+    const clickCount = Math.max(1, Math.min(3, Number(step.clickCount || step.click_count || 1)));
+    // The input layer has always supported a mouse button and a click count of
+    // one to three; nothing carried them here, so a right click and a triple
+    // click were unreachable despite being implemented. A right click is how a
+    // context menu opens and a triple click is how a field's whole value is
+    // selected before being replaced -- both are ordinary operator actions.
+    const button = String(step.button || "left").trim().toLowerCase();
+    const dispatched = await dispatchNativeCommands(tabId, pointerSequence([{ type: "click", ...point, clickCount, button }]), nativeSessionId);
+    return { tabId, action, element: located.element, point, clickCount, button, ...dispatched };
   }
   if (["fill", "type_text"].includes(action)) {
     const text = String(step.value ?? "");

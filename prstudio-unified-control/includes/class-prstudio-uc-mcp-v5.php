@@ -835,7 +835,7 @@ HTML;
     private static function build_tools(): array {
         $tab = array('tab_id'=>self::integer('ID della tab posseduta/adottata dal Browser Agent.',1),'device_id'=>self::str('Device Browser Agent opzionale.'),'sync_wait_seconds'=>self::integer('Secondi da attendere il risultato sincrono.',0,20),'lane_token'=>self::str('Execution lane token. Use the token returned by prstudio_context_open to isolate this ChatGPT conversation.'));
         $selector = array_merge($tab,array(
-            'target_ref'=>self::str('Riferimento riutilizzabile restituito da browser_snapshot; preferito quando disponibile.'),
+            'target_ref'=>self::str('Reusable reference returned by browser_find or browser_snapshot. Prefer it over a selector whenever you have one: it addresses the exact element that was listed.'),
             'selector'=>self::str('Selettore CSS/auto; fallback dopo i locator semantici.'), 'selector_type'=>self::str('auto, css, text, role, label o xpath.'),
             'text'=>self::str('Testo visibile/valore.'), 'role'=>self::str('ARIA role.'), 'name'=>self::str('Accessible name.'),
             'label'=>self::str('Label del controllo.'), 'xpath'=>self::str('XPath.'),
@@ -901,7 +901,15 @@ HTML;
         $tools[]=self::tool('browser_find','Find elements by description','Ask which elements match a plain description of what you are looking for, and get back the candidates with their roles, accessible names and a reusable target_ref. Read them, choose, then act with that target_ref. Use this before clicking on an unfamiliar page: a catalogue returns two dozen buttons whose names differ only by product, and picking from a list is reliable where a single silent guess is not.',self::obj(array_merge($tab,array('query'=>self::str('Plain description of the element, for example: add to cart button for the first product.'),'role'=>self::str('Optional ARIA role filter, for example button or link.'),'limit'=>self::number('How many candidates to return. Default 20.')))),self::annotations(true,false,true,false));
         $tools[]=self::tool('browser_dom','Browser DOM snapshot','Use this for a structured live DOM snapshot from the personal Browser.',self::obj($tab),self::annotations(true,false,true,true));
         $tools[]=self::tool('browser_accessibility','Browser accessibility tree','Use this for the live accessibility tree and semantic controls.',self::obj($tab),self::annotations(true,false,true,true));
-        $tools[]=self::tool('browser_click','Browser click','Use this to click a visible/semantic target exactly as a human operator would.',self::obj($selector),self::annotations(false,false,false,true));
+        // button and click_count instead of separate right-click and triple-click
+        // tools. The reference tooling exposes one pointer action with a mode
+        // rather than one tool per gesture, and the input layer here has always
+        // supported both -- nothing carried them through the schema, so a
+        // context menu and a select-whole-field were unreachable.
+        $tools[]=self::tool('browser_click','Browser click','Use this to click a visible/semantic target exactly as a human operator would. Set button=right to open a context menu, or click_count=2 or 3 to double-click or select a whole value before replacing it.',self::obj(array_merge($selector,array(
+            'button'=>self::str('left, right or middle. Defaults to left.'),
+            'click_count'=>self::number('1, 2 or 3. Three selects the whole value of a field.')
+        ))),self::annotations(false,false,false,true));
         $tools[]=self::tool('browser_double_click','Browser double click','Use this for a double-click on a visible/semantic target.',self::obj($selector),self::annotations(false,false,false,true));
         $tools[]=self::tool('browser_hover','Browser hover','Use this to hover a target and reveal menus/tooltips.',self::obj($selector),self::annotations(false,false,false,true));
         $tools[]=self::tool('browser_focus','Browser focus','Use this to focus a field/control before typing or keyboard interaction.',self::obj($selector),self::annotations(false,false,false,true));
@@ -1588,7 +1596,12 @@ HTML;
         // is what makes a click on an unfamiliar page reliable; a single silent
         // guess is not correctable because nothing else is ever shown.
         'browser_find',
-        'wordpress_content_transaction','procedural_skill_search','procedural_skill_get',
+        // procedural_skill_get is reachable through capability_search and is a
+        // secondary feature: a recipe now needs four confirmations before it is
+        // offered at all. Browsing is the primary surface, so when the ceiling
+        // forces a choice this is the one that yields. Stated rather than left
+        // to the size ordering, which would have dropped something at random.
+        'wordpress_content_transaction',
     );
 
     /**
