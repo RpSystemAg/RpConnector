@@ -196,7 +196,7 @@ final class PRSTUDIO_UC_Memory {
             $extras = array();
             foreach ( array( 'mission_id'=>'mission', 'capability'=>'capability', 'state_initial'=>'initial', 'action'=>'action', 'verification'=>'verification', 'evidence'=>'evidence', 'fingerprint'=>'fingerprint', 'memory_reused'=>'memory_reused', 'reason'=>'reason', 'duration_ms'=>'duration_ms' ) as $key=>$label ) {
                 if ( ! array_key_exists( $key, $clean ) || is_array( $clean[$key] ) || is_object( $clean[$key] ) ) { continue; }
-                $value = str_replace( array("\n","\n","\t"), ' ', substr( (string) $clean[$key], 0, 180 ) ); $extras[] = $label . '=' . $value;
+                $value = str_replace( array("\r","\n","\t"), ' ', substr( (string) $clean[$key], 0, 180 ) ); $extras[] = $label . '=' . $value;
             }
             $line = sprintf( '[%s] #%d %s%s%s%s job=%s%s hash=%s', $entry['gmt'], $entry['seq'], $entry['event'], $method ? ' via=' . substr( $method, 0, 100 ) : '', $resource ? ' resource=' . $resource : '', $outcome ? ' outcome=' . substr( $outcome, 0, 80 ) : '', $job ?: '-', $extras ? ' ' . implode( ' ', $extras ) : '', substr( $entry['hash'], 0, 16 ) );
             @file_put_contents( self::summary_path(), $line . "\n", FILE_APPEND | LOCK_EX );
