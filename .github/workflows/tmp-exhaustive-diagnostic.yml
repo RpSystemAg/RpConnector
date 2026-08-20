@@ -2,6 +2,7 @@ name: Temporary exhaustive diagnostic
 
 on:
   push:
+  pull_request:
 
 permissions:
   contents: read
@@ -24,9 +25,10 @@ jobs:
           from pathlib import Path
           summary=json.loads(Path('EXHAUSTIVE-CHECKPOINT-1.0.0.json').read_text(encoding='utf-8'))
           hard=set(summary.get('hard_failures',[]))
-          print('HARD_FAILURE_COUNT',len(hard))
+          details=[]
           for raw in Path('EXHAUSTIVE-CHECKPOINT-DETAIL-1.0.0.ndjson').read_text(encoding='utf-8').splitlines():
               item=json.loads(raw)
+              details.append(item)
               if item.get('id') in hard:
                   print(json.dumps({
                       'id':item.get('id'),
@@ -34,6 +36,8 @@ jobs:
                       'implementation_status':item.get('implementation_status'),
                       'evidence':item.get('evidence'),
                   },ensure_ascii=False,sort_keys=True))
-          print('NON_ITEM_HARD_FAILURES',json.dumps(sorted(hard-{json.loads(x).get('id') for x in Path('EXHAUSTIVE-CHECKPOINT-DETAIL-1.0.0.ndjson').read_text(encoding='utf-8').splitlines()}),ensure_ascii=False))
+          ids={item.get('id') for item in details}
+          print('HARD_FAILURE_COUNT',len(hard))
+          print('NON_ITEM_HARD_FAILURES',json.dumps(sorted(hard-ids),ensure_ascii=False))
           PY
           exit "$rc"
