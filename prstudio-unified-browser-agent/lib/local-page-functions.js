@@ -11,7 +11,7 @@ export function collectLocalPageHealth() {
   const robots = document.querySelector('meta[name="robots"]')?.content || "";
   const viewport = document.querySelector('meta[name="viewport"]')?.content || "";
   const images = [...document.images];
-  const controls = [...document.querySelector('input:not([type="hidden"]),select,textarea,button')];
+  const controls = [...document.querySelectorAll('input:not([type="hidden"]),select,textarea,button')];
   const unlabeledControls = controls.filter((item) => {
     const text = clean(item.innerText || item.value || "", 120);
     return !item.getAttribute("aria-label") && !item.getAttribute("aria-labelledby") && !item.getAttribute("title") && !item.labels?.length && !text;

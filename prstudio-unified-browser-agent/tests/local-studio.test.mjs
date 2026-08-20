@@ -10,6 +10,7 @@ import {
   pageHealthScore,
   validateLocalWorkflow,
 } from "../lib/local-studio.js";
+import { collectLocalPageHealth } from "../lib/local-page-functions.js";
 
 test("local studio is zero-account additive capability surface", () => {
   const ad = featureAdvertisement();
@@ -58,4 +59,37 @@ test("page health score remains bounded", () => {
   assert.equal(pageHealthScore({ title: "ok", description: "ok", canonical: "x", viewport: "x", h1Count: 1 }), 100);
   const bad = pageHealthScore({ h1Count: 0, imagesMissingAlt: 99, unlabeledControls: 99, duplicateIdCount: 99, schemaParseErrors: 2, mixedContentCount: 1, badLinkCount: 99 });
   assert.ok(bad >= 0 && bad <= 100);
+});
+
+test("page health collector evaluates every visible form control", () => {
+  const originals = {
+    document: globalThis.document,
+    location: globalThis.location,
+    performance: globalThis.performance,
+  };
+  const control = {
+    innerText: "",
+    value: "",
+    labels: [],
+    getAttribute: () => null,
+  };
+  globalThis.document = {
+    documentElement: { lang: "en" },
+    images: [],
+    forms: [],
+    title: "Login",
+    querySelector: () => null,
+    querySelectorAll: (selector) => selector === 'input:not([type="hidden"]),select,textarea,button' ? [control] : [],
+  };
+  globalThis.location = { href: "https://example.test/login", protocol: "https:" };
+  globalThis.performance = { getEntriesByType: () => [] };
+  try {
+    const health = collectLocalPageHealth();
+    assert.equal(health.url, "https://example.test/login");
+    assert.equal(health.unlabeledControls, 1);
+  } finally {
+    if (originals.document === undefined) delete globalThis.document; else globalThis.document = originals.document;
+    if (originals.location === undefined) delete globalThis.location; else globalThis.location = originals.location;
+    if (originals.performance === undefined) delete globalThis.performance; else globalThis.performance = originals.performance;
+  }
 });
