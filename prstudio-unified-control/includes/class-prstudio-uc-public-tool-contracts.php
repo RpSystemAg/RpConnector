@@ -110,9 +110,7 @@ final class PRSTUDIO_UC_Public_Tool_Contracts {
                 self::merge_property( $input, 'url', array(
                     'minLength' => 1,
                     'maxLength' => 4096,
-                    'format' => 'uri',
-                    'pattern' => '^https?://',
-                    'description' => 'Absolute http(s) URL to open in the controlled Browser Agent tab.',
+                    'description' => 'HTTP(S) URL or bare web host; missing scheme is normalized to HTTPS by the Browser Agent.',
                 ) );
                 self::merge_property( $input, 'wait_until', array(
                     'enum' => array( 'complete', 'interactive', 'none' ),
@@ -482,7 +480,7 @@ final class PRSTUDIO_UC_Public_Tool_Contracts {
             'agency_status' => 'Inspect durable agency queues, schedules, dead letters, Browser availability, and truthful H24 runner health.',
             'browser_launch' => 'Establish the paired Browser Agent human-work context for an execution lane before controlled browsing.',
             'browser_live_status' => 'Inspect private WebRTC signaling readiness and the latest Browser Agent diagnostic evidence for this lane.',
-            'browser_open' => 'Open one absolute URL in the controlled Browser Agent and take ownership of the resulting tab.',
+            'browser_open' => 'Open one HTTP(S) URL or bare web host in the controlled Browser Agent and take ownership of the resulting tab.',
             'browser_screenshot' => 'Capture bounded visual evidence from a controlled Browser Agent tab, with optional OCR only when needed.',
             'browser_snapshot' => 'Observe a controlled tab with a bounded screenshot, DOM/AX targets, and explicit screenshot-to-CDP coordinate context.',
             'browser_status' => 'Inspect Browser Agent devices or wait for one browser task to settle by task_id.',

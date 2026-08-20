@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 define('PRSTUDIO_UC_TESTING', true);
+require dirname(__DIR__) . '/prstudio-unified-control/includes/class-prstudio-uc-public-tool-contracts.php';
 require dirname(__DIR__) . '/prstudio-unified-control/includes/class-prstudio-uc-mcp-v5.php';
 
 function fail_contract(string $message): void { fwrite(STDERR, "FAIL {$message}\n"); exit(1); }
@@ -36,7 +37,7 @@ foreach (array('agency_status','engineering_status','procedural_skill_status','p
 }
 
 $open = $by_name['browser_open']['inputSchema'];
-expect_contract(($open['properties']['url']['format'] ?? '') === 'uri', 'browser_open.url must advertise URI format');
+expect_contract(!isset($open['properties']['url']['format']) && !isset($open['properties']['url']['pattern']), 'browser_open.url must allow the Browser Agent to normalize bare hosts to HTTPS');
 expect_contract(($open['properties']['wait_until']['enum'] ?? array()) === array('complete','interactive','none'), 'browser_open.wait_until must be an enum');
 
 $snapshot = $by_name['browser_snapshot']['inputSchema'];

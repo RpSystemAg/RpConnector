@@ -32,6 +32,7 @@ final class PRSTUDIO_UC_Autoload {
         static $map = null;
         if ( is_array( $map ) ) { return $map; }
         $map = array(
+            'PRSTUDIO_UC_Public_Tool_Contracts' => 'includes/class-prstudio-uc-public-tool-contracts.php',
             'PRSTUDIO_Agency' => 'includes/class-prstudio-agency.php',
             'PRSTUDIO_Browser_Runtime' => 'includes/class-prstudio-browser-runtime.php',
             'PRSTUDIO_Domain_Browser' => 'includes/orchestrator/domains/class-prstudio-domain-browser.php',

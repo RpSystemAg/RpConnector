@@ -835,6 +835,9 @@ HTML;
     }
 
     private static function tool(string $name,string $title,string $description,array $input,array $annotations): array {
+        if ( class_exists( 'PRSTUDIO_UC_Public_Tool_Contracts' ) ) {
+            [ $description, $input, $annotations ] = PRSTUDIO_UC_Public_Tool_Contracts::refine( $name, $description, $input, $annotations );
+        }
         $requires_lane = self::requires_lane($name,$annotations);
         if ($requires_lane && isset($input['properties']) && (is_array($input['properties']) || is_object($input['properties']))) {
             if(is_object($input['properties']))$input['properties']=(array)$input['properties'];
