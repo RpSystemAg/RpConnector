@@ -4,17 +4,21 @@ on:
   push:
     branches:
       - chatgpt/bilingual-browser-action-search-20260820
+  pull_request:
+    branches:
+      - master
 
 permissions:
   contents: write
 
 jobs:
   patch:
-    if: github.actor != 'github-actions[bot]'
+    if: github.actor != 'github-actions[bot]' && github.head_ref == 'chatgpt/bilingual-browser-action-search-20260820'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: chatgpt/bilingual-browser-action-search-20260820
           persist-credentials: true
           fetch-depth: 0
       - name: Apply bounded bilingual patch
@@ -32,42 +36,12 @@ jobs:
 
           lex_path = Path('prstudio-unified-control/includes/class-prstudio-uc-action-lexicon.php')
           lex = lex_path.read_text(encoding='utf-8')
-          lex = replace_once(
-              lex,
-              "\t\t'check inspect status list'      => 'controlla controllare controllo ispeziona ispezionare',",
-              "\t\t'check inspect status list'      => 'controlla controllare controllo ispeziona ispezionare spunta spuntare',",
-              'check/spunta concept',
-          )
-          lex = replace_once(
-              lex,
-              "\t\t'screenshot'                     => 'schermata schermate istantanea',",
-              "\t\t'screenshot'                     => 'schermata schermate istantanea cattura catturare',",
-              'screenshot/cattura concept',
-          )
-          lex = replace_once(
-              lex,
-              "\t\t'wait'                           => 'aspetta aspettare attendi attendere',\n\t\t'crop'                           => 'ritaglia ritagliare ritaglio',",
-              "\t\t'wait'                           => 'aspetta aspettare attendi attendere',\n\t\t'reload refresh'                 => 'ricarica ricaricare',\n\t\t'back previous'                  => 'indietro precedente precedenti',\n\t\t'forward next'                   => 'avanti successivo successiva successivi successive',\n\t\t'hover'                          => 'sorvola sorvolare',\n\t\t'focus'                          => 'focalizza focalizzare',\n\t\t'fill'                           => 'compila compilare riempi riempire',\n\t\t'select choose'                  => 'seleziona selezionare scegli scegliere',\n\t\t'extract'                        => 'estrai estrarre',\n\t\t'adopt'                          => 'adotta adottare',\n\t\t'crop'                           => 'ritaglia ritagliare ritaglio',",
-              'browser action concepts',
-          )
-          lex = replace_once(
-              lex,
-              "\t\t'settings options'               => 'impostazione impostazioni configurazione configurazioni preferenze option',",
-              "\t\t'settings options'               => 'impostazione impostazioni configurazione configurazioni preferenze option opzione opzioni',",
-              'option concept',
-          )
-          lex = replace_once(
-              lex,
-              "\t\t'field fields input inputs'      => 'campo campi input',\n\t\t'button buttons'                 => 'pulsante pulsanti bottone bottoni',",
-              "\t\t'field fields input inputs'      => 'campo campi input',\n\t\t'checkbox checkboxes'            => 'casella caselle checkbox',\n\t\t'button buttons'                 => 'pulsante pulsanti bottone bottoni',",
-              'checkbox concept',
-          )
-          lex = replace_once(
-              lex,
-              "\tprivate const PHRASES = array(\n\t\t'banca dati'              => 'database',",
-              "\tprivate const PHRASES = array(\n\t\t'screen shot'             => 'screenshot',\n\t\t'passa sopra'             => 'hover',\n\t\t'metti a fuoco'           => 'focus',\n\t\t'torna indietro'          => 'back previous',\n\t\t'go back'                 => 'back previous',\n\t\t'scrivi nel campo'        => 'fill',\n\t\t'write in the field'      => 'fill',\n\t\t'banca dati'              => 'database',",
-              'browser phrases',
-          )
+          lex = replace_once(lex, "\t\t'check inspect status list'      => 'controlla controllare controllo ispeziona ispezionare',", "\t\t'check inspect status list'      => 'controlla controllare controllo ispeziona ispezionare spunta spuntare',", 'check/spunta concept')
+          lex = replace_once(lex, "\t\t'screenshot'                     => 'schermata schermate istantanea',", "\t\t'screenshot'                     => 'schermata schermate istantanea cattura catturare',", 'screenshot/cattura concept')
+          lex = replace_once(lex, "\t\t'wait'                           => 'aspetta aspettare attendi attendere',\n\t\t'crop'                           => 'ritaglia ritagliare ritaglio',", "\t\t'wait'                           => 'aspetta aspettare attendi attendere',\n\t\t'reload refresh'                 => 'ricarica ricaricare',\n\t\t'back previous'                  => 'indietro precedente precedenti',\n\t\t'forward next'                   => 'avanti successivo successiva successivi successive',\n\t\t'hover'                          => 'sorvola sorvolare',\n\t\t'focus'                          => 'focalizza focalizzare',\n\t\t'fill'                           => 'compila compilare riempi riempire',\n\t\t'select choose'                  => 'seleziona selezionare scegli scegliere',\n\t\t'extract'                        => 'estrai estrarre',\n\t\t'adopt'                          => 'adotta adottare',\n\t\t'crop'                           => 'ritaglia ritagliare ritaglio',", 'browser action concepts')
+          lex = replace_once(lex, "\t\t'settings options'               => 'impostazione impostazioni configurazione configurazioni preferenze option',", "\t\t'settings options'               => 'impostazione impostazioni configurazione configurazioni preferenze option opzione opzioni',", 'option concept')
+          lex = replace_once(lex, "\t\t'field fields input inputs'      => 'campo campi input',\n\t\t'button buttons'                 => 'pulsante pulsanti bottone bottoni',", "\t\t'field fields input inputs'      => 'campo campi input',\n\t\t'checkbox checkboxes'            => 'casella caselle checkbox',\n\t\t'button buttons'                 => 'pulsante pulsanti bottone bottoni',", 'checkbox concept')
+          lex = replace_once(lex, "\tprivate const PHRASES = array(\n\t\t'banca dati'              => 'database',", "\tprivate const PHRASES = array(\n\t\t'screen shot'             => 'screenshot',\n\t\t'passa sopra'             => 'hover',\n\t\t'metti a fuoco'           => 'focus',\n\t\t'torna indietro'          => 'back previous',\n\t\t'go back'                 => 'back previous',\n\t\t'scrivi nel campo'        => 'fill',\n\t\t'write in the field'      => 'fill',\n\t\t'banca dati'              => 'database',", 'browser phrases')
           lex_path.write_text(lex, encoding='utf-8')
 
           mcp_path = Path('prstudio-unified-control/includes/class-prstudio-uc-mcp-v5.php')
@@ -125,8 +99,6 @@ jobs:
                 }
             }
             if($score<1)continue;
-            // A typed tool exists for this action, so prefer it in the ranking:
-            // it is the cheaper, better-documented way to do the same thing.
             if(''!==$typed_tool)$score+=5;
             $aliases=str_starts_with($action,'playwright_')?array('puppeteer_'.substr($action,11)):array();
             $item=array('action'=>$action,'aliases'=>$aliases,'description'=>$desc,'read_only'=>(bool)($meta['read_only']??false),'destructive'=>(bool)($meta['destructive']??false),'input_schema'=>$meta['input_schema']??array(),'executor'=>'browser_agent');
@@ -149,28 +121,13 @@ jobs:
 
 '''
           mcp = mcp[:start] + new_method + mcp[end:]
-          mcp = replace_once(
-              mcp,
-              "$tools[]=self::tool('browser_actions_search','Search advanced browser actions','Use this when the exact browser operation is not one of the typed tools. Searches only actions with a real Browser Agent executor.',self::obj(array('query'=>self::str('Browser intent/action keyword.'),'limit'=>self::integer('',1,50)),array('query')),self::annotations(true,false,true,true));",
-              "$tools[]=self::tool('browser_actions_search','Search advanced browser actions','Use this when the exact browser operation is not one of the typed tools. Searches Italian and English intent through the shared action lexicon and returns only actions with a real Browser Agent executor.',self::obj(array('query'=>self::str('Browser intent/action keyword in Italian or English.'),'limit'=>self::integer('',1,50)),array('query')),self::annotations(true,false,true,true));",
-              'browser_actions_search tool description',
-          )
+          mcp = replace_once(mcp, "$tools[]=self::tool('browser_actions_search','Search advanced browser actions','Use this when the exact browser operation is not one of the typed tools. Searches only actions with a real Browser Agent executor.',self::obj(array('query'=>self::str('Browser intent/action keyword.'),'limit'=>self::integer('',1,50)),array('query')),self::annotations(true,false,true,true));", "$tools[]=self::tool('browser_actions_search','Search advanced browser actions','Use this when the exact browser operation is not one of the typed tools. Searches Italian and English intent through the shared action lexicon and returns only actions with a real Browser Agent executor.',self::obj(array('query'=>self::str('Browser intent/action keyword in Italian or English.'),'limit'=>self::integer('',1,50)),array('query')),self::annotations(true,false,true,true));", 'browser_actions_search tool description')
           mcp_path.write_text(mcp, encoding='utf-8')
 
           test_path = Path('tests/php-mcp-operator-bootstrap-smoke.php')
           test = test_path.read_text(encoding='utf-8')
-          test = replace_once(
-              test,
-              "define('PRSTUDIO_UC_TESTING', true);\n",
-              "define('PRSTUDIO_UC_TESTING', true);\ndefine('ABSPATH', dirname(__DIR__).'/');\ndefine('PRSTUDIO_UC_DIR', dirname(__DIR__).'/prstudio-unified-control/');\nif (!function_exists('trailingslashit')) { function trailingslashit($v){ return rtrim((string)$v, '/\\\\').'/'; } }\n",
-              'test constants',
-          )
-          test = replace_once(
-              test,
-              "final class PRSTUDIO_UC_Execution_Lanes {\n    public static function open(array $args,array $context=[]){return ['ok'=>true,'lane_id'=>'lane_'.str_repeat('a',32),'lane_handle'=>'lane_'.str_repeat('a',32),'lane_token'=>'secret','mission_id'=>'mission:test','reused'=>false];}\n}\n\nrequire dirname(__DIR__).'/prstudio-unified-control/includes/class-prstudio-uc-mcp-v5.php';",
-              "final class PRSTUDIO_UC_Execution_Lanes {\n    public static function open(array $args,array $context=[]){return ['ok'=>true,'lane_id'=>'lane_'.str_repeat('a',32),'lane_handle'=>'lane_'.str_repeat('a',32),'lane_token'=>'secret','mission_id'=>'mission:test','reused'=>false];}\n}\nif (!class_exists('PRSTUDIO_UC_Turn')) {\n    final class PRSTUDIO_UC_Turn {\n        public static function normalize($value,string $correlation_id='',string $tool='',int $attempt=1):array{return ['status'=>'completed','terminal'=>true,'attempt'=>$attempt,'result'=>$value];}\n        public static function is_terminal(string $status):bool{return true;}\n    }\n}\n\nrequire_once dirname(__DIR__).'/prstudio-unified-control/includes/class-prstudio-uc-action-lexicon.php';\nrequire_once dirname(__DIR__).'/prstudio-unified-control/includes/class-prstudio-uc-contract.php';\nrequire dirname(__DIR__).'/prstudio-unified-control/includes/class-prstudio-uc-mcp-v5.php';",
-              'test runtime dependencies',
-          )
+          test = replace_once(test, "define('PRSTUDIO_UC_TESTING', true);\n", "define('PRSTUDIO_UC_TESTING', true);\ndefine('ABSPATH', dirname(__DIR__).'/');\ndefine('PRSTUDIO_UC_DIR', dirname(__DIR__).'/prstudio-unified-control/');\nif (!function_exists('trailingslashit')) { function trailingslashit($v){ return rtrim((string)$v, '/\\\\').'/'; } }\n", 'test constants')
+          test = replace_once(test, "final class PRSTUDIO_UC_Execution_Lanes {\n    public static function open(array $args,array $context=[]){return ['ok'=>true,'lane_id'=>'lane_'.str_repeat('a',32),'lane_handle'=>'lane_'.str_repeat('a',32),'lane_token'=>'secret','mission_id'=>'mission:test','reused'=>false];}\n}\n\nrequire dirname(__DIR__).'/prstudio-unified-control/includes/class-prstudio-uc-mcp-v5.php';", "final class PRSTUDIO_UC_Execution_Lanes {\n    public static function open(array $args,array $context=[]){return ['ok'=>true,'lane_id'=>'lane_'.str_repeat('a',32),'lane_handle'=>'lane_'.str_repeat('a',32),'lane_token'=>'secret','mission_id'=>'mission:test','reused'=>false];}\n}\nif (!class_exists('PRSTUDIO_UC_Turn')) {\n    final class PRSTUDIO_UC_Turn {\n        public static function normalize($value,string $correlation_id='',string $tool='',int $attempt=1):array{return ['status'=>'completed','terminal'=>true,'attempt'=>$attempt,'result'=>$value];}\n        public static function is_terminal(string $status):bool{return true;}\n    }\n}\n\nrequire_once dirname(__DIR__).'/prstudio-unified-control/includes/class-prstudio-uc-action-lexicon.php';\nrequire_once dirname(__DIR__).'/prstudio-unified-control/includes/class-prstudio-uc-contract.php';\nrequire dirname(__DIR__).'/prstudio-unified-control/includes/class-prstudio-uc-mcp-v5.php';", 'test runtime dependencies')
           insertion = r'''
 
 // browser_actions_search is a public MCP discovery surface, so bilingual parity
