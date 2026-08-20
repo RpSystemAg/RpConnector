@@ -245,9 +245,17 @@ try {
   const wpTarget = await cdp.send('Target.createTarget', { url: `${wpUrl}/wp-login.php` });
   wpTargetId = wpTarget.targetId;
   wpSessionId = await attachPage(cdp, wpTargetId);
-  await waitForExpression(cdp, wpSessionId, 'document.readyState === "complete"', 'WordPress login page');
-  const loginPresent = await evaluate(cdp, wpSessionId, 'Boolean(document.querySelector("#user_login") && document.querySelector("#user_pass") && document.querySelector("#wp-submit"))');
-  if (!loginPresent) throw new Error('WordPress login form not present in real browser');
+  await waitForExpression(
+    cdp,
+    wpSessionId,
+    `location.pathname === '/wp-login.php'
+      && document.readyState === 'complete'
+      && Boolean(document.querySelector('#user_login')
+        && document.querySelector('#user_pass')
+        && document.querySelector('#wp-submit'))`,
+    'WordPress login form',
+    20000,
+  );
   pass('WordPress login page rendered in Chrome');
 
   const loginResult = await evaluate(cdp, wpSessionId, `(() => {
@@ -395,7 +403,7 @@ try {
     'Browser Agent real-page audit',
     20000,
   );
-  const auditText = await evaluate(cdp, extensionSessionId, `document.querySelector('#healthResult')?.textContent?.replace(/\\s+/g, ' ').trim() || ''`);
+  const auditText = await evaluate(cdp, extensionSessionId, `document.querySelector('#healthResult')?.textContent?.replace(/\s+/g, ' ').trim() || ''`);
   if (!/\d+\/100/.test(auditText)) throw new Error(`Browser Agent audit produced no score: ${auditText}`);
   evidence.browser_agent_audit = { message: auditMessage, result: auditText.slice(0, 1000) };
   await screenshot(cdp, extensionSessionId, '04-browser-agent-audit.png');
@@ -410,7 +418,7 @@ try {
       const rows = [...document.querySelectorAll('table.prstudio-grid tbody tr')];
       const row = rows.find((candidate) => candidate.textContent.includes(wanted));
       if (!row) return '';
-      const text = row.textContent.replace(/\\s+/g, ' ').trim();
+      const text = row.textContent.replace(/\s+/g, ' ').trim();
       return /Online/i.test(text) ? text : '';
     })()`,
     'paired device visible as Online in WordPress',
