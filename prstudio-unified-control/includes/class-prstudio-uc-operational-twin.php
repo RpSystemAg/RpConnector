@@ -237,25 +237,69 @@ final class PRSTUDIO_UC_Operational_Twin {
 		return $result;
 	}
 
+	/** Query the twin through the shared bilingual action concepts. */
 	public static function query( string $query = '', array $filters = array() ): array {
 		$state = PRSTUDIO_UC_Agency_State::read( self::STATE, self::defaults() );
-		$q = strtolower( trim( $query ) );
+		$q = trim( $query );
+		$q_lower = strtolower( $q );
 		$type = self::key( $filters['type'] ?? '', 40 );
 		$limit = max( 1, min( 200, (int) ( $filters['limit'] ?? 50 ) ) );
+		if ( ! class_exists( 'PRSTUDIO_UC_Action_Lexicon' ) ) {
+			$lexicon_path = __DIR__ . '/class-prstudio-uc-action-lexicon.php';
+			if ( is_readable( $lexicon_path ) ) { require_once $lexicon_path; }
+		}
+		$lexicon_ready = class_exists( 'PRSTUDIO_UC_Action_Lexicon' );
+		$technical_query = '' !== $q && ( str_contains( $q, '://' ) || 1 === preg_match( '/[._:\\/]/', $q ) );
+		$query_normalized = $lexicon_ready ? PRSTUDIO_UC_Action_Lexicon::normalize_text( $q ) : strtolower( trim( str_replace( array( '_', '-' ), ' ', $q ) ) );
+		$query_concepts = ( ! $technical_query && $lexicon_ready ) ? PRSTUDIO_UC_Action_Lexicon::query_concepts( $q ) : array();
+		$query_keys = ( $lexicon_ready && $query_concepts ) ? PRSTUDIO_UC_Action_Lexicon::concept_keys( $query_concepts ) : array();
 		$rows = array();
 		foreach ( (array) $state['entities'] as $entity ) {
 			if ( '' !== $type && $type !== (string) ( $entity['type'] ?? '' ) ) { continue; }
-			$haystack = strtolower( (string) ( $entity['label'] ?? '' ) . ' ' . (string) ( $entity['external_id'] ?? '' ) . ' ' . (string) ( $entity['url'] ?? '' ) . ' ' . json_encode( $entity['attributes'] ?? array() ) );
-			if ( '' !== $q && ! str_contains( $haystack, $q ) ) { continue; }
-			$score = '' === $q ? 1 : ( str_contains( strtolower( (string) ( $entity['label'] ?? '' ) ), $q ) ? 20 : 10 );
+			$label = (string) ( $entity['label'] ?? '' );
+			$haystack = $label . ' ' . (string) ( $entity['external_id'] ?? '' ) . ' ' . (string) ( $entity['url'] ?? '' ) . ' ' . json_encode( $entity['attributes'] ?? array(), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+			$hay_lower = strtolower( $haystack );
+			$label_lower = strtolower( $label );
+			$match = '' === $q;
+			$score = '' === $q ? 1 : 0;
+			if ( ! $match && $technical_query ) {
+				$match = str_contains( $hay_lower, $q_lower );
+				if ( $match ) { $score = str_contains( $label_lower, $q_lower ) ? 20 : 10; }
+			}
+			if ( ! $match && $query_concepts ) {
+				$label_concepts = PRSTUDIO_UC_Action_Lexicon::query_concepts( $label );
+				$candidate_concepts = PRSTUDIO_UC_Action_Lexicon::query_concepts( $haystack );
+				$candidate_keys = PRSTUDIO_UC_Action_Lexicon::concept_keys( $candidate_concepts );
+				if ( PRSTUDIO_UC_Action_Lexicon::equivalent( $label_concepts, $query_concepts ) ) {
+					$match = true; $score = 40;
+				} elseif ( PRSTUDIO_UC_Action_Lexicon::covers( $label_concepts, $query_concepts ) ) {
+					$match = true; $score = 35;
+				} elseif ( PRSTUDIO_UC_Action_Lexicon::equivalent( $candidate_concepts, $query_concepts ) ) {
+					$match = true; $score = 30;
+				} elseif ( PRSTUDIO_UC_Action_Lexicon::covers( $candidate_concepts, $query_concepts ) ) {
+					$match = true; $score = 25;
+				} else {
+					$overlap = count( array_intersect( $query_keys, $candidate_keys ) );
+					if ( 0 < $overlap ) { $match = true; $score = 20 + min( 5, $overlap ); }
+				}
+			}
+			if ( ! $match && ! $technical_query && '' !== $q ) {
+				$hay_normalized = $lexicon_ready ? PRSTUDIO_UC_Action_Lexicon::normalize_text( $haystack ) : strtolower( trim( str_replace( array( '_', '-' ), ' ', $haystack ) ) );
+				$label_normalized = $lexicon_ready ? PRSTUDIO_UC_Action_Lexicon::normalize_text( $label ) : strtolower( trim( str_replace( array( '_', '-' ), ' ', $label ) ) );
+				$match = str_contains( $hay_lower, $q_lower ) || ( '' !== $query_normalized && str_contains( $hay_normalized, $query_normalized ) );
+				if ( $match ) { $score = str_contains( $label_lower, $q_lower ) || ( '' !== $query_normalized && str_contains( $label_normalized, $query_normalized ) ) ? 20 : 10; }
+			}
+			if ( ! $match ) { continue; }
 			$rows[] = array( 'score'=>$score, 'entity'=>$entity );
 		}
 		usort( $rows, static function( array $a, array $b ): int {
 			$score = (int)$b['score'] <=> (int)$a['score'];
-			return 0 !== $score ? $score : strcmp( (string)($b['entity']['updated_gmt']??''), (string)($a['entity']['updated_gmt']??'') );
+			if ( 0 !== $score ) { return $score; }
+			$updated = strcmp( (string)($b['entity']['updated_gmt']??''), (string)($a['entity']['updated_gmt']??'') );
+			return 0 !== $updated ? $updated : strcmp( (string)($a['entity']['id']??''), (string)($b['entity']['id']??'') );
 		} );
 		$items = array_map( static fn( $row ) => $row['entity'], array_slice( $rows, 0, $limit ) );
-		return array( 'ok'=>true, 'version'=>self::VERSION, 'query'=>$query, 'count'=>count($items), 'items'=>$items, 'provenance_explicit'=>true, 'last_sync'=>$state['sync'] );
+		return array( 'ok'=>true, 'version'=>self::VERSION, 'query'=>$query, 'query_normalized'=>$query_normalized, 'bilingual_lexicon'=>$lexicon_ready, 'count'=>count($items), 'items'=>$items, 'provenance_explicit'=>true, 'last_sync'=>$state['sync'] );
 	}
 
 	public static function snapshot(): array {
