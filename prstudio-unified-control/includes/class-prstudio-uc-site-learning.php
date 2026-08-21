@@ -301,7 +301,28 @@ final class PRSTUDIO_UC_Site_Learning {
 
     private static function wordpress_probe_script(): string {
         return <<<'JS'
-(() => {
+(async () => {
+  // Wait for the admin menu instead of sampling once.
+  //
+  // The probe used to read the DOM at whatever instant it happened to run and
+  // report wordpress_admin:false if #adminmenu was not there yet. It reported
+  // exactly that from a page whose own document.title was already
+  // "Dashboard - ... - WordPress": the title lives in <head> and is set early,
+  // the admin menu lives in <body> and is not, so a single sample taken
+  // between the two sees a WordPress page with no WordPress in it.
+  //
+  // The whole study then stops -- no menu means no sections, no sections means
+  // no tables -- and the module is written as studied_degraded with the reason
+  // wordpress_admin_not_observed, which reads as "this is not WordPress" when
+  // it means "I looked too early".
+  //
+  // Eight seconds is generous for a dashboard that has already fired load, and
+  // it is bounded: a page that genuinely is not wp-admin still answers false,
+  // just eight seconds later, once per study.
+  const deadline = Date.now() + 8000;
+  while (Date.now() < deadline && !(document.querySelector('#wpadminbar') && document.querySelector('#adminmenu'))) {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
   const safeHref = (href) => {
     try {
       const u = new URL(href || '', location.href);
