@@ -5310,8 +5310,24 @@ async function captureScreenshot(tabId, fullPage = false, lazyLoad = false, opti
   // Runtime/Network/Log observability stack initialized by attachDebugger().
   await attachDebuggerIfNeeded(tabId, screenshotTimeoutRemainingMs(deadlineAt, SCREENSHOT_ATTACH_TIMEOUT_MS, "cdp_attach"));
   const metrics = await pageDimensions(tabId, { screenshotDeadlineAt: deadlineAt });
-  const requestedWidth = Math.max(1, Math.ceil(fullPage ? metrics.contentWidth : metrics.viewportWidth));
-  const requestedHeight = Math.max(1, Math.ceil(fullPage ? metrics.contentHeight : metrics.viewportHeight));
+  // Math.max(1, NaN) is NaN, not 1. That floor looked like it guaranteed a
+  // positive width and guaranteed nothing: when pageDimensions() came back with
+  // a missing or unparseable metric, NaN travelled all the way into the CDP
+  // clip and Chrome answered "Cannot take screenshot with 0 width" -- an error
+  // about a number this code produced, phrased as though the page had no size.
+  // A real WordPress study run died on exactly that.
+  //
+  // Each dimension now falls back to the viewport, and the viewport to a
+  // conventional 1280x720, so the request is always a picture of something
+  // rather than a malformed rectangle.
+  const positiveDimension = (value, fallback) => {
+    const rounded = Math.ceil(Number(value));
+    return Number.isFinite(rounded) && rounded > 0 ? rounded : fallback;
+  };
+  const viewportWidth = positiveDimension(metrics.viewportWidth, 1280);
+  const viewportHeight = positiveDimension(metrics.viewportHeight, 720);
+  const requestedWidth = fullPage ? positiveDimension(metrics.contentWidth, viewportWidth) : viewportWidth;
+  const requestedHeight = fullPage ? positiveDimension(metrics.contentHeight, viewportHeight) : viewportHeight;
   const maxPixels = Math.max(1_000_000, Math.min(SCREENSHOT_MAX_PIXELS, Number(options.maxPixels || options.max_pixels || SCREENSHOT_MAX_PIXELS)));
   const plannedWidth = Math.min(SCREENSHOT_MAX_DIMENSION, requestedWidth);
   const maxHeightByPixels = Math.max(1, Math.floor(maxPixels / Math.max(1, plannedWidth)));
