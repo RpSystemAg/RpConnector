@@ -9,6 +9,7 @@ const chrome = String(process.env.CHROME_BIN || '/usr/bin/chromium');
 const baseUrl = String(process.env.WP_URL || 'http://127.0.0.1:8080').replace(/\/+$/, '');
 const extensionDir = resolve('prstudio-unified-browser-agent');
 const artifactDir = resolve('artifacts/browser-parity');
+const debuggerProtocolVersion = '0.1';
 
 if (!existsSync(chrome)) throw new Error(`Chrome/Chromium binary missing: ${chrome}`);
 if (!existsSync(extensionDir)) throw new Error(`Browser Agent directory missing: ${extensionDir}`);
@@ -128,6 +129,7 @@ const report = {
   started_at: new Date().toISOString(),
   base_url: baseUrl,
   chrome_binary: chrome,
+  debugger_protocol_version: debuggerProtocolVersion,
 };
 let cdp;
 
@@ -144,6 +146,7 @@ try {
 
   const result = await evaluate(cdp, sessionId, `(async () => {
     const base = ${JSON.stringify(baseUrl)};
+    const debuggerProtocolVersion = ${JSON.stringify(debuggerProtocolVersion)};
     const parity = globalThis.__PRSTUDIO_BROWSER_PARITY__ || null;
     if (!parity?.installed) throw new Error('browser parity bootstrap is not installed');
 
@@ -184,9 +187,12 @@ try {
     const interactionResult = interaction?.[0]?.result || null;
     if (!interactionResult?.ok) throw new Error('lost control of first tab after switching active tab: ' + JSON.stringify(interactionResult));
 
-    await chrome.debugger.attach({ tabId: tabs[0].id }, '1.3');
+    await chrome.debugger.attach({ tabId: tabs[0].id }, debuggerProtocolVersion);
     let screenshotBytes = 0;
+    let browserVersion = null;
     try {
+      browserVersion = await chrome.debugger.sendCommand({ tabId: tabs[0].id }, 'Browser.getVersion', {});
+      if (!browserVersion?.protocolVersion || !browserVersion?.product) throw new Error('Browser.getVersion did not return CDP identity');
       await chrome.debugger.sendCommand({ tabId: tabs[0].id }, 'Page.enable', {});
       const shot = await chrome.debugger.sendCommand({ tabId: tabs[0].id }, 'Page.captureScreenshot', {
         format: 'png', fromSurface: false, captureBeyondViewport: false,
@@ -228,6 +234,8 @@ try {
       beforeWindowIds: beforeWindows.map((row) => row.id),
       afterWindowIds: afterWindows.map((row) => row.id),
       interaction: interactionResult,
+      debuggerProtocolVersion,
+      browserVersion,
       screenshotBytes,
       visualFallback: {
         captured: fallbackStore.captured,
@@ -257,7 +265,7 @@ try {
   report.finished_at = new Date().toISOString();
   await writeFile(join(artifactDir, 'browser-parity-live-probe.json'), JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report.result, null, 2));
-  console.log('PASS Browser parity: one Chrome window, persistent multi-tab control, click/fill after tab switch, CDP screenshot, visual fallback');
+  console.log('PASS Browser parity: one Chrome window, persistent multi-tab control, click/fill after tab switch, chrome.debugger 0.1 Browser.getVersion, CDP screenshot, visual fallback');
 } catch (error) {
   report.error = { message: error?.message || String(error), stack: String(error?.stack || '').slice(0, 16000) };
   report.finished_at = new Date().toISOString();
