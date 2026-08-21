@@ -50,6 +50,7 @@ export const RAW_CDP_METHODS = Object.freeze([
 
 export const INTERNAL_CDP_METHODS = Object.freeze([
   ...RAW_CDP_METHODS,
+  "Browser.setDownloadBehavior",
   "CSS.enable",
   "CSS.disable",
   "CSS.startRuleUsageTracking",
@@ -108,7 +109,8 @@ export const INTERNAL_CDP_METHODS = Object.freeze([
 
 const RAW_CDP_SET = new Set(RAW_CDP_METHODS);
 const INTERNAL_CDP_SET = new Set(INTERNAL_CDP_METHODS);
-const ALWAYS_BLOCKED_CDP = /^(?:Runtime\.(?:evaluate|callFunctionOn|compileScript|runScript)|Debugger\.evaluateOnCallFrame|Page\.(?:addScriptToEvaluateOnNewDocument|addScriptToEvaluateOnLoad|setBypassCSP|setDocumentContent|navigate)|DOM\.(?:setAttributeValue|setAttributesAsText|setNodeValue|setOuterHTML|removeNode)|Network\.(?:getAllCookies|getCookies|setCookie|setCookies|deleteCookies)|Storage\.(?:getCookies|setCookies|clearCookies|clearDataForOrigin)|Browser\.)$/;
+const ALWAYS_BLOCKED_CDP = /^(?:Runtime\.(?:evaluate|callFunctionOn|compileScript|runScript)|Debugger\.evaluateOnCallFrame|Page\.(?:addScriptToEvaluateOnNewDocument|addScriptToEvaluateOnLoad|setBypassCSP|setDocumentContent|navigate)|DOM\.(?:setAttributeValue|setAttributesAsText|setNodeValue|setOuterHTML|removeNode)|Network\.(?:getAllCookies|getCookies|setCookie|setCookies|deleteCookies)|Storage\.(?:getCookies|setCookies|clearCookies|clearDataForOrigin))$/;
+const RAW_BROWSER_DOMAIN = /^Browser\./;
 
 function validateCdpParams(method, params = {}, scope = "raw") {
   if (!params || typeof params !== "object" || Array.isArray(params)) return "cdp_params_object_required";
@@ -119,12 +121,19 @@ function validateCdpParams(method, params = {}, scope = "raw") {
   }
   if (method === "DOM.getDocument" && Number(params.depth ?? 1) < -1) return "cdp_depth_invalid";
   if (method === "Target.getTargets" && Object.keys(params).length) return "cdp_params_forbidden";
+  if (method === "Browser.setDownloadBehavior") {
+    if (scope !== "internal") return "cdp_method_forbidden";
+    if (!params || params.behavior !== "allow" || params.eventsEnabled !== true) return "download_behavior_params_invalid";
+    if (typeof params.downloadPath !== "string" || !params.downloadPath.trim()) return "download_path_required";
+    const allowedKeys = new Set(["behavior", "downloadPath", "eventsEnabled", "browserContextId"]);
+    if (Object.keys(params).some((key) => !allowedKeys.has(key))) return "download_behavior_params_invalid";
+  }
   return null;
 }
 
 export function validateCdpCommand(method, params = {}, scope = "raw") {
   const candidate = String(method || "");
-  if (!candidate || ALWAYS_BLOCKED_CDP.test(candidate)) {
+  if (!candidate || ALWAYS_BLOCKED_CDP.test(candidate) || (scope === "raw" && RAW_BROWSER_DOMAIN.test(candidate))) {
     return { ok: false, code: "cdp_method_forbidden", method: candidate, scope };
   }
   const allowed = scope === "internal" ? INTERNAL_CDP_SET : RAW_CDP_SET;
