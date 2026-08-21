@@ -272,6 +272,32 @@ async function naturalPrompt(intent) {
 }
 function assertStudySnapshot(snapshot, fixture, { requireIncremental = false } = {}) {
   const module = snapshot?.module || {}; const metrics = module.metrics || {}; const tables = Object.values(module.tables || {});
+  // Record what the study actually learned before judging it.
+  //
+  // Every assertion below throws with a verdict and no data, so a failing run
+  // produced an evidence file whose snapshots array was empty -- the one
+  // question worth answering, "what DID it record?", was the one thing not
+  // written down. The module goes into the evidence first, then the assertions
+  // run against it.
+  evidence.snapshots[requireIncremental ? 'restudy' : 'study'] = {
+    mode: module.mode || null,
+    state: module.state || null,
+    revision: module.revision || null,
+    surface_hash: module.surface_hash || null,
+    sections: Object.keys(module.sections || {}),
+    menus: Object.keys(module.menus || {}),
+    table_sections: tables.map((table) => String(table.section || '')),
+    table_summary: tables.map((table) => ({
+      section: table.section || null,
+      columns: (table.columns || []).length,
+      rows: (table.rows || []).length,
+      pages_observed: table.page_count_observed ?? null,
+      total_pages: table.total_pages ?? null,
+    })),
+    metrics,
+    procedures: Object.keys(module.procedures || {}),
+    evidence_refs: (module.evidence || []).length,
+  };
   if (module.mode !== 'wordpress_admin' || !['ready','studied_degraded'].includes(String(module.state || ''))) throw new Error(`WordPress module not terminal/ready: ${JSON.stringify({mode:module.mode,state:module.state})}`);
   const posts = tables.find((table) => String(table.section || '') === 'menu-posts');
   if (!posts) throw new Error('Posts list table was not persisted from Chrome observation');
