@@ -15,7 +15,8 @@
     "webNavigation",
     "sidePanel",
     "tabGroups",
-    "system.display"
+    "system.display",
+    "notifications"
   ],
   "host_permissions": ["<all_urls>"],
   "background": {
