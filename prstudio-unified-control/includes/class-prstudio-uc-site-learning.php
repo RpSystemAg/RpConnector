@@ -237,6 +237,18 @@ final class PRSTUDIO_UC_Site_Learning {
      * @param array $result Raw browser flow result.
      * @return array<string,mixed>
      */
+    /** Scheme, host and path only -- the query is where nonces live. */
+    private static function safe_location( $url ): string {
+        $url = (string) $url;
+        if ( '' === $url ) { return ''; }
+        $parts = @parse_url( $url );
+        if ( ! is_array( $parts ) ) { return substr( $url, 0, 60 ); }
+        $scheme = isset( $parts['scheme'] ) ? $parts['scheme'] . '://' : '';
+        $host = (string) ( $parts['host'] ?? '' );
+        $port = isset( $parts['port'] ) ? ':' . (int) $parts['port'] : '';
+        return substr( $scheme . $host . $port . (string) ( $parts['path'] ?? '' ), 0, 200 );
+    }
+
     private static function result_shape( array $result ): array {
         $rows = array();
         $candidates = array( $result );
@@ -255,6 +267,15 @@ final class PRSTUDIO_UC_Site_Learning {
                     'value_type'  => is_array( $value ) ? 'array' : gettype( $value ),
                     'value_kind'  => is_array( $value ) ? (string) ( $value['kind'] ?? '' ) : '',
                     'value_keys'  => is_array( $value ) ? array_slice( array_keys( $value ), 0, 12 ) : array(),
+                    // Where the step believed it was, with the query string
+                    // removed. The probe reporting "this is not wp-admin" is
+                    // only actionable next to the address it said it about --
+                    // a login redirect, an about:blank that never navigated
+                    // and a genuinely different site all produce the same
+                    // false. The query is dropped because it is the part that
+                    // carries nonces and one-time keys.
+                    'where'       => self::safe_location( is_array( $value ) ? ( $value['url'] ?? '' ) : ( $inner['url'] ?? '' ) ),
+                    'title'       => substr( (string) ( is_array( $value ) ? ( $value['title'] ?? '' ) : ( $inner['title'] ?? '' ) ), 0, 120 ),
                 );
             }
         }
