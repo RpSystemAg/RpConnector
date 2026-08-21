@@ -100,8 +100,9 @@ function ownershipNonce(existing, groupId, tabId) {
  * Chrome tab groups are the recoverable ownership source of truth. The registry
  * is retained as compatibility/telemetry cache, never as the only evidence that
  * a tab is controlled. A tab dragged out of a kernel-managed group is released;
- * a tab dragged into a controlled group is adopted as an explicit Chrome UI
- * gesture. Popups inherit the opener controller and are subsequently groupable.
+ * a tab dragged into a controller-scoped group is adopted as an explicit Chrome
+ * UI gesture. The bare legacy group can migrate an already-identified record,
+ * but can never create unscoped ownership. Popups inherit the opener controller.
  */
 export function reconcileControlState({
   registry = {},
@@ -129,8 +130,6 @@ export function reconcileControlState({
   let adoptedFromGroups = 0;
   let inheritedPopups = 0;
 
-  // Preserve live compatibility records, but a record that was explicitly
-  // kernel-grouped and is now outside that group is intentionally released.
   for (const [key, current] of Object.entries(safeRegistry)) {
     const tabId = Number(current?.tabId || key || 0);
     const tab = liveTabs.get(tabId);
@@ -154,19 +153,15 @@ export function reconcileControlState({
       url: candidateTabUrl(tab, current?.url || ""),
       title: cleanString(tab?.title || current?.title),
       controllerSessionId,
-      // Legacy field retained only for 1.0 call sites. It is no longer secret
-      // material and no longer defines ownership independently from controller.
       laneId: cleanString(current?.laneId) || controllerSessionId,
       expectedOrigin: "",
-      controlGroupId: group ? liveGroupId : (recordedGroupId || null),
+      controlGroupId: group && controllerSessionId ? liveGroupId : (recordedGroupId || null),
       debuggerAttached: attachedTabs.has(tabId),
       kernelVersion: BROWSER_CONTROL_KERNEL_VERSION,
       updatedAt: Number(now),
     };
   }
 
-  // Chrome-controlled group membership can reconstruct a lost registry after an
-  // MV3 service-worker restart. This is the key difference from the 1.0 model.
   for (const [groupId, group] of controlledGroups.entries()) {
     for (const tab of liveTabs.values()) {
       if (Number(tab?.groupId ?? -1) !== groupId) continue;
@@ -174,6 +169,9 @@ export function reconcileControlState({
       const existing = next[String(tabId)] || safeRegistry[String(tabId)] || {};
       const controllerSessionId = cleanString(group.controllerSessionId)
         || normalizeControllerSessionId(existing, {});
+      // The generic 1.0 group is a migration staging area only. Without an
+      // existing controller identity it is insufficient evidence of ownership.
+      if (!controllerSessionId) continue;
       if (!next[String(tabId)]) adoptedFromGroups += 1;
       next[String(tabId)] = {
         ...existing,
@@ -195,8 +193,6 @@ export function reconcileControlState({
     }
   }
 
-  // Popup/target=_blank tabs inherit the opener controller. They are marked as
-  // pending grouping so runtime integration can place them into the same group.
   for (const tab of liveTabs.values()) {
     const tabId = Number(tab.id || 0);
     if (!tabId || next[String(tabId)]) continue;
