@@ -1,0 +1,231 @@
+name: Unified H24 control
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  schedule:
+    - cron: '23 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rpconnector-unified-h24-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suite:
+    name: Suite / WordPress control plane
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      mariadb:
+        image: mariadb:11.4@sha256:a794d9eb009e20de605858a11f32f63b4075cbd197c650436f0e3b457e4caed7
+        env:
+          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: 'yes'
+          MARIADB_DATABASE: prstudio_queue_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      PRSTUDIO_TEST_DB_HOST: 127.0.0.1
+      PRSTUDIO_TEST_DB_PORT: '3306'
+      PRSTUDIO_TEST_DB_USER: root
+      PRSTUDIO_TEST_DB_PASS: ''
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
+        with:
+          php-version: '8.1'
+          extensions: mysqli, mbstring, xml
+          tools: composer, phpunit:10.5
+          coverage: none
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install SQL parser
+        run: python -m pip install --disable-pip-version-check --no-input 'sqlglot==30.14.0'
+      - name: PHP syntax and project metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          find prstudio-unified-control tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l >/tmp/php-lint.txt
+          composer validate --strict --no-check-publish
+          phpunit --configuration phpunit.xml.dist
+      - name: Suite contracts and smoke tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/php-agent-model-constitution.php
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/php-mcp-public-contracts-smoke.php
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/php-mcp-catalog-runtime-smoke.php
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/php-capability-search-relevance-smoke.php
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/schema-validator-single-file.php
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/php-tools-list-budget.php
+          python tests/validate-sql-syntax.py
+          python tests/validate-prepare-arity.py
+          python tests/one_guard_constitution.py
+          python tests/validate-protocol-compatibility.py
+      - name: Real MariaDB task queue
+        env:
+          PRSTUDIO_TEST_DB_NAME: prstudio_queue_test
+        run: php -d auto_prepend_file=tests/strict-php-errors.php tests/php-task-queue-integration.php
+      - name: Real MariaDB write observability
+        env:
+          PRSTUDIO_TEST_DB_NAME: prstudio_writeobs
+        run: php -d auto_prepend_file=tests/strict-php-errors.php tests/php-write-observability-integration.php
+      - name: Real MariaDB runtime liveness
+        env:
+          PRSTUDIO_TEST_DB_NAME: prstudio_runtime_liveness
+        run: php -d auto_prepend_file=tests/strict-php-errors.php tests/php-runtime-db-liveness-integration.php
+
+  extension:
+    name: Chrome extension / Browser Agent
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Build and verify exact extension
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA"
+          python tests/build-release.py --build
+          python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA" --verify
+          python tests/build-release.py --check
+      - name: Extension manifest and JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require('fs');
+          const manifest = JSON.parse(fs.readFileSync('prstudio-unified-browser-agent/manifest.json', 'utf8'));
+          if (manifest.manifest_version !== 3) throw new Error('Browser Agent must remain Manifest V3');
+          if (!manifest.version) throw new Error('Browser Agent version missing');
+          console.log(`manifest ok: v${manifest.version}, MV${manifest.manifest_version}`);
+          NODE
+          find prstudio-unified-browser-agent -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+      - name: Browser Agent deterministic tests
+        run: node --test prstudio-unified-browser-agent/tests/*.test.mjs
+      - name: Real Chromium scripting probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/rpconnector-h24-web
+          cat > /tmp/rpconnector-h24-web/wp-login.php <<'HTML'
+          <!doctype html><html><head><title>RPConnector H24 probe</title></head><body><main id="probe">ready</main></body></html>
+          HTML
+          python -m http.server 8080 --bind 127.0.0.1 --directory /tmp/rpconnector-h24-web >/tmp/rpconnector-h24-web.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for i in $(seq 1 50); do
+            if curl --fail --silent http://127.0.0.1:8080/wp-login.php >/dev/null; then break; fi
+            if [ "$i" = 50 ]; then cat /tmp/rpconnector-h24-web.log; exit 1; fi
+            sleep 0.2
+          done
+          CHROME_BIN="$(command -v chromium || command -v chromium-browser || command -v google-chrome || true)"
+          test -n "$CHROME_BIN"
+          export CHROME_BIN
+          export WP_URL=http://127.0.0.1:8080
+          "$CHROME_BIN" --version
+          node .github/scripts/chrome-scripting-health-probe.mjs
+
+  connector:
+    name: ChatGPT connector JSON / MCP contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
+        with:
+          php-version: '8.1'
+          extensions: mysqli, mbstring, xml
+          coverage: none
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Exactly one workflow is allowed
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t workflows < <(find .github/workflows -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) -printf '%f\n' | sort)
+          printf 'active workflows: %s\n' "${workflows[*]}"
+          test "${#workflows[@]}" -eq 1
+          test "${workflows[0]}" = 'unified-h24-control.yml'
+      - name: Validate connector descriptor structure
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const path = 'RP-STUDIO-CHATGPT-PLUGIN-1.0.0.json';
+          const d = JSON.parse(fs.readFileSync(path, 'utf8'));
+          const fail = (m) => { throw new Error(m); };
+          if (d.schema_version !== '1.0.0') fail('schema_version must be 1.0.0');
+          if (d.type !== 'remote_mcp_server') fail('type must be remote_mcp_server');
+          if (!Number.isInteger(d.expected_tools) || d.expected_tools <= 0) fail('expected_tools invalid');
+          if (!Array.isArray(d.tool_names) || d.tool_names.length !== d.expected_tools) fail('tool_names count mismatch');
+          if (new Set(d.tool_names).size !== d.tool_names.length) fail('duplicate tool_names');
+          if (!Array.isArray(d.mcp_protocols) || d.mcp_protocols.length === 0) fail('mcp_protocols missing');
+          const requiredPaths = [
+            d.installation_contract?.wordpress?.folder,
+            d.installation_contract?.browser_agent?.folder,
+            d.instructions_source,
+            ...(Array.isArray(d.documentation) ? d.documentation : []),
+          ];
+          for (const p of requiredPaths) {
+            if (!p || !fs.existsSync(p)) fail(`descriptor target missing: ${p}`);
+          }
+          console.log(`connector JSON ok: ${d.expected_tools} tools, ${d.mcp_protocols.length} MCP protocols`);
+          NODE
+      - name: Connector and implementation cannot drift
+        shell: bash
+        run: |
+          set -euo pipefail
+          node .github/scripts/check-mcp-tool-drift.mjs
+          node .github/scripts/check-build-info-counts.mjs
+      - name: Full release descriptor validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tests/build-release.py --build
+          node tests/validate-release.mjs --strict --php-smoke
+
+  gate:
+    name: Unified H24 gate
+    if: always()
+    needs: [suite, extension, connector]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every product surface to pass
+        shell: bash
+        run: |
+          set -euo pipefail
+          test '${{ needs.suite.result }}' = 'success'
+          test '${{ needs.extension.result }}' = 'success'
+          test '${{ needs.connector.result }}' = 'success'
+          echo 'PASS: suite + extension + connector are all green'
