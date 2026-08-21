@@ -284,8 +284,15 @@ function assertStudySnapshot(snapshot, fixture, { requireIncremental = false } =
     state: module.state || null,
     revision: module.revision || null,
     surface_hash: module.surface_hash || null,
-    sections: Object.keys(module.sections || {}),
-    menus: Object.keys(module.menus || {}),
+    // admin.sections / admin.menu is where the module keeps them; reading
+    // module.sections reported an empty study three times while the study was
+    // in fact traversing 49 sections. A report that looks in the wrong place
+    // is indistinguishable from the thing it reports on being broken.
+    sections: Object.keys(module.admin?.sections || {}),
+    menus: (module.admin?.menu || []).map((row) => String(row?.id || '')),
+    submenus: (module.admin?.submenus || []).length,
+    coverage: module.coverage || null,
+    last_observation_shape: module.last_observation_shape || null,
     table_sections: tables.map((table) => String(table.section || '')),
     table_summary: tables.map((table) => ({
       section: table.section || null,
