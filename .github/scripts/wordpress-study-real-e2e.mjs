@@ -6,7 +6,13 @@ import { join, resolve } from 'node:path';
 
 const sleep = (ms) => new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
 const wpUrl = String(process.env.WP_URL || 'http://127.0.0.1:8080').replace(/\/+$/, '');
-const wpPath = String(process.env.RP_WP_PATH || '/tmp/rpconnector-h24-wp');
+// Trimmed and asserted here rather than discovered later. WP-CLI rejects an
+// empty --path with "The --path parameter cannot be empty when provided",
+// which names the parameter and not the environment variable behind it, and
+// that message arrives after WordPress, Chrome and the whole study have
+// already run.
+const wpPath = String(process.env.RP_WP_PATH || '/tmp/rpconnector-h24-wp').trim();
+if (!wpPath) { throw new Error('RP_WP_PATH resolved to an empty path; wp-cli cannot be pointed at a WordPress install'); }
 const adminUser = String(process.env.WP_ADMIN_USER || 'rpadmin');
 const adminPassword = String(process.env.WP_ADMIN_PASSWORD || '');
 const accessToken = String(process.env.MCP_ACCESS_TOKEN || '');
@@ -215,11 +221,11 @@ function wpEval(code) {
   // job so far has come down to making the failure say the true thing, so
   // this one carries stderr with it.
   try {
-    return execFileSync('wp', ['--path', wpPath, 'eval', code], { encoding: 'utf8', env: process.env, maxBuffer: 16 * 1024 * 1024 }).trim();
+    return execFileSync('wp', [`--path=${wpPath}`, 'eval', code], { encoding: 'utf8', env: process.env, maxBuffer: 16 * 1024 * 1024 }).trim();
   } catch (error) {
     const stderr = String(error?.stderr || '').trim();
     const stdout = String(error?.stdout || '').trim();
-    throw new Error(`wp eval failed (status ${error?.status ?? '?'})
+    throw new Error(`wp eval failed (status ${error?.status ?? '?'}) with --path=${wpPath}
 -- stderr --
 ${stderr || '<empty>'}
 -- stdout --
