@@ -30,8 +30,6 @@ const args = [
   '--disable-dev-shm-usage',
   `--remote-debugging-port=${port}`,
   `--user-data-dir=${userDataDir}`,
-  `--disable-extensions-except=${extensionDir}`,
-  `--load-extension=${extensionDir}`,
   'about:blank',
 ];
 
@@ -78,16 +76,20 @@ try {
   const version = await waitVersion();
   if (!version.webSocketDebuggerUrl) throw new Error('Chrome returned no browser WebSocket debugger URL');
 
+  const loaded = await cdp(version.webSocketDebuggerUrl, 'Extensions.loadUnpacked', { path: extensionDir });
+  const loadedExtensionId = String(loaded?.id ?? '');
+  if (!loadedExtensionId) throw new Error('Extensions.loadUnpacked returned no extension id');
+
   let extensionTargets = [];
   for (let i = 0; i < 50; i++) {
     const result = await cdp(version.webSocketDebuggerUrl, 'Target.getTargets');
-    extensionTargets = (result.targetInfos ?? []).filter((t) => String(t.url ?? '').startsWith('chrome-extension://'));
+    extensionTargets = (result.targetInfos ?? []).filter((t) => String(t.url ?? '').startsWith(`chrome-extension://${loadedExtensionId}/`));
     if (extensionTargets.some((t) => t.type === 'service_worker' && String(t.url ?? '').endsWith('/service-worker.js'))) break;
     await sleep(100);
   }
 
   if (!extensionTargets.length) {
-    throw new Error('Browser Agent produced no chrome-extension:// target in a real Chrome process');
+    throw new Error(`Browser Agent ${loadedExtensionId} produced no chrome-extension:// target in a real Chrome process`);
   }
 
   const serviceWorkers = extensionTargets.filter((t) => t.type === 'service_worker' && String(t.url ?? '').endsWith('/service-worker.js'));
@@ -102,7 +104,7 @@ try {
     throw new Error(`Chrome reported extension runtime errors:\n${runtimeErrors.slice(0, 20).join('\n')}`);
   }
 
-  console.log(`PASS real Chrome/Chromium loaded Browser Agent; browser=${version.Browser}; extensionTargets=${extensionTargets.length}; prstudioServiceWorkers=${serviceWorkers.length}`);
+  console.log(`PASS real Chrome/Chromium loaded Browser Agent; browser=${version.Browser}; extensionId=${loadedExtensionId}; extensionTargets=${extensionTargets.length}; prstudioServiceWorkers=${serviceWorkers.length}`);
   exitCode = 0;
 } catch (error) {
   console.error(`FAIL real Chrome Browser Agent smoke: ${error?.stack ?? error}`);
