@@ -34,7 +34,9 @@ final class WPAIB_Site {
 		if ( ! function_exists( 'get_plugins' ) ) { require_once ABSPATH . 'wp-admin/includes/plugin.php'; }
 		$plugins = get_plugins(); $active = (array) get_option( 'active_plugins', array() ); $network = is_multisite() ? array_keys( (array) get_site_option( 'active_sitewide_plugins', array() ) ) : array(); $items = array();
 		foreach ( $plugins as $file => $data ) {
-			$items[] = array( 'plugin' => $file, 'name' => $data['Name'] ?? $file, 'version' => $data['Version'] ?? '', 'author' => wp_strip_all_tags( $data['Author'] ?? '' ), 'active' => in_array( $file, $active, true ) || in_array( $file, $network, true ), 'network_active' => in_array( $file, $network, true ), 'requires_php' => $data['RequiresPHP'] ?? '', 'requires_wp' => $data['RequiresWP'] ?? '' );
+			$dir = dirname( $file );
+			$slug = '.' === $dir ? pathinfo( $file, PATHINFO_FILENAME ) : $dir;
+			$items[] = array( 'plugin' => $file, 'slug' => $slug, 'name' => $data['Name'] ?? $file, 'version' => $data['Version'] ?? '', 'author' => wp_strip_all_tags( $data['Author'] ?? '' ), 'active' => in_array( $file, $active, true ) || in_array( $file, $network, true ), 'network_active' => in_array( $file, $network, true ), 'requires_php' => $data['RequiresPHP'] ?? '', 'requires_wp' => $data['RequiresWP'] ?? '' );
 		}
 		return array( 'items' => $items, 'count' => count( $items ) );
 	}
