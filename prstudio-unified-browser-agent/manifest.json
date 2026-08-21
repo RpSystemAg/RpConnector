@@ -14,7 +14,8 @@
     "downloads",
     "webNavigation",
     "sidePanel",
-    "tabGroups"
+    "tabGroups",
+    "system.display"
   ],
   "host_permissions": ["<all_urls>"],
   "background": {
