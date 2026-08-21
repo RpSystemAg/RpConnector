@@ -293,6 +293,7 @@ function assertStudySnapshot(snapshot, fixture, { requireIncremental = false } =
     submenus: (module.admin?.submenus || []).length,
     coverage: module.coverage || null,
     last_observation_shape: module.last_observation_shape || null,
+    last_stop: module.last_stop || null,
     table_sections: tables.map((table) => String(table.section || '')),
     table_summary: tables.map((table) => ({
       section: table.section || null,

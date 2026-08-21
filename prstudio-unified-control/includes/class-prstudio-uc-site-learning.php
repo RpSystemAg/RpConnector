@@ -485,7 +485,24 @@ JS;
     }
 
     private static function queue_browser_flow( array $task, array &$state, string $phase, array $steps, array $extra=array() ): array {
-        if(!$steps)return array('queued'=>false,'defer_parent'=>false);if(!self::parent_waiting_for_task($task))return array('queued'=>false,'defer_parent'=>false,'continuation_skipped'=>'parent_not_waiting_for_task');$module_id=(string)$state['module_id'];$origin=(string)$state['origin'];$index=(int)($state['metrics']['batch_runs']??0)+1;
+        if(!$steps){$state['last_stop']=array('reason'=>'no_steps','phase'=>$phase,'gmt'=>gmdate('c'));return array('queued'=>false,'defer_parent'=>false);}
+        // A continuation that cannot be queued leaves the study half done, and
+        // it used to leave no trace of that at all: the module stayed in
+        // 'studying' forever, indistinguishable from a study still running,
+        // and the next reader had to guess whether to wait or to restart.
+        //
+        // The parent job only accepts a new child while it is
+        // WAITING_FOR_BROWSER and still pointed at this task. Once the study
+        // began doing real work -- waiting for menus, tables and page numbers
+        // instead of sampling -- batches got slower and this guard started
+        // firing, silently, mid-traversal.
+        if(!self::parent_waiting_for_task($task)){
+            $state['state']='interrupted';
+            $state['last_stop']=array('reason'=>'parent_not_waiting_for_task','phase'=>$phase,'gmt'=>gmdate('c'),'sections_remaining'=>count((array)($state['pending_sections']??array())));
+            $state['drift']['revalidation_required']=true;
+            return array('queued'=>false,'defer_parent'=>false,'continuation_skipped'=>'parent_not_waiting_for_task');
+        }
+$module_id=(string)$state['module_id'];$origin=(string)$state['origin'];$index=(int)($state['metrics']['batch_runs']??0)+1;
         $args=array_merge(array('steps'=>$steps,'expected_origin'=>$origin,'_prstudio_site_study'=>true,'_prstudio_wordpress_study'=>true,'_prstudio_site_phase'=>$phase,'_prstudio_site_module_id'=>$module_id,'_prstudio_site_origin'=>$origin,'_prstudio_site_run_id'=>(string)$state['run_id'],'_prstudio_site_read_only'=>true,'_idempotency_key'=>'wordpress-study:'.$module_id.':'.(string)$state['run_id'].':'.$phase.':'.$index),$extra);
         $child=PRSTUDIO_UC_Job_Engine::create_browser_task('playwright_flow',$args,(string)($task['device_uuid']??'')?:null,(string)($task['job_uuid']??''));if(!is_array($child)||empty($child['task_uuid']))return array('queued'=>false,'defer_parent'=>false,'error'=>'site_learning_batch_queue_failed');if(!self::retarget_parent($task,$child))return array('queued'=>true,'defer_parent'=>false,'next_task_id'=>(string)$child['task_uuid'],'error'=>'site_learning_parent_retarget_failed');$state['active_task_id']=(string)$child['task_uuid'];$state['state']='studying';$state['metrics']['batch_runs']=$index;return array('queued'=>true,'defer_parent'=>true,'next_task_id'=>(string)$child['task_uuid'],'phase'=>$phase);
     }
