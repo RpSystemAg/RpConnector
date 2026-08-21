@@ -247,6 +247,20 @@ function moduleSnapshot() {
 async function waitForJob(jobId, label) {
   const deadline = Date.now() + 12 * 60 * 1000; let last;
   while (Date.now() < deadline) {
+    // Drive the scheduler, the way a site with traffic does.
+    //
+    // The study advances by chaining, and the link between one finished
+    // browser flow and the next is a sweep that reconciles terminal browser
+    // tasks with waiting parents. That sweep runs from cron_tick(). A real
+    // WordPress fires wp-cron on incoming requests; this fixture receives
+    // none, so nothing ever swept, the second flow completed in Chrome and
+    // was never collected, and the study sat at 12.5% with two completed
+    // tasks, no errors and an empty queue.
+    //
+    // Worth knowing beyond the test: on a genuinely quiet site the study
+    // progresses only as fast as wp-cron actually fires.
+    try { wpEval('if (class_exists("PRSTUDIO_UC_Agency_Runtime")) { PRSTUDIO_UC_Agency_Runtime::cron_tick(); } echo "tick";'); }
+    catch (error) { evidence.scheduler_tick_error = String(error?.message || error).slice(0, 400); }
     last = await mcpTool('prstudio_job_get', { job_id: jobId, wait_seconds: 20 });
     const status = String(findKey(last, 'status') || '').toUpperCase();
     if (['COMPLETED','TECHNICAL_ERROR','CANCELLED','DEAD_LETTER'].includes(status)) {
