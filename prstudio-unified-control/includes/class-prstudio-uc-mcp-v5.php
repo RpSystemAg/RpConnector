@@ -621,27 +621,6 @@ HTML;
         }
         return array_values( array_unique( $secrets ) );
     }
-    private static function extract_viewer_frame( &$value ): array {
-        if ( ! is_array( $value ) ) { return array(); }
-        if ( isset( $value['dataUrl'] ) && is_string( $value['dataUrl'] ) && str_starts_with( $value['dataUrl'], 'data:image/' ) ) {
-            $frame = array(
-                'dataUrl'=>(string)$value['dataUrl'],
-                'mimeType'=>(string)($value['mimeType']??$value['mime_type']??'image/png'),
-                'width'=>(int)($value['width']??0),
-                'height'=>(int)($value['height']??0),
-            );
-            unset( $value['dataUrl'] );
-            $value['componentFrame'] = array( 'available'=>true, 'mimeType'=>$frame['mimeType'], 'width'=>$frame['width'], 'height'=>$frame['height'] );
-            return $frame;
-        }
-        foreach ( $value as &$child ) {
-            if ( ! is_array( $child ) ) { continue; }
-            $frame = self::extract_viewer_frame( $child );
-            if ( $frame ) { unset( $child ); return $frame; }
-        }
-        unset( $child );
-        return array();
-    }
     private static function find_artifact_id( $value ): string {
         if ( ! is_array( $value ) ) { return ''; }
         if ( isset( $value['artifact_id'] ) && is_scalar( $value['artifact_id'] ) ) {
@@ -696,10 +675,6 @@ HTML;
     }
     private static function tool_success( $value, string $tool_name = '', string $correlation_id = '' ): array {
         $widget_meta = array();
-        if ( 'browser_snapshot' === $tool_name ) {
-            $frame = self::extract_viewer_frame( $value );
-            if ( $frame ) { $widget_meta['prstudio/viewer'] = array( 'frame'=>$frame ); }
-        }
         $value = self::clean_result( $value );
         $structured = self::envelope_from_value( $value, $correlation_id );
         $text = wp_json_encode( $structured, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
@@ -867,7 +842,25 @@ HTML;
             'annotations'=>$annotations,
         );
         if(self::advertise_output_schema())$tool['outputSchema']=self::output_schema();
-        if('browser_snapshot'===$name){$tool['_meta']=array('ui'=>array('resourceUri'=>self::BROWSER_VIEWER_URI),'openai/outputTemplate'=>self::BROWSER_VIEWER_URI);}
+        // No tool declares the controlled-session viewer.
+        //
+        // It used to be declared on browser_snapshot, and a host that honours
+        // openai/outputTemplate renders the template for EVERY result of that
+        // tool -- whether or not the result carries a picture. browser_snapshot
+        // returns structure, not pixels: that is the entire reason
+        // browser_screenshot exists as a separate tool. So the panel opened on
+        // every snapshot and every time reported "frame unavailable / No frame
+        // in this tool result", because the frame it waits for is one this tool
+        // cannot produce.
+        //
+        // An empty black panel on every snapshot is worse than no panel: it
+        // reads as a broken live view rather than as an absent one, and it was
+        // reported as a bug more than once.
+        //
+        // Pixels already reach the client properly. browser_screenshot appends
+        // a native MCP image content block below, which hosts render without
+        // any custom widget. The viewer resource stays registered and served,
+        // so a future tool that genuinely streams frames can point at it.
         return $tool;
     }
 
