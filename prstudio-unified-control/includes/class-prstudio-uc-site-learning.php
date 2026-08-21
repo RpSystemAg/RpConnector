@@ -218,6 +218,55 @@ final class PRSTUDIO_UC_Site_Learning {
         return array_values($refs);
     }
 
+    /**
+     * What the browser flow actually handed back, described in a few hundred bytes.
+     *
+     * When the probe reports that WordPress admin was not observed, there are
+     * three quite different causes and one message: the page really was not
+     * wp-admin, the script ran and returned something unexpected, or the value
+     * never survived the trip and flow_values() found nothing to read. Telling
+     * them apart requires seeing the shape of the result, and the shape is
+     * exactly what no log contained -- a full dump is far too large and is
+     * redacted anyway, so nobody ever printed one.
+     *
+     * This records the skeleton only: which keys exist at each level, how many
+     * step rows came back, and for each row whether it carried a value and what
+     * `kind` that value declared. No page content, no attribute values, nothing
+     * that could carry a token or a customer name.
+     *
+     * @param array $result Raw browser flow result.
+     * @return array<string,mixed>
+     */
+    private static function result_shape( array $result ): array {
+        $rows = array();
+        $candidates = array( $result );
+        if ( isset( $result['result'] ) && is_array( $result['result'] ) ) { $candidates[] = $result['result']; }
+        foreach ( $candidates as $candidate ) {
+            if ( ! is_array( $candidate ) ) { continue; }
+            foreach ( (array) ( $candidate['results'] ?? array() ) as $index => $row ) {
+                if ( ! is_array( $row ) ) { $rows[] = array( 'index' => $index, 'row_type' => gettype( $row ) ); continue; }
+                $inner = is_array( $row['result'] ?? null ) ? $row['result'] : array();
+                $value = $inner['value'] ?? null;
+                $rows[] = array(
+                    'index'       => $index,
+                    'row_keys'    => array_slice( array_keys( $row ), 0, 12 ),
+                    'result_keys' => array_slice( array_keys( $inner ), 0, 12 ),
+                    'has_value'   => array_key_exists( 'value', $inner ),
+                    'value_type'  => is_array( $value ) ? 'array' : gettype( $value ),
+                    'value_kind'  => is_array( $value ) ? (string) ( $value['kind'] ?? '' ) : '',
+                    'value_keys'  => is_array( $value ) ? array_slice( array_keys( $value ), 0, 12 ) : array(),
+                );
+            }
+        }
+        return array(
+            'top_keys'   => array_slice( array_keys( $result ), 0, 12 ),
+            'flow'       => ! empty( $result['flow'] ),
+            'step_count' => (int) ( $result['stepCount'] ?? 0 ),
+            'row_count'  => count( $rows ),
+            'rows'       => array_slice( $rows, 0, 10 ),
+        );
+    }
+
     private static function flow_values( array $result ): array {
         $out=array();$candidates=array($result);if(isset($result['result'])&&is_array($result['result']))$candidates[]=$result['result'];
         foreach($candidates as $candidate){if(!is_array($candidate))continue;foreach((array)($candidate['results']??array()) as $row){if(!is_array($row))continue;$r=is_array($row['result']??null)?$row['result']:array();if(array_key_exists('value',$r))$out[]=$r['value'];}if(array_key_exists('value',$candidate))$out[]=$candidate['value'];}
@@ -430,7 +479,7 @@ JS;
         $phase=(string)($task['arguments']['_prstudio_site_phase']??'wordpress_probe');$state['mode']='wordpress_admin';$state['metrics']['screenshots']=(int)$state['metrics']['screenshots']+count(self::artifact_refs($result));
         if('wordpress_probe'===$phase){
             $state['metrics']['wordpress_probe_runs']=(int)$state['metrics']['wordpress_probe_runs']+1;$state['metrics']['safe_clicks']=(int)$state['metrics']['safe_clicks']+1;$probe=self::value_of_kind($result,'wordpress_probe');$posts=self::value_of_kind($result,'wordpress_section');
-            if(empty($probe['wordpress_admin'])){$state['state']='studied_degraded';$state['drift']['revalidation_required']=true;return array('ok'=>false,'handled'=>true,'defer_parent'=>false,'reason'=>'wordpress_admin_not_observed');}
+            if(empty($probe['wordpress_admin'])){$state['state']='studied_degraded';$state['drift']['revalidation_required']=true;$state['last_probe_shape']=self::result_shape($result);return array('ok'=>false,'handled'=>true,'defer_parent'=>false,'reason'=>'wordpress_admin_not_observed','probe_shape'=>$state['last_probe_shape']);}
             $sections=array();foreach((array)($probe['menu']??array()) as $row){if(!is_array($row))continue;$safe=self::safe_admin_section($row);if(!$safe)continue;$key=self::section_key($safe);$safe['visited']=false;$sections[$key]=$safe;}
             $state['admin']['url']=self::normalize_url((string)($probe['url']??$state['admin']['url']));$state['admin']['menu']=array_values($sections);$state['admin']['sections']=$sections;$submenus=array();foreach($sections as $key=>$section)foreach((array)$section['submenus'] as $submenu)$submenus[]=array('parent'=>$key,'label'=>(string)($submenu['label']??''),'href'=>(string)($submenu['href']??''));$state['admin']['submenus']=$submenus;
             $surface_hash=hash('sha256',(string)json_encode(self::surface_payload($probe,$posts),JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE));$previous=(string)($state['surface_hash']??'');$ready_before=in_array((string)($state['previous_state_before_run']??''),array('ready','studied_degraded'),true)||!empty($state['tables']);$same=''!==$previous&&hash_equals($previous,$surface_hash);$state['previous_surface_hash']=$previous;$state['surface_hash']=$surface_hash;$state['drift']=array('changed'=>''!==$previous&&!$same,'revalidation_required'=>''!==$previous&&!$same);

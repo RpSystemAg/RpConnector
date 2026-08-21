@@ -297,6 +297,8 @@ function assertStudySnapshot(snapshot, fixture, { requireIncremental = false } =
     metrics,
     procedures: Object.keys(module.procedures || {}),
     evidence_refs: (module.evidence || []).length,
+    // Present only when the probe failed; it says which of the three causes it was.
+    last_probe_shape: module.last_probe_shape || null,
   };
   if (module.mode !== 'wordpress_admin' || !['ready','studied_degraded'].includes(String(module.state || ''))) throw new Error(`WordPress module not terminal/ready: ${JSON.stringify({mode:module.mode,state:module.state})}`);
   const posts = tables.find((table) => String(table.section || '') === 'menu-posts');
