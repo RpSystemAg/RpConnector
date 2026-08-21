@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -14,6 +14,11 @@ const debuggerProtocolVersion = '0.1';
 if (!existsSync(chrome)) throw new Error(`Chrome/Chromium binary missing: ${chrome}`);
 if (!existsSync(extensionDir)) throw new Error(`Browser Agent directory missing: ${extensionDir}`);
 await mkdir(artifactDir, { recursive: true });
+
+const manifest = JSON.parse(await readFile(join(extensionDir, 'manifest.json'), 'utf8'));
+const expectedWorkerPath = String(manifest?.background?.service_worker || '').replace(/^\/+/, '');
+if (!expectedWorkerPath) throw new Error('Browser Agent manifest does not declare background.service_worker');
+const expectedWorkerSuffix = `/${expectedWorkerPath}`;
 
 const userDataDir = await mkdtemp(join(tmpdir(), 'rpconnector-browser-parity-'));
 const debugPort = 10100 + (process.pid % 300);
@@ -96,18 +101,21 @@ class Cdp {
   close() { try { this.ws.close(); } catch {} }
 }
 
-async function waitForServiceWorker(cdp) {
+async function waitForBrowserAgentWorker(cdp) {
   let lastTargets = [];
   for (let i = 0; i < 300; i += 1) {
     const { targetInfos = [] } = await cdp.send('Target.getTargets');
     lastTargets = targetInfos;
-    const worker = targetInfos.find((target) =>
-      target.type === 'service_worker'
-      && String(target.url || '').startsWith('chrome-extension://'));
+    const worker = targetInfos.find((target) => {
+      const url = String(target.url || '');
+      return target.type === 'service_worker'
+        && url.startsWith('chrome-extension://')
+        && url.endsWith(expectedWorkerSuffix);
+    });
     if (worker) return worker;
     await sleep(100);
   }
-  throw new Error(`Browser Agent service worker not observed: ${JSON.stringify(lastTargets)}`);
+  throw new Error(`Browser Agent worker ${expectedWorkerPath} not observed: ${JSON.stringify(lastTargets)}`);
 }
 
 async function evaluate(cdp, sessionId, expression) {
@@ -130,6 +138,11 @@ const report = {
   base_url: baseUrl,
   chrome_binary: chrome,
   debugger_protocol_version: debuggerProtocolVersion,
+  expected_extension: {
+    name: String(manifest?.name || ''),
+    version: String(manifest?.version || ''),
+    service_worker: expectedWorkerPath,
+  },
 };
 let cdp;
 
@@ -137,7 +150,7 @@ try {
   const version = await waitForBrowser();
   report.chrome_version = version.Browser || '';
   cdp = new Cdp(version.webSocketDebuggerUrl);
-  const worker = await waitForServiceWorker(cdp);
+  const worker = await waitForBrowserAgentWorker(cdp);
   report.extension_id = String(worker.url).split('/')[2] || '';
   report.service_worker_url = worker.url;
 
@@ -265,7 +278,7 @@ try {
   report.finished_at = new Date().toISOString();
   await writeFile(join(artifactDir, 'browser-parity-live-probe.json'), JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report.result, null, 2));
-  console.log('PASS Browser parity: one Chrome window, persistent multi-tab control, click/fill after tab switch, chrome.debugger 0.1 Browser.getVersion, CDP screenshot, visual fallback');
+  console.log('PASS Browser parity: exact Browser Agent worker, one Chrome window, persistent multi-tab control, click/fill after tab switch, chrome.debugger 0.1 Browser.getVersion, CDP screenshot, visual fallback');
 } catch (error) {
   report.error = { message: error?.message || String(error), stack: String(error?.stack || '').slice(0, 16000) };
   report.finished_at = new Date().toISOString();
