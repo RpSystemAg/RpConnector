@@ -1,0 +1,38 @@
+name: Unified full-suite status publisher
+
+on:
+  workflow_run:
+    workflows: ["Unified full-suite control"]
+    types: [completed]
+
+permissions:
+  statuses: write
+  actions: read
+  contents: read
+
+jobs:
+  publish:
+    if: ${{ github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'master' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish exact-SHA unified full-suite status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          set -euo pipefail
+          case "$CONCLUSION" in
+            success) state=success; description='Unified full suite passed' ;;
+            cancelled) state=error; description='Unified full suite cancelled' ;;
+            *) state=failure; description='Unified full suite failed' ;;
+          esac
+          jq -n --arg state "$state" --arg context 'unified-full-suite' --arg description "$description" --arg target_url "$RUN_URL" \
+            '{state:$state,context:$context,description:$description,target_url:$target_url}' >/tmp/status.json
+          curl --fail-with-body --silent --show-error -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "${{ github.api_url }}/repos/${{ github.repository }}/statuses/$HEAD_SHA" \
+            --data-binary @/tmp/status.json
