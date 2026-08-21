@@ -37,7 +37,14 @@ const evidence = {
 const userDataDir = await mkdtemp(join(tmpdir(), 'rpconnector-wordpress-study-'));
 const debugPort = 9700 + (process.pid % 200);
 const child = spawn(chrome, [
-  '--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage','--disable-background-networking',
+  // --window-size is not cosmetic here. Headless Chrome started on about:blank
+  // with no window size reports a 0x0 viewport until something lays out, and
+  // Page.captureScreenshot answers "Cannot take screenshot with 0 width" -- an
+  // error that describes the page and blames the page, while the missing piece
+  // is this flag. --hide-scrollbars keeps the captured width equal to the
+  // viewport width so screenshots taken before and after a scroll compare.
+  '--headless=new','--window-size=1280,900','--hide-scrollbars',
+  '--no-sandbox','--disable-gpu','--disable-dev-shm-usage','--disable-background-networking',
   '--disable-default-apps','--disable-sync','--no-first-run',`--remote-debugging-port=${debugPort}`,
   `--user-data-dir=${userDataDir}`,`--disable-extensions-except=${extensionDir}`,`--load-extension=${extensionDir}`,'about:blank',
 ], { stdio: ['ignore', 'pipe', 'pipe'] });
