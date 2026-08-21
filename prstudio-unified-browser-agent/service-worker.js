@@ -4206,6 +4206,35 @@ function codedError(code, message, details = {}) {
   return error;
 }
 
+/**
+ * Whether an error is the screenshot budget expiring rather than the page failing.
+ *
+ * A full-page screenshot gets SCREENSHOT_STEP_TIMEOUT_MS to attach the
+ * debugger, scroll the page and upload the result. Each scroll is dispatched
+ * with whatever remains of that budget, so on a cold or loaded machine the last
+ * wheel event can be handed a few hundred milliseconds and exceed them.
+ *
+ * That threw CDP_TIMEOUT, which detached the debugger and failed the browser
+ * task, which failed the mission. A real WordPress study died on a GitHub
+ * runner with "Comando CDP Input.dispatchMouseEvent oltre 919 ms" -- 919 being
+ * all that was left of 9.5 seconds. The page was fine. Chrome was fine. The
+ * screenshot simply took longer than the screenshot was allowed to take.
+ *
+ * A screenshot is evidence, and evidence that arrives shorter than hoped is
+ * degraded, not fatal (LAW 5: transient failure retries, it does not park the
+ * mission). The scroll loop already knows how to stop early and report
+ * timeoutLimited; this lets an overrun inside a single dispatch take that same
+ * exit instead of unwinding the whole task.
+ *
+ * Deliberately narrow: only consulted where a screenshot deadline is in force,
+ * so an ordinary click -- which gets the full CDP_DEFAULT_TIMEOUT_MS and has no
+ * deadline -- keeps failing loudly, as it should.
+ */
+function isScreenshotBudgetTimeout(error) {
+  const code = String(error?.code || "");
+  return code === "SCREENSHOT_TIMEOUT" || code === "CDP_TIMEOUT" || code === "CDP_ATTACH_TIMEOUT" || code === "CDP_DETACH_TIMEOUT";
+}
+
 function screenshotTimeoutRemainingMs(deadlineAt, capMs, phase = "screenshot") {
   const deadline = Number(deadlineAt || 0);
   const remaining = deadline > 0 ? Math.floor(deadline - Date.now()) : Number(capMs || SCREENSHOT_CAPTURE_TIMEOUT_MS);
@@ -5057,12 +5086,19 @@ async function progressiveScroll(tabId, options = {}) {
     throwIfTaskAborted();
     if (timeRemaining() < 250) { timeoutLimited = true; break; }
     const deltaY = Math.max(Number(current.viewportHeight || 720) * 0.82, 500);
-    await (deadlineAt > 0 ? dispatchScreenshotScrollCommands : dispatchNativeCommands)(tabId, pointerSequence([{
-      type: "wheel",
-      x: Math.max(1, Number(current.viewportWidth || 1280) / 2),
-      y: Math.max(1, Number(current.viewportHeight || 720) / 2),
-      deltaY,
-    }]), deadlineAt);
+    try {
+      await (deadlineAt > 0 ? dispatchScreenshotScrollCommands : dispatchNativeCommands)(tabId, pointerSequence([{
+        type: "wheel",
+        x: Math.max(1, Number(current.viewportWidth || 1280) / 2),
+        y: Math.max(1, Number(current.viewportHeight || 720) / 2),
+        deltaY,
+      }]), deadlineAt);
+    } catch (error) {
+      // Out of screenshot budget mid-scroll: keep what has been captured so far
+      // and let the caller report degraded coverage. See isScreenshotBudgetTimeout.
+      if (deadlineAt > 0 && isScreenshotBudgetTimeout(error)) { timeoutLimited = true; break; }
+      throw error;
+    }
     const pauseBudget = Math.min(pause, Math.max(0, timeRemaining() - 150));
     if (pauseBudget < 50) { timeoutLimited = true; break; }
     await abortableSleep(pauseBudget, taskAbortController?.signal);
@@ -5086,14 +5122,20 @@ async function progressiveScroll(tabId, options = {}) {
   const finalState = { ...current, steps, stableBottom: stable >= 3, timeoutLimited };
   let restored = options.restore === false;
   if (options.restore !== false && timeRemaining() >= 250 && Math.abs(Number(current.y || 0) - Number(original.y || 0)) > 1) {
-    await (deadlineAt > 0 ? dispatchScreenshotScrollCommands : dispatchNativeCommands)(tabId, pointerSequence([{
-      type: "wheel",
-      x: Math.max(1, Number(current.viewportWidth || 1280) / 2),
-      y: Math.max(1, Number(current.viewportHeight || 720) / 2),
-      deltaY: Number(original.y || 0) - Number(current.y || 0),
-    }]), deadlineAt);
-    await abortableSleep(Math.min(100, Math.max(25, timeRemaining() - 50)), taskAbortController?.signal);
-    restored = true;
+    try {
+      await (deadlineAt > 0 ? dispatchScreenshotScrollCommands : dispatchNativeCommands)(tabId, pointerSequence([{
+        type: "wheel",
+        x: Math.max(1, Number(current.viewportWidth || 1280) / 2),
+        y: Math.max(1, Number(current.viewportHeight || 720) / 2),
+        deltaY: Number(original.y || 0) - Number(current.y || 0),
+      }]), deadlineAt);
+      await abortableSleep(Math.min(100, Math.max(25, timeRemaining() - 50)), taskAbortController?.signal);
+      restored = true;
+    } catch (error) {
+      // Failing to put the scroll position back is untidy, not a failed task.
+      if (!(deadlineAt > 0 && isScreenshotBudgetTimeout(error))) { throw error; }
+      finalState.timeoutLimited = true;
+    }
   } else if (options.restore !== false && Math.abs(Number(current.y || 0) - Number(original.y || 0)) <= 1) {
     restored = true;
   }
