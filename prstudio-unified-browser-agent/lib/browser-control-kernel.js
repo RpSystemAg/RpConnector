@@ -149,6 +149,10 @@ export function reconcileControlState({
       released.push({ tabId, reason: "dragged_out_of_control_group", recordedGroupId, liveGroupId });
       continue;
     }
+    if (recordedGroupId && liveGroupId === recordedGroupId && !controlledGroups.has(liveGroupId)) {
+      released.push({ tabId, reason: "control_group_no_longer_managed", recordedGroupId, liveGroupId });
+      continue;
+    }
     const group = controlledGroups.get(liveGroupId) || null;
     const controllerSessionId = cleanString(group?.controllerSessionId)
       || normalizeControllerSessionId(current, {});
