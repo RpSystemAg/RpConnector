@@ -110,10 +110,15 @@ await check("Chrome manifest uses exact lowercase MV3 entrypoint", () => {
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.version, "1.0.0");
   assert.deepEqual(manifest.background, { service_worker: "service-worker.js", type: "module" });
-  for (const permission of ["alarms", "debugger", "sidePanel", "storage", "tabs", "windows"]) {
+  for (const permission of ["alarms", "debugger", "sidePanel", "storage", "tabs"]) {
     assert.ok(manifest.permissions.includes(permission), `missing Chrome permission: ${permission}`);
   }
-  assert.equal(manifest.content_security_policy.extension_pages, "script-src 'self'; object-src 'self'");
+  assert.ok(!manifest.permissions.includes("windows"), "chrome.windows does not require a synthetic windows permission");
+  assert.ok(
+    manifest.content_security_policy === undefined
+      || manifest.content_security_policy?.extension_pages === "script-src 'self'; object-src 'self'",
+    "MV3 extension CSP must be omitted for Chrome default or use the exact self-only policy",
+  );
 });
 
 await check("raw CDP policy is an exact read-only allowlist", () => {
