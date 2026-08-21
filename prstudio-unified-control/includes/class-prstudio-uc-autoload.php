@@ -144,6 +144,7 @@ final class PRSTUDIO_UC_Autoload {
             'PRSTUDIO_UC_Secrets_Vault' => 'includes/class-prstudio-uc-safety-runtime.php',
             'PRSTUDIO_UC_SEO_Autopilot' => 'includes/class-prstudio-uc-seo-autopilot.php',
             'PRSTUDIO_UC_SEO_Intelligence' => 'includes/class-prstudio-uc-seo-intelligence.php',
+            'PRSTUDIO_UC_SEO_Operating_Policy' => 'includes/class-prstudio-uc-seo-operating-policy.php',
             'PRSTUDIO_UC_Sequential_Thinking' => 'includes/class-prstudio-uc-sequential-thinking.php',
             'PRSTUDIO_UC_Site_Context' => 'includes/class-prstudio-uc-site-context.php',
             'PRSTUDIO_UC_Site_Sentinel' => 'includes/class-prstudio-uc-site-sentinel.php',
