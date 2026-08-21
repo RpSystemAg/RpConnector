@@ -13,6 +13,7 @@ final class PRSTUDIO_UC_Public_Tool_Contracts {
     /** @var string[] */
     private const TARGETS = array(
         'agency_status',
+        'browser_adopt_tabs',
         'browser_launch',
         'browser_open',
         'browser_screenshot',
@@ -91,6 +92,24 @@ final class PRSTUDIO_UC_Public_Tool_Contracts {
             case 'prstudio_context_status':
             case 'sequential_thinking_status':
                 $input['maxProperties'] = 0;
+                break;
+
+            case 'browser_adopt_tabs':
+                // This tool is deliberately compact. It is the only safe route
+                // for taking over an already-open user tab, so it must remain
+                // cheap enough to survive the hard tools/list budget instead of
+                // disappearing behind generic capability discovery.
+                $description = 'Adopt explicitly selected already-open HTTP(S) tabs into the current execution lane.';
+                $input = self::obj( array(
+                    'lane_handle' => self::str( 'Lane handle.', array( 'minLength' => 1, 'maxLength' => 512 ) ),
+                    'tab_ids' => array( 'type' => 'array', 'items' => array( 'type' => 'integer', 'minimum' => 1 ), 'maxItems' => 12, 'uniqueItems' => true ),
+                    'origin' => self::str( 'Exact HTTP(S) origin.', array( 'minLength' => 1, 'maxLength' => 2048 ) ),
+                    'url_contains' => self::str( 'URL substring.', array( 'minLength' => 1, 'maxLength' => 2048 ) ),
+                    'title_contains' => self::str( 'Title substring.', array( 'minLength' => 1, 'maxLength' => 512 ) ),
+                    'limit' => array( 'type' => 'integer', 'minimum' => 1, 'maximum' => 12 ),
+                    'device_id' => self::str( 'Optional device ID.', array( 'minLength' => 1, 'maxLength' => 256 ) ),
+                    'sync_wait_seconds' => array( 'type' => 'integer', 'minimum' => 0, 'maximum' => 20 ),
+                ) );
                 break;
 
             case 'browser_launch':
@@ -471,6 +490,7 @@ final class PRSTUDIO_UC_Public_Tool_Contracts {
     private static function lead( string $name ): string {
         $map = array(
             'agency_status' => 'Inspect durable agency queues, schedules, dead letters, Browser availability, and truthful H24 runner health.',
+            'browser_adopt_tabs' => 'Adopt explicitly selected already-open HTTP(S) tabs into the current execution lane.',
             'browser_launch' => 'Establish the paired Browser Agent human-work context for an execution lane before controlled browsing.',
             'browser_open' => 'Open one HTTP(S) URL or bare web host in the controlled Browser Agent and take ownership of the resulting tab.',
             'browser_screenshot' => 'Capture bounded visual evidence from a controlled Browser Agent tab, with optional OCR only when needed.',
