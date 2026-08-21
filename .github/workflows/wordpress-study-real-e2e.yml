@@ -237,8 +237,24 @@ jobs:
             exit 1
           fi
           echo "MCP cold tools/list took $(( $(date +%s) - warm_start ))s" | tee "$E2E_ARTIFACT_DIR/mcp-warmup-seconds.txt"
-          jq -e '.result.tools | length > 0' /tmp/rpconnector-study-preflight.json > /dev/null
           cp /tmp/rpconnector-study-preflight.json "$E2E_ARTIFACT_DIR/mcp-preflight.json"
+          # Show what came back before judging it.
+          #
+          # The first version of this line was `jq -e '...' > /dev/null`, which
+          # fails silently: when the assertion did not hold the step exited
+          # instantly, printed nothing, and looked exactly like the endpoint
+          # never answering. It cost a full run to work out that the request had
+          # in fact succeeded and only the shape check had failed -- a
+          # diagnostic step that hides its own evidence is worse than no
+          # diagnostic step, because it produces confident wrong conclusions.
+          if ! jq -e '.result.tools | length > 0' /tmp/rpconnector-study-preflight.json > /dev/null; then
+            echo "::error::the MCP endpoint answered but tools/list carried no tools"
+            head -c 2000 /tmp/rpconnector-study-preflight.json
+            echo
+            tail -n 40 "$E2E_ARTIFACT_DIR/wordpress-server.log" || true
+            exit 1
+          fi
+          echo "MCP preflight: $(jq -r '.result.tools | length' /tmp/rpconnector-study-preflight.json) tools exposed"
 
       - name: Execute natural WordPress study through real MCP + paired Chrome
         run: |
