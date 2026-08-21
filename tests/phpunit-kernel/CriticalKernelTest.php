@@ -56,6 +56,37 @@ final class CriticalKernelTest extends \PHPUnit\Framework\TestCase {
         self::assertSame($first['idempotency_key'], $second['idempotency_key']);
         self::assertSame($first['plan_hash'], $second['plan_hash']);
         self::assertSame('job-1', $first['job_uuid']);
+
+        $legacy = PRSTUDIO_UC_Job_Engine::create_browser_task(
+            'playwright_goto',
+            array(
+                'request_id' => 'browser-wire-1',
+                'url' => 'https://trends.google.com/',
+                '_prstudio_lane_id' => 'lane-controller-a',
+                'lane_token' => 'must-never-reach-extension',
+            ),
+            'device-1',
+            'job-browser-wire'
+        );
+        self::assertSame('lane-controller-a', $legacy['arguments']['controller_session_id']);
+        self::assertSame('lane-controller-a', $legacy['arguments']['_prstudio_controller_session_id']);
+        self::assertSame('lane-controller-a', $legacy['arguments']['_prstudio_lane_id']);
+        self::assertArrayNotHasKey('lane_token', $legacy['arguments']);
+        self::assertArrayNotHasKey('laneToken', $legacy['arguments']);
+
+        $modern = PRSTUDIO_UC_Job_Engine::create_browser_task(
+            'playwright_goto',
+            array(
+                'request_id' => 'browser-wire-1',
+                'url' => 'https://trends.google.com/',
+                'controller_session_id' => 'lane-controller-a',
+                '_prstudio_lane_id' => 'lane-controller-a',
+            ),
+            'device-1',
+            'job-browser-wire'
+        );
+        self::assertSame($legacy['plan_hash'], $modern['plan_hash']);
+        self::assertSame($legacy['idempotency_key'], $modern['idempotency_key']);
     }
 
     public function testVerifierNeverUpgradesMissingApplicationEvidence(): void {
