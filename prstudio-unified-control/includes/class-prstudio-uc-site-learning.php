@@ -427,7 +427,7 @@ JS;
         return array(
             array('type'=>'click','selector'=>(string)$section['selector'],'selectorType'=>'css','expectedOrigin'=>$origin,'timeoutMs'=>30000,'_prstudio_exploratory_read_only'=>true),
             array('type'=>'wait_load','state'=>'complete','timeoutMs'=>45000),
-            array('type'=>'javascript_exec','script'=>self::wordpress_observation_script($key,$expected_page),'timeoutMs'=>30000),
+            array('type'=>'javascript_exec','script'=>self::wordpress_observation_script($key),'timeoutMs'=>30000),
             array('type'=>'screenshot','fullPage'=>true,'lazyLoad'=>true,'format'=>'auto','quality'=>82,'maxPixels'=>28000000),
         );
     }
@@ -437,7 +437,7 @@ JS;
         return array(
             array('type'=>'click','selector'=>'.tablenav.top a.next-page, .tablenav-pages a.next-page','selectorType'=>'css','expectedOrigin'=>$origin,'timeoutMs'=>30000,'_prstudio_exploratory_read_only'=>true),
             array('type'=>'wait_load','state'=>'complete','timeoutMs'=>45000),
-            array('type'=>'javascript_exec','script'=>self::wordpress_observation_script($key),'timeoutMs'=>30000),
+            array('type'=>'javascript_exec','script'=>self::wordpress_observation_script($key,$expected_page),'timeoutMs'=>30000),
             array('type'=>'screenshot','fullPage'=>true,'lazyLoad'=>true,'format'=>'auto','quality'=>82,'maxPixels'=>28000000),
         );
     }
