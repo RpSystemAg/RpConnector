@@ -12,6 +12,7 @@
     "debugger",
     "activeTab",
     "downloads",
+    "notifications",
     "webNavigation",
     "sidePanel",
     "tabGroups"
