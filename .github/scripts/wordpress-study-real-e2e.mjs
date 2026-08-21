@@ -128,7 +128,42 @@ async function waitForExpression(cdp, sessionId, expression, label, timeoutMs = 
   throw new Error(`Timed out waiting for ${label}; last=${lastError?.message || JSON.stringify(lastValue)}`);
 }
 async function navigate(cdp, sessionId, url) { await cdp.send('Page.navigate', { url }, sessionId); await waitForExpression(cdp, sessionId, 'document.readyState === "complete"', `load ${url}`, 25000); }
-async function screenshot(cdp, sessionId, filename) { const result = await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, fromSurface: true }, sessionId); await writeFile(join(artifactDir, filename), Buffer.from(result.data, 'base64')); }
+/**
+ * Capture the page the way the extension already learned to.
+ *
+ * `fromSurface: true` photographs the compositor surface, and a headless tab
+ * that is not the visible one has no surface: CDP answers "Cannot take
+ * screenshot with 0 width", which reads as a fact about the page and is a fact
+ * about the capture mode. This job failed on it twice, once after four
+ * successful MCP calls and once before any -- the same run, intermittently,
+ * because whether a surface exists depends on what else Chrome is doing.
+ *
+ * prstudio-unified-browser-agent/lib/screenshot-candidates.js solved this
+ * inside the product: its chain ends with a renderer capture precisely because
+ * every surface variant photographs nothing at all when there is no surface.
+ * The test harness was still demanding one. It now pins an explicit viewport
+ * and walks the same fallback, so a screenshot is evidence rather than a
+ * coin toss.
+ */
+async function screenshot(cdp, sessionId, filename) {
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false }, sessionId).catch(() => {});
+  const candidates = [
+    { format: 'png', captureBeyondViewport: true, fromSurface: true },
+    { format: 'png', fromSurface: true },
+    { format: 'png', fromSurface: false },
+  ];
+  let lastError = null;
+  for (const params of candidates) {
+    try {
+      const result = await cdp.send('Page.captureScreenshot', params, sessionId);
+      if (result?.data) {
+        await writeFile(join(artifactDir, filename), Buffer.from(result.data, 'base64'));
+        return;
+      }
+    } catch (error) { lastError = error; }
+  }
+  throw lastError || new Error(`screenshot produced no data: ${filename}`);
+}
 async function findExtensionId(cdp) {
   const deadline = Date.now() + 15000;
   while (Date.now() < deadline) { const infos = (await cdp.send('Target.getTargets')).targetInfos || []; const worker = infos.find((t) => t.type === 'service_worker' && String(t.url || '').startsWith('chrome-extension://') && String(t.url || '').endsWith('/service-worker.js')); if (worker) return String(worker.url).split('/')[2]; await sleep(200); }
