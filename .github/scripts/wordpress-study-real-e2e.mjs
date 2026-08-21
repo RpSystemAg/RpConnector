@@ -294,6 +294,7 @@ function assertStudySnapshot(snapshot, fixture, { requireIncremental = false } =
     coverage: module.coverage || null,
     last_observation_shape: module.last_observation_shape || null,
     last_stop: module.last_stop || null,
+    study_log: module.study_log || null,
     table_sections: tables.map((table) => String(table.section || '')),
     table_summary: tables.map((table) => ({
       section: table.section || null,

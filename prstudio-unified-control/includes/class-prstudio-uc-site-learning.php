@@ -557,15 +557,35 @@ $module_id=(string)$state['module_id'];$origin=(string)$state['origin'];$index=(
         $tables=array();foreach((array)($posts_observation['tables']??array()) as $table){if(!is_array($table))continue;$row_keys=array();foreach((array)($table['rows']??array()) as $row)if(is_array($row))$row_keys[]=self::row_key($row);$tables[]=array('id'=>(string)($table['id']??''),'headers'=>array_values((array)($table['headers']??array())),'row_keys'=>$row_keys,'total_pages'=>(int)($table['pagination']['total']??1));}return array('menu'=>$menu,'posts_first_page'=>$tables);
     }
 
+    /**
+     * A short account of what each completion actually did.
+     *
+     * The study advances by chaining: every finished flow decides what to queue
+     * next. When it stops early there is no single failure to look at -- the
+     * chain simply does not continue, and every individual piece reports
+     * success. Two browser tasks completed, the queue was empty, nothing was
+     * dispatched, and coverage sat at 12.5% with no error anywhere.
+     *
+     * Twenty entries of phase, what was merged and what was queued is enough to
+     * read the chain back and see which link returned nothing.
+     *
+     * @param array<string,mixed> $state  Module state, by reference.
+     * @param string              $phase  Which flow completed.
+     * @param array<string,mixed> $detail Compact facts, no page content.
+     */
+    private static function note( array &$state, string $phase, array $detail ): void {
+        $state['study_log'] = array_slice( array_merge( (array) ( $state['study_log'] ?? array() ), array( array_merge( array( 'phase' => $phase, 'gmt' => gmdate( 'c' ) ), $detail ) ) ), -20 );
+    }
+
     private static function queue_wordpress_next( array $task, array &$state, array $last_tables=array() ): array {
-        $active=(array)($state['active_section']??array());foreach($last_tables as $summary){if(!is_array($summary))continue;if(!empty($summary['has_next'])&&(int)$summary['page']<(int)$summary['total']){$state['metrics']['wordpress_pagination_clicks']=(int)$state['metrics']['wordpress_pagination_clicks']+1;$state['metrics']['safe_clicks']=(int)$state['metrics']['safe_clicks']+1;return self::queue_browser_flow($task,$state,'wordpress_pagination',self::wordpress_next_page_steps($active,(string)$state['origin'],(int)$summary['page']+1),array('_prstudio_wordpress_section'=>$active));}}
+        $active=(array)($state['active_section']??array());self::note($state,'queue_next',array('tables_in'=>count($last_tables),'pending_sections'=>count((array)($state['pending_sections']??array())),'active'=>self::section_key($active)));foreach($last_tables as $summary){if(!is_array($summary))continue;if(!empty($summary['has_next'])&&(int)$summary['page']<(int)$summary['total']){$state['metrics']['wordpress_pagination_clicks']=(int)$state['metrics']['wordpress_pagination_clicks']+1;$state['metrics']['safe_clicks']=(int)$state['metrics']['safe_clicks']+1;return self::queue_browser_flow($task,$state,'wordpress_pagination',self::wordpress_next_page_steps($active,(string)$state['origin'],(int)$summary['page']+1),array('_prstudio_wordpress_section'=>$active));}}
         if($active){$key=self::section_key($active);if(isset($state['admin']['sections'][$key]))$state['admin']['sections'][$key]['visited']=true;}
         $pending=array_values((array)($state['pending_sections']??array()));if(!$pending){self::update_coverage($state);$state['state']='ready';$state['active_task_id']='';$state['drift']['revalidation_required']=false;return array('queued'=>false,'defer_parent'=>false);}
         $next=array_shift($pending);$state['pending_sections']=$pending;$state['active_section']=$next;$state['metrics']['safe_clicks']=(int)$state['metrics']['safe_clicks']+1;return self::queue_browser_flow($task,$state,'wordpress_section',self::wordpress_section_steps($next,(string)$state['origin']),array('_prstudio_wordpress_section'=>$next));
     }
 
     private static function handle_wordpress_completion( array $task, array $result, array $verification, array &$state ): array {
-        $phase=(string)($task['arguments']['_prstudio_site_phase']??'wordpress_probe');$state['mode']='wordpress_admin';$state['metrics']['screenshots']=(int)$state['metrics']['screenshots']+count(self::artifact_refs($result));
+        $phase=(string)($task['arguments']['_prstudio_site_phase']??'wordpress_probe');$state['mode']='wordpress_admin';self::note($state,'completion',array('for_phase'=>$phase,'task'=>substr((string)($task['task_uuid']??''),0,8),'has_section_value'=>!empty(self::value_of_kind($result,'wordpress_section')),'has_probe_value'=>!empty(self::value_of_kind($result,'wordpress_probe'))));$state['metrics']['screenshots']=(int)$state['metrics']['screenshots']+count(self::artifact_refs($result));
         if('wordpress_probe'===$phase){
             $state['metrics']['wordpress_probe_runs']=(int)$state['metrics']['wordpress_probe_runs']+1;$state['metrics']['safe_clicks']=(int)$state['metrics']['safe_clicks']+1;$probe=self::value_of_kind($result,'wordpress_probe');$posts=self::value_of_kind($result,'wordpress_section');
             if(empty($probe['wordpress_admin'])){$state['state']='studied_degraded';$state['drift']['revalidation_required']=true;$state['last_probe_shape']=self::result_shape($result);return array('ok'=>false,'handled'=>true,'defer_parent'=>false,'reason'=>'wordpress_admin_not_observed','probe_shape'=>$state['last_probe_shape']);}
