@@ -2,7 +2,7 @@
 
 if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
 
-/** Evidence observer only. It classifies what happened after execution and never authorizes, vetoes, rolls back or fails a mutation. */
+/** Evidence observer only. It classifies what happened after execution and never authorizes, vetoes or rolls back a mutation. */
 final class PRSTUDIO_UC_Verifier {
 	private static function boolean_flag( $value ): ?bool {
 		if ( is_bool( $value ) ) { return $value; }
@@ -26,6 +26,34 @@ final class PRSTUDIO_UC_Verifier {
 		return is_string( $value ) || is_int( $value ) || is_float( $value ) ? (string) $value : '';
 	}
 
+	private static function first_boolean( array $source, array $keys ): ?bool {
+		foreach ( $keys as $key ) {
+			if ( ! array_key_exists( $key, $source ) || null === $source[ $key ] ) { continue; }
+			$flag = self::boolean_flag( $source[ $key ] );
+			if ( null !== $flag ) { return $flag; }
+		}
+		return null;
+	}
+
+	private static function mutating_browser_action( string $action, string $step_type ): bool {
+		$read_only_steps = array(
+			'agent_status', 'list_tabs', 'wait', 'wait_load', 'wait_url', 'wait_selector',
+			'extract_text', 'dom_snapshot', 'page_snapshot', 'accessibility_snapshot',
+			'computed_styles', 'screenshot', 'screenshot_element', 'pdf', 'network_report',
+			'console_report', 'page_errors', 'headers', 'service_workers', 'core_web_vitals',
+			'accessibility_scan', 'observation_bundle', 'find_elements', 'verify_url',
+		);
+		if ( '' !== $step_type && in_array( $step_type, $read_only_steps, true ) ) { return false; }
+		$read_only_actions = array(
+			'playwright_content', 'playwright_dom_snapshot', 'playwright_accessibility_snapshot',
+			'playwright_screenshot_page', 'playwright_screenshot_element', 'playwright_page_errors',
+			'playwright_console_report', 'playwright_network_report', 'playwright_headers',
+			'playwright_status', 'playwright_list_pages', 'playwright_get_pages',
+		);
+		if ( in_array( $action, $read_only_actions, true ) ) { return false; }
+		return true;
+	}
+
 	public static function browser_result( array $task, array $result ): array {
 		$verified = true === ( $result['verified'] ?? false );
 		$step_value = $result['stepType'] ?? $result['step_type'] ?? '';
@@ -42,12 +70,29 @@ final class PRSTUDIO_UC_Verifier {
 			$accepted_valid = null !== $accepted;
 		}
 		$reason = $verified ? '' : 'browser_result_missing_verified_evidence';
-
-		// Search Console completion is data-semantic, not merely transport/UI
-		// dispatch. The Browser Agent wraps its collector result under
-		// observation.data, so validate the requested surface there as well as at
-		// the top level.
 		$action = sanitize_key( self::text_value( $task['action'] ?? '' ) );
+		$strength = sanitize_key( self::text_value( $result['verificationStrength'] ?? $result['verification_strength'] ?? '' ) );
+		$effect_verified = self::first_boolean( $result, array(
+			'effectVerified', 'effect_verified', 'applicationEffectVerified', 'application_effect_verified',
+			'postconditionVerified', 'postcondition_verified',
+		) );
+
+		// A dispatch receipt proves only that Chrome accepted an instruction. For
+		// mutating browser actions it is not evidence that the application state
+		// changed. An explicit negative effect signal always wins; a weak
+		// transport/UI strength cannot be promoted to verified without a positive
+		// effect/application signal.
+		if ( $verified && false === $effect_verified ) {
+			$verified = false;
+			$reason = 'browser_effect_rejected_or_unverified';
+		}
+		$weak_strength = in_array( $strength, array( 'transport_or_ui_dispatch', 'transport_only', 'dispatch_only', 'ui_dispatch' ), true );
+		if ( $verified && $weak_strength && self::mutating_browser_action( $action, $step_type ) && true !== $effect_verified && true !== $accepted ) {
+			$verified = false;
+			$reason = 'browser_effect_not_verified';
+		}
+
+		// Search Console completion is data-semantic, not merely transport/UI dispatch.
 		$observation = is_array( $result['observation'] ?? null ) ? $result['observation'] : array();
 		$payload = is_array( $observation['data'] ?? null ) ? $observation['data'] : $result;
 		if ( $verified && str_starts_with( $action, 'search_console_' ) ) {
@@ -69,12 +114,6 @@ final class PRSTUDIO_UC_Verifier {
 				$inspection = is_array( $payload['structuredInspection'] ?? null ) ? $payload['structuredInspection'] : ( is_array( $payload['inspection'] ?? null ) ? $payload['inspection'] : array() );
 				$verified = $property_ok && ! empty( $inspection['data_verified'] ) && ! empty( $inspection['verified_fields'] );
 				if ( ! $verified ) { $reason = 'gsc_url_inspection_data_not_verified'; }
-				// "Request indexing" is dispatched as a URL inspection carrying
-				// request_indexing=true -- there is no distinct queued action name --
-				// so without this branch the run was graded on the inspection alone
-				// and reported verified while the indexing request itself was never
-				// confirmed. That is a false positive on the one part the caller
-				// actually asked for, so require the confirmation when it was requested.
 				if ( $verified && self::boolean_flag( $args['request_indexing'] ?? false ) ) {
 					$indexing = is_array( $payload['indexingRequest'] ?? null ) ? $payload['indexingRequest'] : array();
 					$verified = ! empty( $indexing['verified'] );
@@ -101,7 +140,8 @@ final class PRSTUDIO_UC_Verifier {
 			'step_type' => $step_type,
 			'evidence_hash' => hash( 'sha256', PRSTUDIO_UC_Idempotency::canonical_json( $result ) ),
 			'application_accepted' => $accepted,
-			'verification_strength' => sanitize_key( self::text_value( $result['verificationStrength'] ?? $result['verification_strength'] ?? '' ) ),
+			'effect_verified' => $effect_verified,
+			'verification_strength' => $strength,
 			'reason' => $reason,
 			'verified_gmt' => gmdate( 'c' ),
 		);
@@ -111,9 +151,10 @@ final class PRSTUDIO_UC_Verifier {
 	public static function control_receipt( string $route, string $action, array $outcome, $result ): array {
 		$executed = ! empty( $outcome['executed'] );
 		$verified = ! empty( $outcome['verified'] );
-		$reason = $executed && ! $verified ? 'executed_evidence_unverified' : '';
+		$ok = $executed && $verified;
+		$reason = ! $executed ? 'execution_not_observed' : ( ! $verified ? 'executed_effect_unverified' : '' );
 		return array(
-			'ok' => true,
+			'ok' => $ok,
 			'executed' => $executed,
 			'verified' => $verified,
 			'degraded' => $executed && ! $verified,
