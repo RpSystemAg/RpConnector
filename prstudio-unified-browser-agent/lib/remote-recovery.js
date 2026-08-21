@@ -1,7 +1,12 @@
-export const REMOTE_RECOVERY_POLICY_VERSION = "1.0.0";
+export const REMOTE_RECOVERY_POLICY_VERSION = "1.1.0";
 export const REMOTE_MAX_STEP_ATTEMPTS = 2;
 export const REMOTE_MAX_FRESH_RESTARTS = 1;
+export const HARD_TASK_WATCHDOG_ALARM = "prstudio-hard-task-watchdog";
+export const HARD_TASK_WATCHDOG_PERIOD_MINUTES = 0.5;
+export const HARD_TASK_WATCHDOG_COOLDOWN_MS = 5 * 60 * 1000;
 
+const ACTIVE_TASK_STORAGE_KEY = "prstudioActiveTask";
+const HARD_RECOVERY_STORAGE_KEY = "prstudioHardRecovery";
 const RETRY_SAFE_TYPES = new Set(["scroll", "wait_selector", "wait_url", "wait_load", "reload"]);
 const PRE_DISPATCH_CODES = [
   "pointer_event_invalid",
@@ -74,6 +79,14 @@ export function stepWatchdogMs(step = {}) {
     : 0;
   const type = stepType(record);
   const defaults = {
+    open_tab: 30000,
+    navigate: 50000,
+    click: 30000,
+    fill: 30000,
+    type_text: 30000,
+    press: 30000,
+    select: 30000,
+    check: 30000,
     screenshot: 9500,
     screenshot_element: 9500,
     scroll: 18000,
@@ -82,8 +95,9 @@ export function stepWatchdogMs(step = {}) {
     wait_url: 35000,
     wait_load: 50000,
     reload: 50000,
+    contract_action: 60000,
   };
-  const base = requested > 0 ? requested + 5000 : (defaults[type] || 90000);
+  const base = requested > 0 ? requested + 5000 : (defaults[type] || 60000);
   // Screenshot is an interactive operation: caller-provided timeouts may make
   // the internal attempt shorter, but can never expand the public envelope.
   if (type === "screenshot" || type === "screenshot_element") return Math.max(5000, Math.min(9500, base));
@@ -137,6 +151,65 @@ export function noProgressExceeded(state = {}, now = Date.now()) {
       ? 15000
       : type === "contract_action" && action === "playwright_responsive_matrix"
         ? 30000
-        : 120000;
+        : stepWatchdogMs({ type, action });
   return now - activityAt > limit;
 }
+
+/**
+ * MV3 service workers can remain alive while an unresolved extension API
+ * promise monopolises the task lane. AbortController alone cannot cancel a
+ * Chrome API promise that never observes its signal. This independent alarm is
+ * the final fail-closed circuit: once the persisted in-flight step exceeds its
+ * bounded no-progress budget, reload the extension exactly once for that
+ * attempt. Startup recovery then reconciles the persisted task/lease and never
+ * blindly replays an uncertain mutation.
+ */
+export function installHardTaskWatchdog(chromeApi = globalThis.chrome) {
+  if (!chromeApi?.alarms?.create || !chromeApi?.alarms?.onAlarm?.addListener || !chromeApi?.storage?.local || !chromeApi?.runtime?.reload) {
+    return false;
+  }
+
+  try {
+    chromeApi.alarms.create(HARD_TASK_WATCHDOG_ALARM, {
+      delayInMinutes: HARD_TASK_WATCHDOG_PERIOD_MINUTES,
+      periodInMinutes: HARD_TASK_WATCHDOG_PERIOD_MINUTES,
+    });
+  } catch {
+    return false;
+  }
+
+  chromeApi.alarms.onAlarm.addListener(async (alarm) => {
+    if (alarm?.name !== HARD_TASK_WATCHDOG_ALARM) return;
+    try {
+      const row = await chromeApi.storage.local.get([ACTIVE_TASK_STORAGE_KEY, HARD_RECOVERY_STORAGE_KEY]);
+      const state = row?.[ACTIVE_TASK_STORAGE_KEY] || null;
+      if (!state?.taskId || !noProgressExceeded(state)) return;
+
+      const attemptId = String(state?.inFlight?.attemptId || "");
+      const marker = row?.[HARD_RECOVERY_STORAGE_KEY] || null;
+      const sameAttempt = marker
+        && String(marker.taskId || "") === String(state.taskId)
+        && String(marker.attemptId || "") === attemptId;
+      const recent = sameAttempt && Number.isFinite(Number(marker.at))
+        && (Date.now() - Number(marker.at)) < HARD_TASK_WATCHDOG_COOLDOWN_MS;
+      if (recent) return;
+
+      await chromeApi.storage.local.set({
+        [HARD_RECOVERY_STORAGE_KEY]: {
+          taskId: String(state.taskId),
+          attemptId,
+          stepType: String(state?.inFlight?.type || ""),
+          at: Date.now(),
+          reason: "hard_no_progress_reload",
+        },
+      });
+      chromeApi.runtime.reload();
+    } catch {
+      // Never let the watchdog itself terminate the service worker. The normal
+      // lease timeout/recovery path remains available if storage is unhealthy.
+    }
+  });
+  return true;
+}
+
+installHardTaskWatchdog();
