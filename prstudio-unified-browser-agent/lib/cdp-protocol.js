@@ -1,11 +1,17 @@
-export const DEBUGGER_PROTOCOL_CANDIDATES = Object.freeze(["1.3", "0.1"]);
+// chrome.debugger.attach does NOT take the DevTools browser protocol version
+// (for example 1.3). Its requiredVersion contract is the Chrome Extensions
+// debugger API protocol version. Chrome documents "0.1": the major must match
+// and the browser minor must be >= the requested minor. Supplying 1.3 first
+// created a deterministic compatibility failure before every valid attach and
+// could leave the target in an ambiguous state on some Chrome builds.
+export const DEBUGGER_PROTOCOL_CANDIDATES = Object.freeze(["0.1"]);
 
 export async function attachWithProtocolFallback(debuggerApi, target, isAttached = async () => false) {
   const errors = [];
   for (const protocolVersion of DEBUGGER_PROTOCOL_CANDIDATES) {
     try {
       await debuggerApi.attach(target, protocolVersion);
-      return { ok: true, protocolVersion, fallbackUsed: protocolVersion !== DEBUGGER_PROTOCOL_CANDIDATES[0], errors };
+      return { ok: true, protocolVersion, fallbackUsed: false, errors };
     } catch (error) {
       const message = String(error?.message || error);
       let attached;
@@ -14,12 +20,16 @@ export async function attachWithProtocolFallback(debuggerApi, target, isAttached
       } catch (stateError) {
         const verificationError = new Error("Debugger attach state could not be verified after attach failure.");
         verificationError.code = "cdp_attach_state_unverified";
-        verificationError.details = { protocolVersion, attachError: message.slice(0, 240), stateError: String(stateError?.message || stateError).slice(0, 240) };
+        verificationError.details = {
+          protocolVersion,
+          attachError: message.slice(0, 240),
+          stateError: String(stateError?.message || stateError).slice(0, 240),
+        };
         throw verificationError;
       }
       if (attached) {
         if (/already attached|Another debugger is already attached/i.test(message)) {
-          return { ok: true, protocolVersion, fallbackUsed: protocolVersion !== DEBUGGER_PROTOCOL_CANDIDATES[0], alreadyAttached: true, errors };
+          return { ok: true, protocolVersion, fallbackUsed: false, alreadyAttached: true, errors };
         }
         const ambiguousError = new Error("Debugger attach failed but target reports attached; protocol replay is unsafe without a clean state.");
         ambiguousError.code = "cdp_attach_state_ambiguous";
@@ -29,7 +39,7 @@ export async function attachWithProtocolFallback(debuggerApi, target, isAttached
       errors.push({ protocolVersion, message: message.slice(0, 240) });
     }
   }
-  const error = new Error("No compatible Chrome DevTools Protocol version could be negotiated.");
+  const error = new Error("Chrome extension debugger protocol 0.1 could not be attached to the target.");
   error.code = "cdp_protocol_incompatible";
   error.details = { candidates: [...DEBUGGER_PROTOCOL_CANDIDATES], errors };
   throw error;
