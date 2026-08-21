@@ -68,8 +68,17 @@ jobs:
             -e MARIADB_DATABASE="$PRSTUDIO_TEST_DB_NAME" \
             -p 3306:3306 \
             mariadb:11.4@sha256:a794d9eb009e20de605858a11f32f63b4075cbd197c650436f0e3b457e4caed7
+          # mysqli_report(MYSQLI_REPORT_OFF) is what makes this a probe rather
+          # than a crash. Since PHP 8.1 mysqli throws on connection failure and
+          # @ does not suppress an exception, so every attempt made while the
+          # container was still starting printed "PHP Fatal error: Uncaught
+          # mysqli_sql_exception: MySQL server has gone away". The loop still
+          # worked -- a fatal exits non-zero too -- but it wrote four fatal
+          # database errors into the log of a job whose real failure was
+          # somewhere else entirely, which is exactly the wrong thing for a
+          # diagnostic artifact to do.
           for i in $(seq 1 90); do
-            if php -r '$m=@new mysqli("127.0.0.1","root","","",3306); exit($m->connect_errno?1:0);'; then exit 0; fi
+            if php -r 'mysqli_report(MYSQLI_REPORT_OFF); $m=@new mysqli("127.0.0.1","root","","",3306); exit($m->connect_errno?1:0);'; then exit 0; fi
             sleep 1
           done
           docker logs rpconnector-study-db
@@ -108,6 +117,20 @@ jobs:
           wp user create studyviewer2 studyviewer2@example.invalid --role=author --user_pass='ReadOnlyFixture-2!' --path="$RP_WP_PATH" >/dev/null
           jq -Rn '[inputs|select(length>0)|tonumber] | {post_ids:., expected_post_count:length, expected_min_pages:2}' < /tmp/wordpress-study-post-ids.txt > "$WORDPRESS_STUDY_FIXTURE"
           jq -e '.expected_post_count == 37 and .expected_min_pages == 2' "$WORDPRESS_STUDY_FIXTURE"
+          # Pretty permalinks, before anything asks WordPress for /wp-json/.
+          #
+          # Without a rewrite structure WordPress serves the REST index only at
+          # /?rest_route=/, and /wp-json/ returns an ordinary 404 page. The
+          # readiness gate below pipes that page into jq, which reports
+          # "Invalid numeric literal at line 1, column 10" and exits 5 -- an
+          # error that says nothing about WordPress, the plugin, or the study
+          # mission the job exists to prove.
+          #
+          # full-surface-execution.yml already does this for the same reason.
+          # This workflow provisions its own WordPress from scratch and had
+          # inherited the router but not the rewrite rules.
+          wp rewrite structure '/%postname%/' --path="$RP_WP_PATH"
+          wp rewrite flush --path="$RP_WP_PATH"
 
       - name: Capture independent pre-study mutation oracle
         run: |
