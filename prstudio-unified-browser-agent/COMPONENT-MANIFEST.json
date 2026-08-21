@@ -1,0 +1,7 @@
+{
+  "component": "browser_agent",
+  "version": "1.0.0",
+  "generated_by": "tests/build-release.py",
+  "status": "source-placeholder",
+  "note": "The deterministic release builder rewrites this file with the exact component tree digest before packaging; this checked-in placeholder exists so runtime/source-contract consumers have a canonical component manifest path without introducing a second build-identity authority."
+}
