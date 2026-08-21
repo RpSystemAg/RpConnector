@@ -192,6 +192,38 @@ jobs:
           echo "MCP_ACCESS_TOKEN=$token" >> "$GITHUB_ENV"
           rm -f /tmp/rpconnector-study-token
 
+      - name: Confirm WordPress is still answering before the study starts
+        # The study script reported only "TypeError: fetch failed", which in
+        # Node means the socket, not the response -- and says nothing about
+        # who closed it. The server log ended at the readiness check with no
+        # further requests, so the PHP built-in server was already gone by the
+        # time the first MCP call left the script, and fifteen seconds of
+        # Chrome startup sat between the two with nothing watching.
+        #
+        # This step is the watcher. It fails with the server log and the
+        # process state attached, so the next failure names the thing that
+        # died instead of naming fetch.
+        run: |
+          set -euo pipefail
+          pid="$(cat /tmp/rpconnector-study-wp.pid 2>/dev/null || echo '')"
+          if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then
+            echo "::error::the WordPress PHP server (pid $pid) is no longer running"
+            tail -n 80 "$E2E_ARTIFACT_DIR/wordpress-server.log" || true
+            exit 1
+          fi
+          if ! curl --fail --silent --max-time 20 \
+               -H "Authorization: Bearer $MCP_ACCESS_TOKEN" \
+               -H 'Content-Type: application/json' \
+               -H 'MCP-Protocol-Version: 2026-07-28' \
+               --data '{"jsonrpc":"2.0","id":"preflight","method":"tools/list","params":{}}' \
+               "$WP_URL/?rest_route=/prstudio-unified/v1/mcp" > /tmp/rpconnector-study-preflight.json; then
+            echo "::error::the authenticated MCP endpoint did not answer before the study started"
+            tail -n 80 "$E2E_ARTIFACT_DIR/wordpress-server.log" || true
+            exit 1
+          fi
+          jq -e '.result.tools | length > 0' /tmp/rpconnector-study-preflight.json > /dev/null
+          cp /tmp/rpconnector-study-preflight.json "$E2E_ARTIFACT_DIR/mcp-preflight.json"
+
       - name: Execute natural WordPress study through real MCP + paired Chrome
         run: |
           set -euo pipefail
