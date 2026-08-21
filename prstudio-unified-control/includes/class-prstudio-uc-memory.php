@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
  * event hash, making accidental/tampered edits detectable.
  */
 final class PRSTUDIO_UC_Memory {
-    public const VERSION = '5.0.0';
+    public const VERSION = '5.0.1';
     private const MAX_RESOURCES = 50000;
     private const MAX_TXT_BYTES = 8388608;
     private const MAX_CHAIN_BYTES = 33554432;
@@ -137,7 +137,12 @@ final class PRSTUDIO_UC_Memory {
 
     private static function clean( $value, string $key = '', int $depth = 0 ) {
         if ( $depth > 6 ) { return '[MAX_DEPTH]'; }
-        if ( preg_match( '/password|secret|token|api[_-]?key|apikey|credential|authorization|cookie|session|oauth|code_verifier|private_key/i', $key ) ) { return '[REDACTED]'; }
+        // Public continuation credentials are intentionally returned to the MCP
+        // caller and are not bearer secrets. Keep them usable while redacting
+        // actual authentication/session credentials. The former broad `token`
+        // substring rule destroyed write_token and made every observed write
+        // precondition unusable before the anti-crash gate could even run.
+        if ( preg_match( '/password|secret|(?:^|_)(?:access|refresh|id|lane|pairing)_?token(?:$|_)|api[_-]?key|apikey|credential|authorization|cookie|session|oauth|code_verifier|private_key/i', $key ) ) { return '[REDACTED]'; }
         if ( is_object( $value ) ) { $value = get_object_vars( $value ); }
         if ( is_array( $value ) ) {
             $out = array(); $count = 0;
@@ -196,9 +201,7 @@ final class PRSTUDIO_UC_Memory {
             $extras = array();
             foreach ( array( 'mission_id'=>'mission', 'capability'=>'capability', 'state_initial'=>'initial', 'action'=>'action', 'verification'=>'verification', 'evidence'=>'evidence', 'fingerprint'=>'fingerprint', 'memory_reused'=>'memory_reused', 'reason'=>'reason', 'duration_ms'=>'duration_ms' ) as $key=>$label ) {
                 if ( ! array_key_exists( $key, $clean ) || is_array( $clean[$key] ) || is_object( $clean[$key] ) ) { continue; }
-                $value = str_replace( array("
-","
-","	"), ' ', substr( (string) $clean[$key], 0, 180 ) ); $extras[] = $label . '=' . $value;
+                $value = str_replace( array("\n","\n","\t"), ' ', substr( (string) $clean[$key], 0, 180 ) ); $extras[] = $label . '=' . $value;
             }
             $line = sprintf( '[%s] #%d %s%s%s%s job=%s%s hash=%s', $entry['gmt'], $entry['seq'], $entry['event'], $method ? ' via=' . substr( $method, 0, 100 ) : '', $resource ? ' resource=' . $resource : '', $outcome ? ' outcome=' . substr( $outcome, 0, 80 ) : '', $job ?: '-', $extras ? ' ' . implode( ' ', $extras ) : '', substr( $entry['hash'], 0, 16 ) );
             @file_put_contents( self::summary_path(), $line . "\n", FILE_APPEND | LOCK_EX );
