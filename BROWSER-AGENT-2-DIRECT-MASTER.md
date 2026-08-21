@@ -1,1 +1,1 @@
-This candidate is intended for non-forced fast-forward integration into master without a pull request.
+This Browser Agent 2 candidate is integrated into master by non-forced fast-forward without a pull request.
