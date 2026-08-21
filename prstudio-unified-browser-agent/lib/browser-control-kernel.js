@@ -58,16 +58,27 @@ export function sitePermissionDecision({
   requestedUrl = "",
   allowedOrigins = [],
   deniedOrigins = [],
+  unknownPolicy = "deny",
 } = {}) {
   const actualOrigin = originOf(requestedUrl || url);
   const allow = new Set((Array.isArray(allowedOrigins) ? allowedOrigins : []).map(cleanString).filter(Boolean));
   const deny = new Set((Array.isArray(deniedOrigins) ? deniedOrigins : []).map(cleanString).filter(Boolean));
+  const unknown = ["allow", "ask", "deny"].includes(cleanString(unknownPolicy).toLowerCase())
+    ? cleanString(unknownPolicy).toLowerCase()
+    : "deny";
   if (!actualOrigin) return { decision: "deny", reason: "invalid_origin", actualOrigin };
   if (deny.has(actualOrigin)) return { decision: "deny", reason: "explicit_deny", actualOrigin };
-  if (allow.size && !allow.has(actualOrigin)) return { decision: "deny", reason: "not_in_allowlist", actualOrigin };
+  if (allow.has(actualOrigin)) return { decision: "allow", reason: "explicit_allow", actualOrigin };
+  if (allow.size) {
+    return {
+      decision: unknown,
+      reason: unknown === "ask" ? "unknown_origin_requires_handoff" : unknown === "allow" ? "unknown_origin_allowed_by_policy" : "not_in_allowlist",
+      actualOrigin,
+    };
+  }
   return {
     decision: "allow",
-    reason: allow.size ? "explicit_allow" : "open_world",
+    reason: "open_world",
     actualOrigin,
   };
 }
