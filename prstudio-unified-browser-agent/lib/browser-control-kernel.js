@@ -49,8 +49,13 @@ export function isControllerGroup(group = {}) {
 }
 
 function originOf(value = "") {
-  try { return new URL(String(value || "")).origin; }
-  catch { return ""; }
+  try {
+    const url = new URL(String(value || ""));
+    if (url.protocol !== "http:" && url.protocol !== "https:") return "";
+    return url.origin === "null" ? "" : url.origin;
+  } catch {
+    return "";
+  }
 }
 
 export function sitePermissionDecision({
@@ -61,8 +66,8 @@ export function sitePermissionDecision({
   unknownPolicy = "deny",
 } = {}) {
   const actualOrigin = originOf(requestedUrl || url);
-  const allow = new Set((Array.isArray(allowedOrigins) ? allowedOrigins : []).map(cleanString).filter(Boolean));
-  const deny = new Set((Array.isArray(deniedOrigins) ? deniedOrigins : []).map(cleanString).filter(Boolean));
+  const allow = new Set((Array.isArray(allowedOrigins) ? allowedOrigins : []).map(originOf).filter(Boolean));
+  const deny = new Set((Array.isArray(deniedOrigins) ? deniedOrigins : []).map(originOf).filter(Boolean));
   const unknown = ["allow", "ask", "deny"].includes(cleanString(unknownPolicy).toLowerCase())
     ? cleanString(unknownPolicy).toLowerCase()
     : "deny";
