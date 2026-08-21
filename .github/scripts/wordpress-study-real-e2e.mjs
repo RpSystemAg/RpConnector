@@ -173,8 +173,23 @@ async function mcpTool(name, args) {
 }
 
 function wpEval(code) {
-  const output = execFileSync('wp', ['--path', wpPath, 'eval', code], { encoding: 'utf8', env: process.env, maxBuffer: 16 * 1024 * 1024 });
-  return output.trim();
+  // execFileSync throws with the command in the message and the reason in
+  // error.stderr, so an uncaught failure here reports the entire PHP snippet
+  // and none of the PHP error -- which is how a run ended with fifteen lines
+  // of the code that failed and nothing about why. Every diagnosis in this
+  // job so far has come down to making the failure say the true thing, so
+  // this one carries stderr with it.
+  try {
+    return execFileSync('wp', ['--path', wpPath, 'eval', code], { encoding: 'utf8', env: process.env, maxBuffer: 16 * 1024 * 1024 }).trim();
+  } catch (error) {
+    const stderr = String(error?.stderr || '').trim();
+    const stdout = String(error?.stdout || '').trim();
+    throw new Error(`wp eval failed (status ${error?.status ?? '?'})
+-- stderr --
+${stderr || '<empty>'}
+-- stdout --
+${stdout.slice(0, 2000) || '<empty>'}`);
+  }
 }
 function moduleSnapshot() {
   const raw = wpEval(`
