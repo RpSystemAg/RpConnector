@@ -114,9 +114,21 @@ if 'waitForExternalAuthChallenge' not in sw: fail.append('auth challenge auto-re
 if 'observerOnly: true' not in sw: fail.append('human input is not observer-only telemetry')
 if re.search(r'phase\s*=\s*["\']pending["\']',sw): fail.append('runtime uses pending as an execution phase')
 
-# No manual Resume surface.
-ui='\n'.join(p.read_text(errors='replace') for p in [BROWSER/'sidepanel.html',BROWSER/'sidepanel.js'])
-if re.search(r'\bresume\b|riprendi|takeover|acknowledge',ui,re.I): fail.append('manual human control surface remains')
+# No manual Resume/takeover surface. A normal implementation method named
+# `resume()` (for example the panel refresh loop after visibilitychange) is not
+# a human control. Detect actual controls, action names and user-facing labels
+# instead of banning the English verb everywhere in JavaScript.
+html=(BROWSER/'sidepanel.html').read_text(errors='replace')
+js=(BROWSER/'sidepanel.js').read_text(errors='replace')
+manual_control_patterns=[
+    r'id=["\'][^"\']*(?:resume|takeover|acknowledge)[^"\']*["\']',
+    r'data-action=["\'][^"\']*(?:resume|takeover|acknowledge)[^"\']*["\']',
+    r'>\s*(?:resume|riprendi|takeover|acknowledge)\b',
+    r'\bsend\(\s*["\'](?:resume|manual_resume|takeover|acknowledge)["\']',
+    r'\b(?:resume|takeover|acknowledge)(?:Button|Task|Execution)\b',
+]
+if any(re.search(pattern,html,re.I) or re.search(pattern,js,re.I) for pattern in manual_control_patterns):
+    fail.append('manual human control surface remains')
 
 
 def constitution_text(path):
