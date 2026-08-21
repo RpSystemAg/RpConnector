@@ -22,6 +22,61 @@ final class PRSTUDIO_UC_Memory {
         return rtrim( str_replace( '\\', '/', $base ), '/' ) . '/prstudio-unified-private/memory';
     }
 
+    /**
+     * Whether this installation can actually keep what it learns, and if not, why.
+     *
+     * Everything the suite remembers lives under
+     * wp-content/prstudio-unified-private/ -- learned site modules, procedural
+     * skills, evidence. On a hardened host the web user often cannot write
+     * inside wp-content at all, which is a reasonable way to run WordPress and
+     * completely fatal to remembering anything.
+     *
+     * The failure never looked like a permission problem. The skill store said
+     * "Unable to persist procedural skill store", the site module said "Unable
+     * to create private site-learning directory", and an operator who hit it
+     * could only report that saving "had a technical error". Three subsystems,
+     * three fixed sentences, and no path or permission between them.
+     *
+     * This is the single answer to "can it remember", callable before anything
+     * tries: which directory, whether it exists, whether it and the nearest
+     * existing parent are writable, whether wp-content itself is, and what PHP
+     * last complained about.
+     *
+     * A read-only theme or plugin directory is a different matter and is
+     * deliberately absent here. That is frequently intentional on a hardened
+     * host, it does not stop the suite from remembering, and conflating the two
+     * sends the fix in the wrong direction.
+     *
+     * @param string $subpath Optional directory under the memory root.
+     * @return array<string,mixed>
+     */
+    public static function writability( string $subpath = '' ): array {
+        $root = self::root();
+        $dir  = '' === $subpath ? $root : rtrim( $root, '/' ) . '/' . ltrim( str_replace( '\\', '/', $subpath ), '/' );
+
+        // Walk up to whatever does exist: on a fresh install nothing under the
+        // root has been created yet, and "the directory is not writable" is
+        // useless when the directory is not there. The nearest existing parent
+        // is the one whose permissions actually decide the outcome.
+        $existing = $dir;
+        while ( '' !== $existing && ! is_dir( $existing ) && dirname( $existing ) !== $existing ) {
+            $existing = dirname( $existing );
+        }
+
+        $last = error_get_last();
+        return array(
+            'memory_root'          => $root,
+            'target_dir'           => $dir,
+            'target_exists'        => is_dir( $dir ),
+            'target_writable'      => is_dir( $dir ) && is_writable( $dir ),
+            'nearest_existing_dir' => $existing,
+            'nearest_writable'     => '' !== $existing && is_writable( $existing ),
+            'wp_content_writable'  => defined( 'WP_CONTENT_DIR' ) ? is_writable( (string) WP_CONTENT_DIR ) : null,
+            'free_bytes'           => ( '' !== $existing && is_dir( $existing ) ) ? @disk_free_space( $existing ) : null,
+            'last_php_error'       => is_array( $last ) ? substr( (string) ( $last['message'] ?? '' ), 0, 300 ) : '',
+        );
+    }
+
     public static function installation_identity(): string {
         $option = 'prstudio_uc_installation_identity';
         if ( function_exists( 'get_option' ) ) {
