@@ -10,7 +10,6 @@ on:
 permissions:
   contents: read
   actions: read
-  statuses: write
 
 concurrency:
   group: unified-full-suite-${{ github.ref }}
@@ -35,60 +34,370 @@ jobs:
       CHROME_BIN: /usr/bin/chromium
       GITHUB_TOKEN: ${{ github.token }}
     steps:
-      - name: Publish pending commit status
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          curl --fail-with-body --silent --show-error \
-            -X POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "${{ github.api_url }}/repos/${{ github.repository }}/statuses/${{ github.sha }}" \
-            -d '{"state":"pending","context":"unified-full-suite","description":"Unified full suite running","target_url":"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"}'
-
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Execute full repository surface
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: '8.1'
+          extensions: mysqli, mbstring, xml
+          tools: composer, wp-cli:2.12.0, phpunit:10.5
+          coverage: none
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Install mandatory parser, generative and syscall evidence tools
         run: |
           set -euo pipefail
-          python .github/scripts/full-surface-execution.py
+          sudo apt-get update
+          sudo apt-get install -y strace
+          # tiktoken measures the LAW 9 tools/list ceiling with a real tokenizer
+          # instead of the assembler's four-bytes-per-token divisor. Pinned like
+          # the others: a tokenizer that changes under us would move the number
+          # the law is enforced against.
+          python -m pip install --disable-pip-version-check --no-input PyYAML "hypothesis==6.164.0" "tiktoken==0.14.0" sqlglot
+          python - <<'PY'
+          import hypothesis, yaml
+          assert hypothesis.__version__ == '6.164.0', hypothesis.__version__
+          print('Hypothesis', hypothesis.__version__)
+          print('PyYAML', yaml.__version__)
+          PY
+          strace -V
+          wp --info
+          php -v
+          node --version
+          python --version
+          bash --version | head -n 1
 
-      - name: Upload full-suite evidence
+      - name: Deterministic full-repository contract and inventory preflight
+        run: |
+          set -euo pipefail
+          find . -path './.git' -prune -o -type f -name '*.php' -print0 \
+            | xargs -0 -n1 php -l >/tmp/unified-php-lint.txt
+          composer validate --strict --no-check-publish
+          phpunit --configuration phpunit.xml.dist
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/php-mcp-public-contracts-smoke.php
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/php-capability-search-relevance-smoke.php
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/schema-validator-single-file.php
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/enterprise-schema-batch-1.php
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/enterprise-schema-batch-2.php
+          php -d auto_prepend_file=tests/strict-php-errors.php tests/php-mcp-catalog-runtime-smoke.php
+          python3 tests/test-wiring-audit.py
+          build_checkout="$RUNNER_TEMP/rpconnector-preflight-build"
+          git worktree add --detach "$build_checkout" "$GITHUB_SHA"
+          (
+            cd "$build_checkout"
+            python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA"
+            python tests/build-release.py --build
+            python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA" --verify
+            python tests/build-release.py --check
+          )
+          git worktree remove --force "$build_checkout"
+          # Runtime tests consume the deterministic component metadata from the
+          # current checkout. Build it here as an actual test precondition; the
+          # detached pass above independently proves exact-SHA stamp parity.
+          python tests/build-release.py --build
+          node --test prstudio-unified-browser-agent/tests/*.test.mjs
+          if git grep -n -E '^(<<<<<<< |=======|>>>>>>> )' -- ':!composer.lock'; then
+            echo 'Merge conflict marker detected.' >&2
+            exit 1
+          fi
+
+      - name: Start real SQL engine used by integration and WordPress tests
+        run: |
+          set -euo pipefail
+          docker run -d --name rpconnector-full-surface-db \
+            -e MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=yes \
+            -e MARIADB_DATABASE=wordpress_stateful \
+            -p 3306:3306 \
+            mariadb:11.4@sha256:a794d9eb009e20de605858a11f32f63b4075cbd197c650436f0e3b457e4caed7
+          for i in $(seq 1 90); do
+            if php -r '$m=@new mysqli("127.0.0.1","root","", "",3306); exit($m->connect_errno?1:0);'; then
+              break
+            fi
+            if [ "$i" = 90 ]; then
+              docker logs rpconnector-full-surface-db
+              exit 1
+            fi
+            sleep 1
+          done
+          php -r '$m=new mysqli("127.0.0.1","root","", "",3306); if($m->connect_errno){fwrite(STDERR,$m->connect_error);exit(1);} if(!$m->query("CREATE DATABASE IF NOT EXISTS prstudio_full_surface CHARACTER SET utf8mb4")){fwrite(STDERR,$m->error);exit(1);} echo "databases ready\n";'
+
+      - name: Install exact candidate into real WordPress runtime
+        run: |
+          set -euo pipefail
+          rm -rf "$RP_WP_PATH"
+          mkdir -p "$RP_WP_PATH"
+          wp core download --path="$RP_WP_PATH" --version="${RP_WP_VERSION:-7.1}" --force
+          wp config create --path="$RP_WP_PATH" --dbname=wordpress_stateful --dbuser=root --dbpass='' --dbhost=127.0.0.1:3306 --skip-check
+          wp config set WP_ENVIRONMENT_TYPE local --path="$RP_WP_PATH"
+          wp core install --path="$RP_WP_PATH" --url="$WP_URL" --title='Full surface execution' --admin_user=rpadmin --admin_password='Full-Surface-Only-2026!' --admin_email='full-surface@example.invalid' --skip-email
+          wp rewrite structure '/%postname%/' --path="$RP_WP_PATH"
+          wp rewrite flush --path="$RP_WP_PATH"
+          cp -a prstudio-unified-control "$RP_WP_PATH/wp-content/plugins/prstudio-unified-control"
+          wp plugin activate prstudio-unified-control --path="$RP_WP_PATH"
+          wp eval --path="$RP_WP_PATH" 'if (!PRSTUDIO_UC_Store::maybe_upgrade()) { fwrite(STDERR,"store upgrade failed\n"); exit(1); } echo "store ready\n";'
+
+      - name: Serve exact plugin and prove a real authenticated MCP request
+        run: |
+          set -euo pipefail
+          cat > /tmp/rpconnector-full-surface-router.php <<'PHP'
+          <?php
+          $root = rtrim((string) $_SERVER['DOCUMENT_ROOT'], '/');
+          $path = parse_url((string) $_SERVER['REQUEST_URI'], PHP_URL_PATH);
+          $path = is_string($path) ? $path : '/';
+          $candidate = $root . $path;
+          if ($path !== '/' && (is_file($candidate) || is_dir($candidate))) {
+              return false;
+          }
+          require $root . '/index.php';
+          PHP
+          PHP_CLI_SERVER_WORKERS=8 php -S 127.0.0.1:8080 -t "$RP_WP_PATH" /tmp/rpconnector-full-surface-router.php > /tmp/rp-full-surface-wp.log 2>&1 &
+          echo $! > /tmp/rp-full-surface-wp.pid
+          for i in $(seq 1 100); do
+            if curl --fail --silent "$WP_URL/.well-known/oauth-authorization-server" >/tmp/rp-full-surface-oauth.json; then
+              break
+            fi
+            if [ "$i" = 100 ]; then
+              cat /tmp/rp-full-surface-wp.log
+              exit 1
+            fi
+            sleep 0.2
+          done
+          jq -e '.issuer and .token_endpoint and .authorization_endpoint' /tmp/rp-full-surface-oauth.json >/dev/null
+          curl --fail --silent --output /tmp/rp-full-surface-login.html "$WP_URL/wp-login.php"
+          test -s /tmp/rp-full-surface-login.html
+          curl --fail --silent "$WP_URL/wp-json/" > /tmp/rp-full-surface-rest-index.json
+          jq -e '.namespaces | index("prstudio-unified/v1")' /tmp/rp-full-surface-rest-index.json >/dev/null
+
+          token="$(wp eval --path="$RP_WP_PATH" '$m=new ReflectionMethod(PRSTUDIO_UC_MCP_Auth_V5::class,"issue_tokens"); $m->setAccessible(true); $t=$m->invoke(null,"full-surface-runtime","prstudio.read prstudio.write",PRSTUDIO_UC_MCP_Auth_V5::mcp_url()); if (empty($t["access_token"])) { exit(1); } echo $t["access_token"];' | tail -n 1)"
+          test -n "$token"
+          case "$token" in prstudio_at_*) ;; *) echo 'generated token format invalid' >&2; exit 1 ;; esac
+          echo "::add-mask::$token"
+          export RP_MCP_URL="$WP_URL/?rest_route=/prstudio-unified/v1/mcp"
+          export RP_MCP_TOKEN="$token"
+
+          python - <<'PY'
+          import json, os, urllib.request, urllib.error
+          payload=json.dumps({
+              'jsonrpc':'2.0','id':'workflow-auth-baseline','method':'ping',
+              'params':{'_meta':{
+                  'io.modelcontextprotocol/protocolVersion':'2026-07-28',
+                  'io.modelcontextprotocol/clientCapabilities':{},
+                  'io.modelcontextprotocol/clientInfo':{'name':'full-surface-workflow','version':'1.0'},
+              }},
+          }).encode()
+          req=urllib.request.Request(
+              os.environ['RP_MCP_URL'], data=payload, method='POST',
+              headers={
+                  'Authorization':'Bearer '+os.environ['RP_MCP_TOKEN'],
+                  'Content-Type':'application/json',
+                  'MCP-Protocol-Version':'2026-07-28',
+                  'Mcp-Method':'ping',
+              },
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=5) as response:
+                  status=int(response.status); body=response.read(4096)
+          except urllib.error.HTTPError as exc:
+              status=int(exc.code); body=exc.read(4096)
+          if status not in (200,204):
+              raise SystemExit(f'authenticated MCP baseline failed HTTP {status}: {body[:240]!r}')
+          print('PASS real authenticated MCP baseline HTTP', status)
+          PY
+
+          printf 'RP_MCP_URL=%s\n' "$RP_MCP_URL" >> "$GITHUB_ENV"
+          printf 'RP_MCP_TOKEN=%s\n' "$RP_MCP_TOKEN" >> "$GITHUB_ENV"
+
+      - name: Prove real WordPress plus Chrome Browser Agent end to end
+        run: |
+          set -euo pipefail
+          test -x "$CHROME_BIN"
+          "$CHROME_BIN" --version
+          mkdir -p artifacts/unified-real-e2e
+          node .github/scripts/chrome-scripting-health-probe.mjs
+          E2E_DEVICE_NAME='Unified full-suite Chrome' \
+            E2E_ARTIFACT_DIR="$GITHUB_WORKSPACE/artifacts/unified-real-e2e" \
+            node tests/wordpress-browser-e2e.mjs
+          wp eval --path="$RP_WP_PATH" '
+            $fresh = array_values(array_filter(PRSTUDIO_UC_Store::list_devices(), static function ($device) {
+              return "active" === (string) ($device["status"] ?? "")
+                && "Unified full-suite Chrome" === (string) ($device["name"] ?? "")
+                && isset($device["last_seen_age_seconds"])
+                && (int) $device["last_seen_age_seconds"] <= 60;
+            }));
+            if (!$fresh) { fwrite(STDERR, "Independent WordPress oracle did not observe the Chrome pairing.\n"); exit(1); }
+            echo "real Chrome pairing observed\n";
+          '
+
+      - name: Execute exact-checkout 100 percent gate
+        run: |
+          set -euo pipefail
+          python .github/scripts/full-surface-execution.py \
+            --registry evidence/full-surface-execution.json \
+            --timeout-seconds 180
+
+      - name: Assert exact arithmetic and fail closed
+        if: always()
+        run: |
+          set -euo pipefail
+          test -s evidence/full-surface-execution.json
+          jq -e '
+            .requirements.no_exception_table == true and
+            .requirements.no_helper_classification == true and
+            .requirements.no_baseline == true and
+            .requirements.parse_does_not_count_as_execution == true and
+            .requirements.direct_execution_requires_syscall_evidence == true and
+            .requirements.required_execution_percent == 100 and
+            .counts.syntax_targets == .counts.syntax_passed and
+            .counts.total_test_surface_files == .counts.real_executed_files and
+            .counts.execution_percent == 100 and
+            .ok == true
+          ' evidence/full-surface-execution.json
+
+      - name: Show database, WordPress and HTTP evidence on failure
+        if: failure()
+        run: |
+          docker logs rpconnector-full-surface-db || true
+          cat /tmp/rp-full-surface-wp.log || true
+          wp eval --path="$RP_WP_PATH" 'echo wp_json_encode(PRSTUDIO_UC_Store::queue_stats(), JSON_PRETTY_PRINT),"\n";' || true
+
+      - name: Upload exact-SHA execution registry
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: unified-full-suite-${{ github.sha }}
-          path: artifacts
-          if-no-files-found: warn
+          name: full-surface-execution-${{ github.sha }}
+          path: evidence/full-surface-execution.json
+          if-no-files-found: error
           retention-days: 30
 
-      - name: Publish final commit status
-        if: always()
-        env:
-          GH_TOKEN: ${{ github.token }}
-          JOB_STATUS: ${{ job.status }}
-        run: |
-          set -euo pipefail
-          case "$JOB_STATUS" in
-            success) state=success; description='Unified full suite passed' ;;
-            cancelled) state=error; description='Unified full suite cancelled' ;;
-            *) state=failure; description='Unified full suite failed' ;;
-          esac
-          jq -n \
-            --arg state "$state" \
-            --arg context 'unified-full-suite' \
-            --arg description "$description" \
-            --arg target_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            '{state:$state,context:$context,description:$description,target_url:$target_url}' > /tmp/unified-full-suite-status.json
-          curl --fail-with-body --silent --show-error \
-            -X POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "${{ github.api_url }}/repos/${{ github.repository }}/statuses/${{ github.sha }}" \
-            --data-binary @/tmp/unified-full-suite-status.json
+# Unified full-suite inventory (executed dynamically by full-surface-execution.py):
+# - prstudio-unified-browser-agent/tests/agent-cursor.test.mjs
+# - prstudio-unified-browser-agent/tests/agent-tab-group.test.mjs
+# - prstudio-unified-browser-agent/tests/browser-security-runtime.test.mjs
+# - prstudio-unified-browser-agent/tests/capability-truth.test.mjs
+# - prstudio-unified-browser-agent/tests/cdp-protocol-single-file.test.mjs
+# - prstudio-unified-browser-agent/tests/coverage-lifecycle-2026.test.mjs
+# - prstudio-unified-browser-agent/tests/enterprise-runtime-single-file.test.mjs
+# - prstudio-unified-browser-agent/tests/failing-task-backoff.test.mjs
+# - prstudio-unified-browser-agent/tests/gsc-dimensions-2026.test.mjs
+# - prstudio-unified-browser-agent/tests/horizon-stability.test.mjs
+# - prstudio-unified-browser-agent/tests/local-studio.test.mjs
+# - prstudio-unified-browser-agent/tests/multiframe-runtime.test.mjs
+# - prstudio-unified-browser-agent/tests/native-input-property.test.mjs
+# - prstudio-unified-browser-agent/tests/native-input-single-file.test.mjs
+# - prstudio-unified-browser-agent/tests/observation-security.test.mjs
+# - prstudio-unified-browser-agent/tests/one-guard-constitution.test.mjs
+# - prstudio-unified-browser-agent/tests/recovery-single-file.test.mjs
+# - prstudio-unified-browser-agent/tests/remote-recovery-micro-slo.test.mjs
+# - prstudio-unified-browser-agent/tests/remote-recovery-property.test.mjs
+# - prstudio-unified-browser-agent/tests/remote-recovery-single-file.test.mjs
+# - prstudio-unified-browser-agent/tests/runtime-capabilities-single-file.test.mjs
+# - prstudio-unified-browser-agent/tests/runtime-timeout.test.mjs
+# - prstudio-unified-browser-agent/tests/screenshot-candidates.test.mjs
+# - prstudio-unified-browser-agent/tests/semantic-targeting.test.mjs
+# - prstudio-unified-browser-agent/tests/sidepanel-ui.test.mjs
+# - prstudio-unified-browser-agent/tests/suite-migration.test.mjs
+# - prstudio-unified-browser-agent/tests/tab-close-ownership-loss.test.mjs
+# - prstudio-unified-browser-agent/tests/tab-provisional-ownership-concurrency.test.mjs
+# - prstudio-unified-browser-agent/tests/tab-replacement.test.mjs
+# - prstudio-unified-browser-agent/tests/trap-page-policy.test.mjs
+# - prstudio-unified-browser-agent/tests/url-input.test.mjs
+# - prstudio-unified-browser-agent/tests/web-vitals-runtime.test.mjs
+# - tests/atomic-capability-assurance.py
+# - tests/chrome-extension-live-smoke.mjs
+# - tests/deterministic-replay-oracle.py
+# - tests/deterministic-replay-readiness.py
+# - tests/enterprise-static-audit.py
+# - tests/generate-one-guard-audit.py
+# - tests/m11-engineering-runtime-smoke.php
+# - tests/m11_contract_audit.py
+# - tests/mcp-2026-07-28-conformance.py
+# - tests/mcp-http-fuzz.py
+# - tests/mutation-kernel-readiness.py
+# - tests/phpunit-kernel/bootstrap.php
+# - tests/phpunit-kernel/CriticalKernelTest.php
+# - tests/oauth-concurrency-invariants.py
+# - tests/one-guard-browser-mission-smoke.mjs
+# - tests/php-action-feasibility-smoke.php
+# - tests/php-agency-state-runtime-smoke.php
+# - tests/php-agency-verification-monotonicity-smoke.php
+# - tests/php-agent-model-constitution.php
+# - tests/php-anti-crash-work-binding-smoke.php
+# - tests/php-audit-trail-smoke.php
+# - tests/php-bootstrap-fastlane-benchmark.php
+# - tests/php-browser-parent-reconciliation-smoke.php
+# - tests/php-confidence-calibration-smoke.php
+# - tests/php-context-leakage-gauges-smoke.php
+# - tests/php-database-bulk-v17-smoke.php
+# - tests/php-database-querycount-benchmark.php
+# - tests/php-device-alias-smoke.php
+# - tests/php-editorial-concurrency-smoke.php
+# - tests/php-editorial-efficiency-smoke.php
+# - tests/php-evidence-gate-smoke.php
+# - tests/php-evidence-memory-smoke.php
+# - tests/php-execution-lane-concurrency-smoke.php
+# - tests/php-first-action-recovery-smoke.php
+# - tests/php-health-integrity-smoke.php
+# - tests/php-intelligence-smoke.php
+# - tests/php-m11-core-contract-smoke.php
+# - tests/php-mcp-browser-sync-budget-smoke.php
+# - tests/php-mcp-catalog-runtime-smoke.php
+# - tests/php-mcp-legacy-protocol-surface-smoke.php
+# - tests/php-mcp-oauth-2026-smoke.php
+# - tests/php-mcp-operator-bootstrap-smoke.php
+# - tests/php-mcp-protocol-runtime-smoke.php
+# - tests/php-capability-search-relevance-smoke.php
+# - tests/php-mcp-public-contracts-smoke.php
+# - tests/php-new-capabilities-smoke.php
+# - tests/php-oauth-concurrency-integration.php
+# - tests/php-operational-completeness-smoke.php
+# - tests/php-pre-mutation-routing-smoke.php
+# - tests/php-procedural-skill-confidence-smoke.php
+# - tests/php-prstudio-flow-smoke.php
+# - tests/php-publish-transaction-smoke.php
+# - tests/php-reliability-hotfix-smoke.php
+# - tests/php-research-radar-smoke.php
+# - tests/php-retry-policy-smoke.php
+# - tests/php-runtime-db-liveness-integration.php
+# - tests/php-runtime-recovery-prepare-smoke.php
+# - tests/php-schedule-clock-smoke.php
+# - tests/php-scheduler-topology-v17-smoke.php
+# - tests/php-screenshot-storage-smoke.php
+# - tests/php-security-primitives-v17-smoke.php
+# - tests/php-sidecar-supply-chain-v17-smoke.php
+# - tests/php-style-drift-monitor-smoke.php
+# - tests/php-suite-latency-runtime-smoke.php
+# - tests/php-task-queue-integration.php
+# - tests/php-toolchain-smoke.php
+# - tests/php-trust-trajectory-smoke.php
+# - tests/php-universal-execution-benchmark.php
+# - tests/php-wait-channel-lost-wakeup-smoke.php
+# - tests/php-wordpress-woocommerce-bulk-v17-smoke.php
+# - tests/php-workspace-snapshots-smoke.php
+# - tests/php-write-observability-integration.php
+# - tests/production-readiness-certifier-selftest.py
+# - tests/production-readiness-certifier.py
+# - tests/production-readiness-with-modern.py
+# - tests/production-scenario-gate.py
+# - tests/production-test-plan-audit.py
+# - tests/psalm-wordpress-security-stubs.php
+# - tests/release-evidence-gate.py
+# - tests/rigorous-audit-controller.py
+# - tests/runtime-chaos-model.py
+# - tests/runtime-invariants-audit.py
+# - tests/runtime-state-model-check.py
+# - tests/security-drift-audit.py
+# - tests/telemetry-progress-readiness.py
+# - tests/test-wiring-audit.py
+# - tests/validate-local-integration.mjs
+# - tests/validate-security-contract.mjs
+# - tests/validate-test-inventory.py
