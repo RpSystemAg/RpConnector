@@ -319,7 +319,23 @@ final class PRSTUDIO_UC_Agency_Runtime {
 		// wrong signal: "no external runner configured" and "nothing is executing"
 		// are different conditions and only the second is an outage.
 		if(class_exists('PRSTUDIO_UC_Site_Sentinel'))PRSTUDIO_UC_Site_Sentinel::record_execution_heartbeat(self::scheduler_mode());
-		self::process_schedules(10);if(class_exists('PRSTUDIO_UC_Procedural_Skills')){try{PRSTUDIO_UC_Procedural_Skills::curate(array('apply'=>true));}catch(Throwable $ignored){PRSTUDIO_UC_Store::event('runtime:procedural-skills','runtime.procedural_skills_error',array('source'=>'scheduler','exception_class'=>get_class($ignored)));}}self::run_batch(5,'scheduler',4.0); }
+		self::process_schedules(10);
+		// Close the loop between a finished browser task and whatever was
+		// waiting for it.
+		//
+		// PRSTUDIO_UC_Job_Engine::recover() is what reconciles terminal browser
+		// tasks with parents still in WAITING_FOR_BROWSER, and nothing periodic
+		// called it: only manual recovery and the change tracker did. So a
+		// mission that continues after a browser step -- every chained one --
+		// advanced exactly as far as its first hop and then waited for a human
+		// to ask for recovery.
+		//
+		// A site study made it visible: the probe flow completed, queued the
+		// next flow, Chrome ran it to completion, and the study stayed at 12.5%
+		// with an empty queue, no dead letters and no error anywhere, because
+		// the finished work was collected by nobody.
+		if(class_exists('PRSTUDIO_UC_Job_Engine')){try{PRSTUDIO_UC_Job_Engine::recover();}catch(Throwable $ignored){PRSTUDIO_UC_Store::event('runtime:job-engine','runtime.job_recover_error',array('source'=>'scheduler','exception_class'=>get_class($ignored)));}}
+		if(class_exists('PRSTUDIO_UC_Procedural_Skills')){try{PRSTUDIO_UC_Procedural_Skills::curate(array('apply'=>true));}catch(Throwable $ignored){PRSTUDIO_UC_Store::event('runtime:procedural-skills','runtime.procedural_skills_error',array('source'=>'scheduler','exception_class'=>get_class($ignored)));}}self::run_batch(5,'scheduler',4.0); }
 
 	public static function control( string $job_uuid, string $action, array $args = array() ) {
 		$job=PRSTUDIO_UC_Store::get_job($job_uuid);if(!$job)return new WP_Error('agency_job_missing','Mission job not found.',array('status'=>404));$action=sanitize_key($action);$checkpoint=(array)($job['checkpoint']??array());
