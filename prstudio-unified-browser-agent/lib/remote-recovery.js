@@ -1,4 +1,4 @@
-export const REMOTE_RECOVERY_POLICY_VERSION = "1.2.0";
+export const REMOTE_RECOVERY_POLICY_VERSION = "1.2.1";
 export const REMOTE_MAX_STEP_ATTEMPTS = 2;
 export const REMOTE_MAX_FRESH_RESTARTS = 1;
 export const HARD_TASK_WATCHDOG_ALARM = "prstudio-hard-task-watchdog";
@@ -116,7 +116,7 @@ export function stepWatchdogMs(step = {}) {
     reload: 50000,
     contract_action: 60000,
   };
-  const base = requested > 0 ? requested + 5000 : (defaults[type] || 60000);
+  const base = requested > 0 ? requested + 5000 : (defaults[type] || 90000);
   // Screenshot is an interactive operation: caller-provided timeouts may make
   // the internal attempt shorter, but can never expand the public envelope.
   if (type === "screenshot" || type === "screenshot_element") return Math.max(5000, Math.min(9500, base));
@@ -170,7 +170,9 @@ export function noProgressExceeded(state = {}, now = Date.now()) {
       ? 15000
       : type === "contract_action" && action === "playwright_responsive_matrix"
         ? 30000
-        : stepWatchdogMs({ type, action });
+        : ["wait_selector", "wait_url", "wait_load", "reload"].includes(type)
+          ? 120000
+          : stepWatchdogMs({ type, action });
   return now - activityAt > limit;
 }
 
