@@ -1,1 +1,0 @@
-The Browser Agent 2.0 certification runs after direct updates to master. The canonical commit status contexts are `browser-agent-2-certification` and `unified-full-suite`; both must refer to the exact master SHA before certification is declared complete.

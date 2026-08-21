@@ -1,1 +1,0 @@
-Browser Agent 2.0 preventive fixes are tracked in BROWSER-AGENT-2-FIX-NOTES-2026-08-21.md. This marker intentionally contains no executable test logic; certification remains in the dedicated workflows after merge.

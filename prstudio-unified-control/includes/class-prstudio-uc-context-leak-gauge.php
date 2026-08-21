@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
  * iniettati dal chiamante (in produzione: i valori delle opzioni OAuth).
  */
 final class PRSTUDIO_UC_Context_Leak_Gauge {
-    public const VERSION = '1.0.1';
+    public const VERSION = '1.0.0';
 
     /** Pattern di segreto generici (Bearer, query token, chiavi esadecimali). */
     private const SECRET_PATTERNS = array(
@@ -34,16 +34,6 @@ final class PRSTUDIO_UC_Context_Leak_Gauge {
         'client_secret_expires_at', 'code_verifier', 'code_challenge',
         'token_endpoint_auth_method', 'pairing_key', 'pairing_token',
     );
-
-    /**
-     * A forbidden key whose value has already been replaced by the canonical
-     * redaction marker is evidence that the guard worked, not evidence of a
-     * leak. Treating the marker itself as a leak caused every task/status row
-     * containing a redacted lane_token to fail closed forever.
-     */
-    private static function is_redacted_marker( $value ): bool {
-        return is_string( $value ) && '[REDACTED]' === trim( $value );
-    }
 
     /**
      * Scansione completa di un payload.
@@ -69,13 +59,7 @@ final class PRSTUDIO_UC_Context_Leak_Gauge {
             if ( is_array( $value ) ) {
                 foreach ( $value as $key => $child ) {
                     $child_path = '' === $path ? (string) $key : $path . '.' . (string) $key;
-                    if (
-                        is_string( $key )
-                        && in_array( strtolower( $key ), $forbidden, true )
-                        && ! is_array( $child )
-                        && null !== $child
-                        && ! self::is_redacted_marker( $child )
-                    ) {
+                    if ( is_string( $key ) && in_array( strtolower( $key ), $forbidden, true ) && ! is_array( $child ) && null !== $child ) {
                         $findings[] = array( 'code' => 'forbidden_key_present', 'path' => $child_path );
                         $gauges['gauge_forbidden_key'] = true;
                     }
@@ -83,7 +67,7 @@ final class PRSTUDIO_UC_Context_Leak_Gauge {
                 }
                 return;
             }
-            if ( ! is_string( $value ) || '' === $value || self::is_redacted_marker( $value ) ) { return; }
+            if ( ! is_string( $value ) || '' === $value ) { return; }
             if ( isset( $known[ $value ] ) ) {
                 $findings[] = array( 'code' => 'known_secret_exact_match', 'path' => $path );
                 $gauges['gauge_known_secret'] = true;
@@ -125,10 +109,6 @@ final class PRSTUDIO_UC_Context_Leak_Gauge {
                 foreach ( $value as $key => $child ) {
                     $child_path = '' === $path ? (string) $key : $path . '.' . (string) $key;
                     if ( is_string( $key ) && in_array( strtolower( $key ), $forbidden, true ) && ! is_array( $child ) && null !== $child ) {
-                        if ( self::is_redacted_marker( $child ) ) {
-                            $out[ $key ] = '[REDACTED]';
-                            continue;
-                        }
                         $findings[] = array( 'code' => 'forbidden_key_present', 'path' => $child_path );
                         $out[ $key ] = '[REDACTED]';
                         continue;

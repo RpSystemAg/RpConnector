@@ -79,36 +79,6 @@ final class PRSTUDIO_UC_Procedural_Skills {
         if(!is_dir($d)){function_exists('wp_mkdir_p')?wp_mkdir_p($d):@mkdir($d,0750,true);}
         return $d;
     }
-    /**
-     * Why the skill store could not be written, in terms someone can act on.
-     *
-     * Both failure paths below used to return "Unable to lock/persist
-     * procedural skill store" and nothing else -- no path, no permissions, no
-     * message from the filesystem. An operator who hit it could only report
-     * that saving the skill "had a technical error", which is exactly what
-     * happened and exactly as far as anyone could get.
-     *
-     * A store that cannot be written is a real and fixable condition: the
-     * memory root is usually not writable, or open_basedir excludes it, or the
-     * disk is full. All three are one `ls -la` away once the message says
-     * which directory it meant.
-     */
-    private static function store_diagnosis(): array {
-        $dir = self::dir();
-        $parent = dirname( $dir );
-        $last = error_get_last();
-        return array(
-            'skills_dir'       => $dir,
-            'skills_dir_exists'=> is_dir( $dir ),
-            'skills_dir_writable' => is_dir( $dir ) && is_writable( $dir ),
-            'parent_dir'       => $parent,
-            'parent_writable'  => is_dir( $parent ) && is_writable( $parent ),
-            'index_path'       => self::index_path(),
-            'index_writable'   => is_readable( self::index_path() ) ? is_writable( self::index_path() ) : null,
-            'free_bytes'       => is_dir( $dir ) ? @disk_free_space( $dir ) : null,
-            'last_php_error'   => is_array( $last ) ? substr( (string) ( $last['message'] ?? '' ), 0, 300 ) : '',
-        );
-    }
     private static function index_path(): string {return self::dir().'/'.self::INDEX;}
     private static function lock_path(): string {return self::dir().'/'.self::LOCK;}
     private static function defaults(): array {return array('schema_version'=>1,'skills'=>array(),'metrics'=>array('learned'=>0,'reused'=>0,'failures_observed'=>0),'updated_gmt'=>'');}
@@ -116,19 +86,7 @@ final class PRSTUDIO_UC_Procedural_Skills {
     private static function key(string $v,int $max=100):string{$v=strtolower(trim($v));$v=(string)preg_replace('/[^a-z0-9._:-]+/','-',$v);return substr(trim($v,'-.'),0,$max);}
     private static function state_unlocked():array{$raw=is_readable(self::index_path())?(string)file_get_contents(self::index_path()):'';$d=''!==$raw?json_decode($raw,true):array();return is_array($d)?array_merge(self::defaults(),$d):self::defaults();}
     private static function atomic(array $state):bool{$state['updated_gmt']=gmdate('c');$json=json_encode($state,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);if(false===$json||strlen($json)>16777216)return false;try{$s=bin2hex(random_bytes(5));}catch(Throwable $e){$s=str_replace('.','',uniqid('',true));}$tmp=self::index_path().'.'.$s.'.tmp';if(false===@file_put_contents($tmp,$json."\n",LOCK_EX))return false;@chmod($tmp,0640);if(@rename($tmp,self::index_path()))return true;@unlink($tmp);return false;}
-    private static function mutate(callable $cb){
-        $fh=@fopen(self::lock_path(),'c+');
-        if(!is_resource($fh)||!@flock($fh,LOCK_EX)){
-            if(is_resource($fh))@fclose($fh);
-            return new WP_Error('procedural_skill_lock_failed','Unable to lock procedural skill store: '.self::dir().' is not writable by the web user.',array_merge(array('status'=>503,'retryable'=>true,'lock_path'=>self::lock_path()),self::store_diagnosis()));
-        }
-        try{
-            $state=self::state_unlocked();$r=$cb($state);
-            if(is_wp_error($r))return$r;
-            if(!self::atomic($state))return new WP_Error('procedural_skill_write_failed','Unable to persist procedural skill store: writing '.self::index_path().' failed.',array_merge(array('status'=>503,'retryable'=>true),self::store_diagnosis()));
-            return$r;
-        }finally{@flock($fh,LOCK_UN);@fclose($fh);}
-    }
+    private static function mutate(callable $cb){$fh=@fopen(self::lock_path(),'c+');if(!is_resource($fh)||!@flock($fh,LOCK_EX)){if(is_resource($fh))@fclose($fh);return new WP_Error('procedural_skill_lock_failed','Unable to lock procedural skill store.',array('status'=>503,'retryable'=>true));}try{$state=self::state_unlocked();$r=$cb($state);if(is_wp_error($r))return$r;if(!self::atomic($state))return new WP_Error('procedural_skill_write_failed','Unable to persist procedural skill store.',array('status'=>503,'retryable'=>true));return$r;}finally{@flock($fh,LOCK_UN);@fclose($fh);}}
     private static function fingerprint(string $kind,string $name,array $args):string{
         $shape=array();foreach($args as $k=>$v){if(str_starts_with((string)$k,'_prstudio_'))continue;$shape[(string)$k]=is_array($v)?'array':(is_object($v)?'object':gettype($v));}ksort($shape);return hash('sha256',$kind.'|'.$name.'|'.PRSTUDIO_UC_Idempotency::canonical_json($shape));
     }

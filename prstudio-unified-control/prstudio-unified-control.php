@@ -67,11 +67,6 @@ add_action( 'before_woocommerce_init', static function (): void {
 require_once PRSTUDIO_UC_DIR . 'includes/class-prstudio-uc-autoload.php';
 PRSTUDIO_UC_Autoload::register();
 
-// Browser execution surface 1.1: keep the existing MCP/pairing wire, but swap
-// the ChatGPT-visible browser tools to vendor MCP providers.
-require_once PRSTUDIO_UC_DIR . 'includes/class-prstudio-uc-browser-vendor-mcp.php';
-PRSTUDIO_UC_Browser_Vendor_MCP::register();
-
 if ( ! $prstudio_legacy_bridge_loaded ) {
     final class PRSTUDIO_AI_Bridge_Plugin {
         private static ?self $instance = null;

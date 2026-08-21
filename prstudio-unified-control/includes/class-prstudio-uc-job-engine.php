@@ -6,35 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 final class PRSTUDIO_UC_Job_Engine {
 	public const VERSION = '1.0.0';
 
-	/**
-	 * Browser Agent 2.0 wire normalization.
-	 *
-	 * The lane remains a Control Plane concept. The extension receives only an
-	 * opaque controller-session identifier; credential-shaped lane_token values
-	 * must never enter task arguments, polling payloads, checkpoints or health
-	 * output. `_prstudio_lane_id` is retained temporarily as an internal 1.0
-	 * compatibility alias while every extension call site migrates.
-	 */
-	public static function normalize_browser_arguments( array $arguments ): array {
-		$controller = sanitize_text_field( (string) (
-			$arguments['controller_session_id']
-			?? $arguments['_prstudio_controller_session_id']
-			?? $arguments['_prstudio_lane_id']
-			?? ''
-		) );
-		if ( '' !== $controller ) {
-			$arguments['controller_session_id'] = $controller;
-			$arguments['_prstudio_controller_session_id'] = $controller;
-			if ( empty( $arguments['_prstudio_lane_id'] ) ) {
-				$arguments['_prstudio_lane_id'] = $controller;
-			}
-		}
-		unset( $arguments['lane_token'], $arguments['laneToken'] );
-		return $arguments;
-	}
-
 	public static function create_browser_task( string $action, array $arguments, ?string $device_uuid = null, string $job_uuid = '' ): array {
-		$arguments = self::normalize_browser_arguments( $arguments );
 		$explicit = PRSTUDIO_UC_Idempotency::explicit_key( $arguments );
 		$scope = 'browser:' . sanitize_key( $action ) . ':' . (string) $device_uuid . ':' . $job_uuid;
 		$idempotency = PRSTUDIO_UC_Idempotency::storage_key( $scope, $explicit );

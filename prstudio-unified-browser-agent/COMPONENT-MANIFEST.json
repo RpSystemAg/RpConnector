@@ -1,7 +1,0 @@
-{
-  "component": "prstudio-unified-browser-agent",
-  "version": "1.1.0",
-  "backend": "official_mcp_bridge",
-  "custom_browser_runtime": false,
-  "bridge": "http://127.0.0.1:8765"
-}

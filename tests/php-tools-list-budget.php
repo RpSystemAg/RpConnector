@@ -32,9 +32,6 @@
 declare( strict_types = 1 );
 
 define( 'PRSTUDIO_UC_TESTING', true );
-// Match production bootstrap: public contract refinements are loaded before the
-// MCP catalogue is built and materially affect the budgeted surface.
-require dirname( __DIR__ ) . '/prstudio-unified-control/includes/class-prstudio-uc-public-tool-contracts.php';
 require dirname( __DIR__ ) . '/prstudio-unified-control/includes/class-prstudio-uc-mcp-v5.php';
 
 /** Rough token estimate. Good enough to see an order of magnitude. */
@@ -153,14 +150,6 @@ if ( ! $advertised['tools'] ) {
     $failures[] = 'tools/list emitted nothing';
 }
 
-// Existing-tab adoption must be directly visible. It is the safe ownership
-// transfer path for a user-opened tab; hiding it behind generic discovery
-// recreates the production failure where the caller can open new tabs but
-// cannot bind the tab the user explicitly asked it to use.
-if ( ! isset( $advertised_names['browser_adopt_tabs'] ) ) {
-    $failures[] = 'browser_adopt_tabs was trimmed from tools/list; existing user tabs must remain directly adoptable inside the Law 9 budget.';
-}
-
 echo "\n";
 
 // Research radar admission (2026-08-19): the radar tool is admitted to the
@@ -200,7 +189,6 @@ if ( $failures ) {
     exit( 1 );
 }
 printf( "PASS tools/list stays within the %d-token surface budget with every essential tool advertised\n", $budget );
-printf( "PASS browser_adopt_tabs stays directly advertised inside the %d-token hard cap\n", $budget );
 printf( "PASS prstudio_research_radar admitted after essential routers\n" );
 printf( "PASS per-task intent profiles stay within the %d-token hard cap\n", $budget );
 exit( 0 );

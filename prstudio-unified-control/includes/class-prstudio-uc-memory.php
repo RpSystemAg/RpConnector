@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
  * event hash, making accidental/tampered edits detectable.
  */
 final class PRSTUDIO_UC_Memory {
-    public const VERSION = '5.0.1';
+    public const VERSION = '5.0.0';
     private const MAX_RESOURCES = 50000;
     private const MAX_TXT_BYTES = 8388608;
     private const MAX_CHAIN_BYTES = 33554432;
@@ -20,61 +20,6 @@ final class PRSTUDIO_UC_Memory {
     public static function root(): string {
         $base = defined( 'WP_CONTENT_DIR' ) ? (string) WP_CONTENT_DIR : sys_get_temp_dir();
         return rtrim( str_replace( '\\', '/', $base ), '/' ) . '/prstudio-unified-private/memory';
-    }
-
-    /**
-     * Whether this installation can actually keep what it learns, and if not, why.
-     *
-     * Everything the suite remembers lives under
-     * wp-content/prstudio-unified-private/ -- learned site modules, procedural
-     * skills, evidence. On a hardened host the web user often cannot write
-     * inside wp-content at all, which is a reasonable way to run WordPress and
-     * completely fatal to remembering anything.
-     *
-     * The failure never looked like a permission problem. The skill store said
-     * "Unable to persist procedural skill store", the site module said "Unable
-     * to create private site-learning directory", and an operator who hit it
-     * could only report that saving "had a technical error". Three subsystems,
-     * three fixed sentences, and no path or permission between them.
-     *
-     * This is the single answer to "can it remember", callable before anything
-     * tries: which directory, whether it exists, whether it and the nearest
-     * existing parent are writable, whether wp-content itself is, and what PHP
-     * last complained about.
-     *
-     * A read-only theme or plugin directory is a different matter and is
-     * deliberately absent here. That is frequently intentional on a hardened
-     * host, it does not stop the suite from remembering, and conflating the two
-     * sends the fix in the wrong direction.
-     *
-     * @param string $subpath Optional directory under the memory root.
-     * @return array<string,mixed>
-     */
-    public static function writability( string $subpath = '' ): array {
-        $root = self::root();
-        $dir  = '' === $subpath ? $root : rtrim( $root, '/' ) . '/' . ltrim( str_replace( '\\', '/', $subpath ), '/' );
-
-        // Walk up to whatever does exist: on a fresh install nothing under the
-        // root has been created yet, and "the directory is not writable" is
-        // useless when the directory is not there. The nearest existing parent
-        // is the one whose permissions actually decide the outcome.
-        $existing = $dir;
-        while ( '' !== $existing && ! is_dir( $existing ) && dirname( $existing ) !== $existing ) {
-            $existing = dirname( $existing );
-        }
-
-        $last = error_get_last();
-        return array(
-            'memory_root'          => $root,
-            'target_dir'           => $dir,
-            'target_exists'        => is_dir( $dir ),
-            'target_writable'      => is_dir( $dir ) && is_writable( $dir ),
-            'nearest_existing_dir' => $existing,
-            'nearest_writable'     => '' !== $existing && is_writable( $existing ),
-            'wp_content_writable'  => defined( 'WP_CONTENT_DIR' ) ? is_writable( (string) WP_CONTENT_DIR ) : null,
-            'free_bytes'           => ( '' !== $existing && is_dir( $existing ) ) ? @disk_free_space( $existing ) : null,
-            'last_php_error'       => is_array( $last ) ? substr( (string) ( $last['message'] ?? '' ), 0, 300 ) : '',
-        );
     }
 
     public static function installation_identity(): string {
@@ -192,12 +137,7 @@ final class PRSTUDIO_UC_Memory {
 
     private static function clean( $value, string $key = '', int $depth = 0 ) {
         if ( $depth > 6 ) { return '[MAX_DEPTH]'; }
-        // Public continuation credentials are intentionally returned to the MCP
-        // caller and are not bearer secrets. Keep them usable while redacting
-        // actual authentication/session credentials. The former broad `token`
-        // substring rule destroyed write_token and made every observed write
-        // precondition unusable before the anti-crash gate could even run.
-        if ( preg_match( '/password|secret|(?:^|_)(?:access|refresh|id|lane|pairing)_?token(?:$|_)|api[_-]?key|apikey|credential|authorization|cookie|session|oauth|code_verifier|private_key/i', $key ) ) { return '[REDACTED]'; }
+        if ( preg_match( '/password|secret|token|api[_-]?key|apikey|credential|authorization|cookie|session|oauth|code_verifier|private_key/i', $key ) ) { return '[REDACTED]'; }
         if ( is_object( $value ) ) { $value = get_object_vars( $value ); }
         if ( is_array( $value ) ) {
             $out = array(); $count = 0;
@@ -256,7 +196,9 @@ final class PRSTUDIO_UC_Memory {
             $extras = array();
             foreach ( array( 'mission_id'=>'mission', 'capability'=>'capability', 'state_initial'=>'initial', 'action'=>'action', 'verification'=>'verification', 'evidence'=>'evidence', 'fingerprint'=>'fingerprint', 'memory_reused'=>'memory_reused', 'reason'=>'reason', 'duration_ms'=>'duration_ms' ) as $key=>$label ) {
                 if ( ! array_key_exists( $key, $clean ) || is_array( $clean[$key] ) || is_object( $clean[$key] ) ) { continue; }
-                $value = str_replace( array("\n","\n","\t"), ' ', substr( (string) $clean[$key], 0, 180 ) ); $extras[] = $label . '=' . $value;
+                $value = str_replace( array("
+","
+","	"), ' ', substr( (string) $clean[$key], 0, 180 ) ); $extras[] = $label . '=' . $value;
             }
             $line = sprintf( '[%s] #%d %s%s%s%s job=%s%s hash=%s', $entry['gmt'], $entry['seq'], $entry['event'], $method ? ' via=' . substr( $method, 0, 100 ) : '', $resource ? ' resource=' . $resource : '', $outcome ? ' outcome=' . substr( $outcome, 0, 80 ) : '', $job ?: '-', $extras ? ' ' . implode( ' ', $extras ) : '', substr( $entry['hash'], 0, 16 ) );
             @file_put_contents( self::summary_path(), $line . "\n", FILE_APPEND | LOCK_EX );
