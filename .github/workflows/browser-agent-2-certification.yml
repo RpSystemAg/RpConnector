@@ -63,10 +63,13 @@ jobs:
           node --check prstudio-unified-browser-agent/lib/tab-ownership.js
           node --check prstudio-unified-browser-agent/tests/browser-control-kernel-stress.test.mjs
           node --check prstudio-unified-browser-agent/tests/browser-control-kernel-runtime.test.mjs
+          node --check prstudio-unified-browser-agent/tests/shadow-runtime-contract.test.mjs
           node --check tests/browser-agent-2-real-chrome.mjs
+          node --check tests/browser-agent-2-advanced-chrome.mjs
           php -l prstudio-unified-control/includes/class-prstudio-uc-job-engine.php
           php -l tests/phpunit-kernel/CriticalKernelTest.php
           python tests/validate-protocol-compatibility.py
+          php tests/browser-protocol-single-file.php
 
       - name: Browser Agent complete Node test surface
         run: |
@@ -95,7 +98,7 @@ jobs:
           fi
           cat prstudio-unified-browser-agent/lib/executor-meta.js
 
-      - name: Real Chrome Browser Agent 2.0 stress certification
+      - name: Real Chrome Browser Agent 2.0 ownership stress certification
         run: |
           set -euo pipefail
           node tests/browser-agent-2-real-chrome.mjs
@@ -108,10 +111,29 @@ jobs:
             .build_identity.built != "UNSTAMPED"
           ' artifacts/browser-agent-2-certification/evidence.json
 
+      - name: Real Chrome Browser Agent 2.0 advanced certification
+        run: |
+          set -euo pipefail
+          node tests/browser-agent-2-advanced-chrome.mjs
+          jq -e '
+            .ok == true and
+            (.checks | length) >= 10 and
+            (.checks | map(.ok) | all) and
+            ([.checks[].name] | index("protocol mismatch fails before pairing/config dispatch") != null) and
+            ([.checks[].name] | index("Shadow DOM semantic targeting works in main frame and iframe") != null) and
+            ([.checks[].name] | index("screenshot capture succeeds without pairing or artifact upload backend") != null) and
+            ([.checks[].name] | index("network + console capture uses debugger without losing UI ownership") != null) and
+            ([.checks[].name] | index("file upload is verified in live DOM") != null) and
+            ([.checks[].name] | index("download event and downloaded bytes are verified") != null) and
+            ([.checks[].name] | index("OTP/MFA human handoff auto-resumes without ownership loss") != null) and
+            ([.checks[].name] | index("full Chrome process restart reconciles or cleanly closes every controlled tab") != null)
+          ' artifacts/browser-agent-2-certification/advanced-evidence.json
+
       - name: Verify no ownership/origin regression appears in certificate
         run: |
           set -euo pipefail
           test -s artifacts/browser-agent-2-certification/evidence.json
+          test -s artifacts/browser-agent-2-certification/advanced-evidence.json
           if grep -R -n -E 'technical_tab_not_controlled|target_origin_mismatch|tab_controller_conflict|context_leak_blocked' artifacts/browser-agent-2-certification; then
             echo 'Browser Agent 2.0 regression signature found in certification evidence.' >&2
             exit 1
