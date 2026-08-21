@@ -19,7 +19,7 @@
   ],
   "host_permissions": ["<all_urls>"],
   "background": {
-    "service_worker": "service-worker.js",
+    "service_worker": "service-worker-bootstrap.js",
     "type": "module"
   },
   "action": {
