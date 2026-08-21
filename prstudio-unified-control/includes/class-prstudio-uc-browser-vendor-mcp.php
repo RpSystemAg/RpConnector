@@ -19,6 +19,87 @@ final class PRSTUDIO_UC_Browser_Vendor_MCP {
         self::$registered = true;
         add_filter( 'rest_pre_dispatch', array( __CLASS__, 'rewrite_tool_call' ), 4, 3 );
         add_filter( 'rest_post_dispatch', array( __CLASS__, 'rewrite_tools_list' ), 20, 3 );
+
+        // ChatGPT/MCP compatibility:
+        // - keep Dynamic Client Registration as the advertised registration path;
+        // - answer HEAD probes on the MCP endpoint with the same OAuth challenge
+        //   semantics as an unauthenticated GET instead of WordPress rest_no_route.
+        // The underlying OAuth class retains CIMD resolution support for clients
+        // that explicitly use a URL-form client_id, but we do not advertise CIMD
+        // until it has been verified end-to-end with the production ChatGPT client.
+        add_action( 'parse_request', array( __CLASS__, 'serve_oauth_authorization_metadata' ), -100 );
+        add_action( 'rest_api_init', array( __CLASS__, 'register_mcp_head_route' ), 4 );
+    }
+
+    /**
+     * Serve OAuth authorization-server metadata before the generic auth handler.
+     *
+     * MCP 2026 prefers Client ID Metadata Documents (CIMD), but DCR remains a
+     * supported compatibility path. Advertising CIMD makes modern clients skip
+     * /oauth/register entirely; if their metadata document cannot be resolved by
+     * WordPress, authorization fails later with a generic invalid-client request.
+     * PR STUDIO therefore advertises the already-implemented DCR endpoint and
+     * leaves CIMD as a non-advertised compatibility capability for now.
+     */
+    public static function serve_oauth_authorization_metadata(): void {
+        $request_path = untrailingslashit( (string) wp_parse_url( (string) ( $_SERVER['REQUEST_URI'] ?? '' ), PHP_URL_PATH ) );
+        $metadata_path = untrailingslashit( (string) wp_parse_url( home_url( '/.well-known/oauth-authorization-server' ), PHP_URL_PATH ) );
+        if ( $request_path !== $metadata_path ) { return; }
+
+        $method = strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) );
+        if ( 'GET' !== $method && 'HEAD' !== $method ) { return; }
+        if ( ! class_exists( 'PRSTUDIO_UC_MCP_Auth_V5' ) ) { return; }
+
+        $metadata = PRSTUDIO_UC_MCP_Auth_V5::authorization_server_metadata();
+        if ( ! is_array( $metadata ) ) { return; }
+
+        // Presence=true instructs MCP 2026 clients to skip DCR. Do not advertise
+        // it until production ChatGPT CIMD retrieval has been certified.
+        unset( $metadata['client_id_metadata_document_supported'] );
+
+        nocache_headers();
+        status_header( 200 );
+        header( 'Content-Type: application/json; charset=' . get_option( 'blog_charset' ) );
+        header( 'Access-Control-Allow-Origin: *' );
+        if ( 'HEAD' !== $method ) {
+            echo wp_json_encode( $metadata, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+        }
+        exit;
+    }
+
+    /** Add HEAD without changing the existing GET/POST/DELETE MCP route. */
+    public static function register_mcp_head_route(): void {
+        register_rest_route( 'prstudio-unified/v1', '/mcp', array(
+            'methods' => 'HEAD',
+            'callback' => array( __CLASS__, 'handle_mcp_head' ),
+            'permission_callback' => '__return_true',
+        ) );
+    }
+
+    /**
+     * HEAD is used by some remote clients as a reachability/auth probe. Return a
+     * standards-shaped OAuth challenge rather than asking the normal JSON-RPC
+     * handler to parse a body that a HEAD request does not have.
+     */
+    public static function handle_mcp_head( WP_REST_Request $request ): WP_REST_Response {
+        unset( $request );
+        $auth = PRSTUDIO_UC_MCP_Auth_V5::permission( false );
+        if ( is_wp_error( $auth ) ) {
+            $data = (array) $auth->get_error_data();
+            $status = max( 400, (int) ( $data['status'] ?? 401 ) );
+            $response = new WP_REST_Response( null, $status );
+            if ( 401 === $status ) {
+                $response->header(
+                    'WWW-Authenticate',
+                    'Bearer resource_metadata="' . esc_url_raw( PRSTUDIO_UC_MCP_Auth_V5::protected_resource_metadata_url() ) . '", scope="prstudio.read prstudio.write offline_access"'
+                );
+            }
+        } else {
+            $response = new WP_REST_Response( null, 200 );
+        }
+        $response->header( 'Cache-Control', 'no-store' );
+        $response->header( 'X-Content-Type-Options', 'nosniff' );
+        return $response;
     }
 
     private static function is_mcp_request( WP_REST_Request $request ): bool {
