@@ -92,7 +92,7 @@ jobs:
   extension:
     name: Chrome extension / Browser Agent
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -121,12 +121,14 @@ jobs:
           const manifest = JSON.parse(fs.readFileSync('prstudio-unified-browser-agent/manifest.json', 'utf8'));
           if (manifest.manifest_version !== 3) throw new Error('Browser Agent must remain Manifest V3');
           if (!manifest.version) throw new Error('Browser Agent version missing');
+          if (!manifest.permissions.includes('system.display')) throw new Error('system.display permission required by native coordinate mapping');
+          if (manifest.background?.service_worker !== 'service-worker-bootstrap.js') throw new Error('Chrome parity bootstrap is not the active MV3 worker');
           console.log(`manifest ok: v${manifest.version}, MV${manifest.manifest_version}`);
           NODE
           find prstudio-unified-browser-agent -type f -name '*.js' -print0 | xargs -0 -n1 node --check
       - name: Browser Agent deterministic tests
         run: node --test prstudio-unified-browser-agent/tests/*.test.mjs
-      - name: Real Chromium scripting probe
+      - name: Real Chromium scripting and persistent multi-tab parity
         shell: bash
         run: |
           set -euo pipefail
@@ -134,6 +136,18 @@ jobs:
           cat > /tmp/rpconnector-h24-web/wp-login.php <<'HTML'
           <!doctype html><html><head><title>RPConnector H24 probe</title></head><body><main id="probe">ready</main></body></html>
           HTML
+          for page in a b c; do
+            cat > "/tmp/rpconnector-h24-web/parity-${page}.html" <<'HTML'
+          <!doctype html>
+          <html><head><meta charset="utf-8"><title>RPConnector parity</title></head>
+          <body data-clicked="no">
+            <label>Value <input id="parity-input" value=""></label>
+            <button id="parity-button" type="button">Confirm</button>
+            <main id="parity-content">persistent browser control surface</main>
+            <script>document.querySelector('#parity-button').addEventListener('click',()=>{document.body.dataset.clicked='yes';});</script>
+          </body></html>
+          HTML
+          done
           python -m http.server 8080 --bind 127.0.0.1 --directory /tmp/rpconnector-h24-web >/tmp/rpconnector-h24-web.log 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid" 2>/dev/null || true' EXIT
@@ -148,6 +162,15 @@ jobs:
           export WP_URL=http://127.0.0.1:8080
           "$CHROME_BIN" --version
           node .github/scripts/chrome-scripting-health-probe.mjs
+          node .github/scripts/browser-parity-live-probe.mjs
+      - name: Upload browser parity evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: browser-parity-${{ github.sha }}
+          path: artifacts/browser-parity/browser-parity-live-probe.json
+          if-no-files-found: warn
+          retention-days: 30
 
   connector:
     name: ChatGPT connector JSON / MCP contract
