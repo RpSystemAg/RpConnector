@@ -1,0 +1,229 @@
+{
+  "schema_version": "1.0.0",
+  "surface_id": "prstudio-browser-vendor-mcp-2026-08-21",
+  "checked_at": "2026-08-21",
+  "language": "it-IT+en",
+  "transport_action": "mcp_bridge_call",
+  "legacy_browser_surface": "hidden_from_tools_list_except_browser_status",
+  "upstream": {
+    "chrome_devtools_mcp": {
+      "official": true,
+      "package": "chrome-devtools-mcp",
+      "version": "1.7.0",
+      "repository": "https://github.com/ChromeDevTools/chrome-devtools-mcp",
+      "transport": "stdio"
+    },
+    "chrome_webmcp": {
+      "official": true,
+      "via": "chrome-devtools-mcp",
+      "tool_names": [
+        "list_webmcp_tools",
+        "execute_webmcp_tool"
+      ]
+    },
+    "puppeteer_mcp": {
+      "official_guidance": true,
+      "via": "chrome-devtools-mcp",
+      "note": "Puppeteer documents chrome-devtools-mcp as a Puppeteer-based MCP server."
+    },
+    "selenium": {
+      "official_mcp_server": false,
+      "official_library": "selenium-webdriver",
+      "version": "4.47.0",
+      "note": "SeleniumHQ issue #15969 remains an open request for an official Selenium MCP server."
+    }
+  },
+  "tools": [
+    {
+      "name": "chrome_devtools_tools_list",
+      "provider": "chrome_devtools",
+      "operation": "tools/list",
+      "title_it": "Elenco tool Chrome DevTools MCP",
+      "title_en": "Chrome DevTools MCP tool list",
+      "description_it": "Restituisce nomi e JSON Schema correnti direttamente dal server ufficiale Chrome DevTools MCP.",
+      "description_en": "Returns the current tool names and JSON Schemas directly from the official Chrome DevTools MCP server.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "readOnlyHint": true
+    },
+    {
+      "name": "chrome_devtools_call",
+      "provider": "chrome_devtools",
+      "operation": "tools/call",
+      "title_it": "Chiama Chrome DevTools MCP",
+      "title_en": "Call Chrome DevTools MCP",
+      "description_it": "Invoca un tool ufficiale Chrome DevTools MCP usando esattamente il nome e gli argomenti dello schema upstream.",
+      "description_en": "Calls an official Chrome DevTools MCP tool using the exact upstream tool name and arguments.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tool": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Nome esatto tool upstream / Exact upstream tool name."
+          },
+          "arguments": {
+            "type": "object",
+            "description": "Argomenti conformi allo schema upstream / Arguments matching the upstream schema.",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "tool"
+        ],
+        "additionalProperties": false
+      },
+      "readOnlyHint": false
+    },
+    {
+      "name": "chrome_webmcp_tools_list",
+      "provider": "chrome_webmcp",
+      "operation": "tools/list",
+      "title_it": "Elenco tool Chrome WebMCP",
+      "title_en": "Chrome WebMCP tool list",
+      "description_it": "Espone gli strumenti WebMCP ufficialmente integrati in Chrome DevTools MCP.",
+      "description_en": "Lists the WebMCP tools officially integrated into Chrome DevTools MCP.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "readOnlyHint": true
+    },
+    {
+      "name": "chrome_webmcp_call",
+      "provider": "chrome_webmcp",
+      "operation": "tools/call",
+      "title_it": "Chiama Chrome WebMCP",
+      "title_en": "Call Chrome WebMCP",
+      "description_it": "Invoca list_webmcp_tools o execute_webmcp_tool tramite Chrome DevTools MCP.",
+      "description_en": "Calls list_webmcp_tools or execute_webmcp_tool through Chrome DevTools MCP.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tool": {
+            "type": "string",
+            "enum": [
+              "list_webmcp_tools",
+              "execute_webmcp_tool"
+            ],
+            "description": "Tool WebMCP ufficiale da invocare / Official WebMCP tool to invoke."
+          },
+          "arguments": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "tool"
+        ],
+        "additionalProperties": false
+      },
+      "readOnlyHint": false
+    },
+    {
+      "name": "puppeteer_mcp_tools_list",
+      "provider": "puppeteer",
+      "operation": "tools/list",
+      "title_it": "Elenco tool Puppeteer MCP",
+      "title_en": "Puppeteer MCP tool list",
+      "description_it": "Restituisce gli strumenti del server MCP Puppeteer-based raccomandato dal progetto Puppeteer: chrome-devtools-mcp.",
+      "description_en": "Lists tools from the Puppeteer-based MCP server recommended by the Puppeteer project: chrome-devtools-mcp.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "readOnlyHint": true
+    },
+    {
+      "name": "puppeteer_mcp_call",
+      "provider": "puppeteer",
+      "operation": "tools/call",
+      "title_it": "Chiama Puppeteer MCP",
+      "title_en": "Call Puppeteer MCP",
+      "description_it": "Invoca chrome-devtools-mcp con semantica Puppeteer; non usa il vecchio server-puppeteer archiviato.",
+      "description_en": "Calls chrome-devtools-mcp as the Puppeteer MCP path; it does not use the archived server-puppeteer package.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tool": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Nome esatto tool upstream / Exact upstream tool name."
+          },
+          "arguments": {
+            "type": "object",
+            "description": "Argomenti conformi allo schema upstream / Arguments matching the upstream schema.",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "tool"
+        ],
+        "additionalProperties": false
+      },
+      "readOnlyHint": false
+    },
+    {
+      "name": "selenium_tools_list",
+      "provider": "selenium",
+      "operation": "tools/list",
+      "title_it": "Elenco tool Selenium ufficiale",
+      "title_en": "Official Selenium tool list",
+      "description_it": "Restituisce gli strumenti dell'adapter minimale basato su selenium-webdriver ufficiale. SeleniumHQ non pubblica un server MCP ufficiale al 21/08/2026.",
+      "description_en": "Lists the minimal adapter tools backed by official selenium-webdriver. SeleniumHQ does not publish an official MCP server as of 2026-08-21.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "readOnlyHint": true
+    },
+    {
+      "name": "selenium_call",
+      "provider": "selenium",
+      "operation": "tools/call",
+      "title_it": "Chiama Selenium WebDriver",
+      "title_en": "Call Selenium WebDriver",
+      "description_it": "Invoca un'operazione dell'adapter basato sulla libreria ufficiale selenium-webdriver 4.47.0.",
+      "description_en": "Calls an operation in the adapter backed by the official selenium-webdriver 4.47.0 library.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tool": {
+            "type": "string",
+            "enum": [
+              "selenium_start",
+              "selenium_navigate",
+              "selenium_get_title",
+              "selenium_get_url",
+              "selenium_find",
+              "selenium_click",
+              "selenium_type",
+              "selenium_get_text",
+              "selenium_get_attribute",
+              "selenium_screenshot",
+              "selenium_back",
+              "selenium_forward",
+              "selenium_refresh",
+              "selenium_quit"
+            ]
+          },
+          "arguments": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "tool"
+        ],
+        "additionalProperties": false
+      },
+      "readOnlyHint": false
+    }
+  ]
+}

@@ -1,23 +1,17 @@
 {
   "manifest_version": 3,
   "name": "PR STUDIO Unified Browser Agent",
-  "version": "1.0.0",
+  "version": "1.1.0",
+  "description": "PR STUDIO pairing and task transport backed by official browser MCP tooling.",
   "minimum_chrome_version": "120",
-  "description": "Browser Agent e Local Studio per PR STUDIO.",
   "permissions": [
     "storage",
     "alarms",
-    "tabs",
-    "scripting",
-    "debugger",
-    "activeTab",
-    "downloads",
-    "notifications",
-    "webNavigation",
-    "sidePanel",
-    "tabGroups"
+    "sidePanel"
   ],
-  "host_permissions": ["<all_urls>"],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "background": {
     "service_worker": "service-worker.js",
     "type": "module"
@@ -28,28 +22,9 @@
   "side_panel": {
     "default_path": "sidepanel.html"
   },
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["page-runtime-main.js"],
-      "run_at": "document_start",
-      "all_frames": true,
-      "match_about_blank": true,
-      "match_origin_as_fallback": true,
-      "world": "MAIN"
-    },
-    {
-      "matches": ["<all_urls>"],
-      "js": [
-        "lib/reconnect-backoff.js",
-        "lib/runtime-dirty-notifier.js",
-        "page-runtime.js"
-      ],
-      "run_at": "document_start",
-      "all_frames": true,
-      "match_about_blank": true,
-      "match_origin_as_fallback": true,
-      "world": "ISOLATED"
-    }
-  ]
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
 }

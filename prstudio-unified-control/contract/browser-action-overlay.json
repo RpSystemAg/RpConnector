@@ -141,6 +141,56 @@
       "route": "/frontend-manage",
       "strategy": "normalized_browser_command",
       "tool_name": "rpconnector_frontend_manage_local_studio_run"
+    },
+    {
+      "action": "mcp_bridge_call",
+      "adapter_hook": "rpconnector_admin_execute_frontend_manage_mcp_bridge_call",
+      "description": "Forward one vendor browser MCP list/call operation to the paired Browser Agent, which relays it to the local official MCP bridge.",
+      "destructive": false,
+      "domain": "browser",
+      "executor": "browser_agent",
+      "idempotent": false,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "chrome_devtools",
+              "chrome_webmcp",
+              "puppeteer",
+              "selenium"
+            ]
+          },
+          "operation": {
+            "type": "string",
+            "enum": [
+              "tools/list",
+              "tools/call"
+            ]
+          },
+          "tool": {
+            "type": "string"
+          },
+          "arguments": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "requested_tool": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "operation"
+        ],
+        "additionalProperties": false
+      },
+      "open_world": true,
+      "read_only": false,
+      "route": "/frontend-manage",
+      "strategy": "vendor_mcp_bridge",
+      "tool_name": "rpconnector_frontend_manage_mcp_bridge_call"
     }
   ]
 }
