@@ -1,0 +1,127 @@
+name: Browser Agent 2.0 certification
+
+on:
+  push:
+    branches:
+      - master
+      - feat/browser-agent-2.0-certified
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: browser-agent-2-certification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  certify-browser-agent-2:
+    name: Kernel / MV3 / real Chrome / stress
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CI: '1'
+      CHROME_BIN: /usr/bin/chromium
+      BROWSER2_REAL_CYCLES: '1000'
+      BROWSER2_CROSS_ORIGIN_CYCLES: '100'
+      BROWSER2_ARTIFACT_DIR: artifacts/browser-agent-2-certification
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: '8.1'
+          tools: composer, phpunit:10.5
+          coverage: none
+
+      - name: Environment evidence
+        run: |
+          set -euo pipefail
+          test -x "$CHROME_BIN"
+          "$CHROME_BIN" --version
+          node --version
+          python --version
+          php --version
+          git rev-parse HEAD
+
+      - name: Browser 2 syntax and wire preflight
+        run: |
+          set -euo pipefail
+          node --check prstudio-unified-browser-agent/lib/browser-control-kernel.js
+          node --check prstudio-unified-browser-agent/lib/tab-ownership.js
+          node --check prstudio-unified-browser-agent/tests/browser-control-kernel-stress.test.mjs
+          node --check prstudio-unified-browser-agent/tests/browser-control-kernel-runtime.test.mjs
+          node --check tests/browser-agent-2-real-chrome.mjs
+          php -l prstudio-unified-control/includes/class-prstudio-uc-job-engine.php
+          php -l tests/phpunit-kernel/CriticalKernelTest.php
+          python tests/validate-protocol-compatibility.py
+
+      - name: Browser Agent complete Node test surface
+        run: |
+          set -euo pipefail
+          node --test prstudio-unified-browser-agent/tests/*.test.mjs
+
+      - name: Browser Agent 2 deterministic stress certificate
+        run: |
+          set -euo pipefail
+          node --test prstudio-unified-browser-agent/tests/browser-control-kernel-stress.test.mjs
+          node --test prstudio-unified-browser-agent/tests/browser-control-kernel-runtime.test.mjs
+
+      - name: Critical PHP kernel contract
+        run: |
+          set -euo pipefail
+          phpunit --configuration phpunit.xml.dist --filter CriticalKernelTest
+
+      - name: Stamp exact candidate build identity
+        run: |
+          set -euo pipefail
+          python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA"
+          python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA" --verify
+          if grep -R -n -E 'UNSTAMPED|prstudio-browser-[^"[:space:]]+\+unbound' prstudio-unified-browser-agent/lib/executor-meta.js; then
+            echo 'Browser Agent build remains uncertifiable after exact-SHA stamping.' >&2
+            exit 1
+          fi
+          cat prstudio-unified-browser-agent/lib/executor-meta.js
+
+      - name: Real Chrome Browser Agent 2.0 stress certification
+        run: |
+          set -euo pipefail
+          node tests/browser-agent-2-real-chrome.mjs
+          jq -e '
+            .ok == true and
+            .cycles_requested == 1000 and
+            .cross_origin_cycles_requested == 100 and
+            (.build_identity.source | length) >= 40 and
+            .build_identity.source != "UNSTAMPED" and
+            .build_identity.built != "UNSTAMPED"
+          ' artifacts/browser-agent-2-certification/evidence.json
+
+      - name: Verify no ownership/origin regression appears in certificate
+        run: |
+          set -euo pipefail
+          test -s artifacts/browser-agent-2-certification/evidence.json
+          if grep -R -n -E 'technical_tab_not_controlled|target_origin_mismatch|tab_controller_conflict|context_leak_blocked' artifacts/browser-agent-2-certification; then
+            echo 'Browser Agent 2.0 regression signature found in certification evidence.' >&2
+            exit 1
+          fi
+
+      - name: Upload Browser Agent 2.0 certificate
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: browser-agent-2-certificate-${{ github.sha }}
+          path: artifacts/browser-agent-2-certification
+          if-no-files-found: error
+          retention-days: 30
