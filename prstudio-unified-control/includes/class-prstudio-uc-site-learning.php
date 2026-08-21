@@ -345,9 +345,9 @@ final class PRSTUDIO_UC_Site_Learning {
 JS;
     }
 
-    private static function wordpress_observation_script( string $section = '' ): string {
+    private static function wordpress_observation_script( string $section = '', int $expected_page = 0 ): string {
         $section_json=json_encode($section,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
-        return '(async function(){const section='.$section_json.';'.
+        return '(async function(){const section='.$section_json.';const expectedPage='.max(0,$expected_page).';'.
 <<<'JS'
 // Wait for the list table, for the same reason the probe waits for the menu.
 //
@@ -363,6 +363,21 @@ JS;
 const listDeadline = Date.now() + 6000;
 while (Date.now() < listDeadline && !document.querySelector('table.wp-list-table')) {
   await new Promise((resolve) => setTimeout(resolve, 150));
+}
+// After a pagination click the table already exists, so waiting for one to
+// appear returns instantly and reads the page that is being replaced. The
+// study clicked "next page" sixteen times and recorded page 1 sixteen times:
+// it knew total_pages was 2 and observed 1, because existence is not the
+// state that changed. When a page is expected, wait for that page.
+const readCurrentPage = () => {
+  const nav = document.querySelector('.tablenav.top .tablenav-pages') || document.querySelector('.tablenav-pages');
+  return Number(nav?.querySelector('.current-page')?.value || nav?.querySelector('.current-page')?.textContent || 0) || 0;
+};
+if (expectedPage > 0) {
+  const pageDeadline = Date.now() + 8000;
+  while (Date.now() < pageDeadline && readCurrentPage() !== expectedPage) {
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
 }
 const clean=(v)=>String(v||'').replace(/\s+/g,' ').trim();
 const tables=[...document.querySelectorAll('table.wp-list-table')].map((table,ti)=>{
@@ -412,12 +427,12 @@ JS;
         return array(
             array('type'=>'click','selector'=>(string)$section['selector'],'selectorType'=>'css','expectedOrigin'=>$origin,'timeoutMs'=>30000,'_prstudio_exploratory_read_only'=>true),
             array('type'=>'wait_load','state'=>'complete','timeoutMs'=>45000),
-            array('type'=>'javascript_exec','script'=>self::wordpress_observation_script($key),'timeoutMs'=>30000),
+            array('type'=>'javascript_exec','script'=>self::wordpress_observation_script($key,$expected_page),'timeoutMs'=>30000),
             array('type'=>'screenshot','fullPage'=>true,'lazyLoad'=>true,'format'=>'auto','quality'=>82,'maxPixels'=>28000000),
         );
     }
 
-    private static function wordpress_next_page_steps( array $section, string $origin ): array {
+    private static function wordpress_next_page_steps( array $section, string $origin, int $expected_page = 0 ): array {
         $key=self::section_key($section);
         return array(
             array('type'=>'click','selector'=>'.tablenav.top a.next-page, .tablenav-pages a.next-page','selectorType'=>'css','expectedOrigin'=>$origin,'timeoutMs'=>30000,'_prstudio_exploratory_read_only'=>true),
@@ -526,7 +541,7 @@ JS;
     }
 
     private static function queue_wordpress_next( array $task, array &$state, array $last_tables=array() ): array {
-        $active=(array)($state['active_section']??array());foreach($last_tables as $summary){if(!is_array($summary))continue;if(!empty($summary['has_next'])&&(int)$summary['page']<(int)$summary['total']){$state['metrics']['wordpress_pagination_clicks']=(int)$state['metrics']['wordpress_pagination_clicks']+1;$state['metrics']['safe_clicks']=(int)$state['metrics']['safe_clicks']+1;return self::queue_browser_flow($task,$state,'wordpress_pagination',self::wordpress_next_page_steps($active,(string)$state['origin']),array('_prstudio_wordpress_section'=>$active));}}
+        $active=(array)($state['active_section']??array());foreach($last_tables as $summary){if(!is_array($summary))continue;if(!empty($summary['has_next'])&&(int)$summary['page']<(int)$summary['total']){$state['metrics']['wordpress_pagination_clicks']=(int)$state['metrics']['wordpress_pagination_clicks']+1;$state['metrics']['safe_clicks']=(int)$state['metrics']['safe_clicks']+1;return self::queue_browser_flow($task,$state,'wordpress_pagination',self::wordpress_next_page_steps($active,(string)$state['origin'],(int)$summary['page']+1),array('_prstudio_wordpress_section'=>$active));}}
         if($active){$key=self::section_key($active);if(isset($state['admin']['sections'][$key]))$state['admin']['sections'][$key]['visited']=true;}
         $pending=array_values((array)($state['pending_sections']??array()));if(!$pending){self::update_coverage($state);$state['state']='ready';$state['active_task_id']='';$state['drift']['revalidation_required']=false;return array('queued'=>false,'defer_parent'=>false);}
         $next=array_shift($pending);$state['pending_sections']=$pending;$state['active_section']=$next;$state['metrics']['safe_clicks']=(int)$state['metrics']['safe_clicks']+1;return self::queue_browser_flow($task,$state,'wordpress_section',self::wordpress_section_steps($next,(string)$state['origin']),array('_prstudio_wordpress_section'=>$next));

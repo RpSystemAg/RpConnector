@@ -296,7 +296,9 @@ function assertStudySnapshot(snapshot, fixture, { requireIncremental = false } =
     table_sections: tables.map((table) => String(table.section || '')),
     table_summary: tables.map((table) => ({
       section: table.section || null,
-      columns: (table.columns || []).length,
+      // The module stores them as `headers`; reading `columns` reported 0
+      // for six captured tables that all had headers.
+      columns: (table.headers || []).length,
       rows: (table.rows || []).length,
       pages_observed: table.page_count_observed ?? null,
       total_pages: table.total_pages ?? null,
