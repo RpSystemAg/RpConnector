@@ -27,8 +27,6 @@ const child = spawn(chrome, [
   '--no-first-run',
   `--remote-debugging-port=${debugPort}`,
   `--user-data-dir=${userDataDir}`,
-  `--disable-extensions-except=${extensionDir}`,
-  `--load-extension=${extensionDir}`,
   'about:blank',
 ], { stdio: ['ignore', 'pipe', 'pipe'] });
 
@@ -159,7 +157,13 @@ try {
   const version = await waitForChromeVersion();
   report.chrome_version = version.Browser || '';
   cdp = new Cdp(version.webSocketDebuggerUrl);
+  const loaded = await cdp.send('Extensions.loadUnpacked', { path: extensionDir });
+  const loadedExtensionId = String(loaded?.id || '');
+  if (!loadedExtensionId) throw new Error('Extensions.loadUnpacked returned no extension id');
   const extensionId = await findExtensionId(cdp);
+  if (extensionId !== loadedExtensionId) {
+    throw new Error(`Loaded extension id mismatch: loaded=${loadedExtensionId} observed=${extensionId}`);
+  }
   report.extension_id = extensionId;
 
   const { targetId: wpTargetId } = await cdp.send('Target.createTarget', { url: `${wpUrl}/wp-login.php` });
