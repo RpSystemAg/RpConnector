@@ -27,7 +27,7 @@
   "protocol_compatibility_target": "future protocol generations are not advertised until implemented and tested",
   "protocol_compatibility_claim": "MCP 2026-07-28 is primary with bounded 2025 compatibility; Tasks remain opt-in and are not a mandatory dependency",
   "mcp_tasks_extension": "not_advertised",
-  "expected_tools": 124,
+  "expected_tools": 120,
   "browser_role": "primary for live UI and human-visible evidence",
   "internal_capabilities": {
     "runtime_total": 1371,
@@ -35,8 +35,8 @@
     "agency_overlay": 76
   },
   "browser_catalog_total": 130,
-  "browser_catalog_executable": 130,
-  "browser_catalog_security_restricted": 0,
+  "browser_catalog_executable": 119,
+  "browser_catalog_security_restricted": 11,
   "connector_zip_required": false,
   "custom_gpt_required": false,
   "gpt_actions_required": false,
@@ -134,10 +134,6 @@
     "browser_launch",
     "browser_lighthouse",
     "browser_link_crawl",
-    "browser_live_attach",
-    "browser_live_signal",
-    "browser_live_status",
-    "browser_live_stop",
     "browser_locale",
     "browser_navigate",
     "browser_network",
@@ -208,8 +204,8 @@
     "prstudio_seo_autopilot_control",
     "prstudio_seo_autopilot_next",
     "prstudio_seo_autopilot_status",
-    "prstudio_tool_manual",
     "prstudio_research_radar",
+    "prstudio_tool_manual",
     "sentinel_scan",
     "sequential_thinking",
     "sequential_thinking_session",
@@ -224,14 +220,5 @@
     "remote_mcp_tool": "local_studio",
     "local_features_remain_local": true,
     "remote_context_is_per_call": true
-  },
-  "browser_live_webrtc": {
-    "transport": "webrtc",
-    "media": "video",
-    "capture": "chrome.tabCapture -> offscreen getUserMedia",
-    "persistent_media_storage": false,
-    "signaling_storage": "private_ephemeral_file",
-    "installation_contract_unchanged": true,
-    "live_acceptance_required": true
   }
 }
