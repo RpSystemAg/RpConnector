@@ -26,8 +26,26 @@ final class PRSTUDIO_UC_Job_Engine {
 		try {
 			$out = PRSTUDIO_UC_Site_Learning::after_browser_completion( $task, $result, $verification );
 			return is_array( $out ) ? $out : array( 'handled'=>false, 'defer_parent'=>false );
-		} catch ( Throwable $ignored ) {
-			PRSTUDIO_UC_Store::event( (string)($task['task_uuid']??''), 'task.site_learning_error', array( 'exception_class'=>get_class($ignored) ) );
+		} catch ( Throwable $error ) {
+			// Record what went wrong, not merely that something did.
+			//
+			// This logged the exception class and nothing else, and the
+			// consequence is not a missing log line: catching here returns
+			// defer_parent false, so the parent job is reconciled and completed
+			// as though the study had finished. A site study died mid-traversal
+			// on a TypeError and the only trace anywhere was the word
+			// "TypeError" -- no message, no file, no line, and a job that
+			// reported success.
+			//
+			// The message and location are ours, not the site's: this code runs
+			// inside the plugin, so nothing here can carry page content.
+			PRSTUDIO_UC_Store::event( (string)($task['task_uuid']??''), 'task.site_learning_error', array(
+				'exception_class'=>get_class($error),
+				'message'=>substr((string)$error->getMessage(),0,400),
+				'file'=>substr(basename((string)$error->getFile()),0,80),
+				'line'=>(int)$error->getLine(),
+				'phase'=>(string)($task['arguments']['_prstudio_site_phase']??''),
+			) );
 			return array( 'handled'=>true, 'defer_parent'=>false, 'error'=>'site_learning_exception' );
 		}
 	}
