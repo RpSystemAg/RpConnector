@@ -1,12 +1,28 @@
 export const DEBUGGER_PROTOCOL_CANDIDATES = Object.freeze(["1.3", "0.1"]);
 
+async function enableBrowserDownloadEvents(debuggerApi, target) {
+  try {
+    await debuggerApi.sendCommand(target, "Browser.setDownloadBehavior", {
+      behavior: "default",
+      eventsEnabled: true,
+    });
+  } catch (error) {
+    const wrapped = new Error("Browser download events could not be enabled after debugger attachment.");
+    wrapped.code = "cdp_download_events_unavailable";
+    wrapped.details = { message: String(error?.message || error).slice(0, 240) };
+    throw wrapped;
+  }
+}
+
 export async function attachWithProtocolFallback(debuggerApi, target, isAttached = async () => false) {
   const errors = [];
   for (const protocolVersion of DEBUGGER_PROTOCOL_CANDIDATES) {
     try {
       await debuggerApi.attach(target, protocolVersion);
+      await enableBrowserDownloadEvents(debuggerApi, target);
       return { ok: true, protocolVersion, fallbackUsed: protocolVersion !== DEBUGGER_PROTOCOL_CANDIDATES[0], errors };
     } catch (error) {
+      if (error?.code === "cdp_download_events_unavailable") throw error;
       const message = String(error?.message || error);
       let attached;
       try {
@@ -19,6 +35,7 @@ export async function attachWithProtocolFallback(debuggerApi, target, isAttached
       }
       if (attached) {
         if (/already attached|Another debugger is already attached/i.test(message)) {
+          await enableBrowserDownloadEvents(debuggerApi, target);
           return { ok: true, protocolVersion, fallbackUsed: protocolVersion !== DEBUGGER_PROTOCOL_CANDIDATES[0], alreadyAttached: true, errors };
         }
         const ambiguousError = new Error("Debugger attach failed but target reports attached; protocol replay is unsafe without a clean state.");
