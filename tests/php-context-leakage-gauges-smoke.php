@@ -74,6 +74,20 @@ ok( '[REDACTED]' === ( $redacted['redacted']['result']['lane_token'] ?? '' ), 'r
 ok( false === strpos( (string) wp_json_encode( $redacted['redacted'] ), 'Bearer abcdefghijklmnopqrstuvwxyz' ), 'redact removes bearer tokens' );
 ok( 2 === count( $redacted['findings'] ), 'redact reports every finding' );
 
+// 6b) A payload that has already been safely redacted must not be blocked a
+//     second time merely because the forbidden key is still present. This is
+//     the production path used by MCP clean_result(): Memory::redact first,
+//     leakage gauge second.
+$already_redacted = PRSTUDIO_UC_Context_Leak_Gauge::blocking_verdict( array(
+    'ok' => true,
+    'result' => array(
+        'lane_token' => '[REDACTED]',
+        'access_token' => '[REDACTED]',
+        'client_secret' => '[REDACTED]',
+    ),
+) );
+ok( false === $already_redacted['blocked'], 'already-redacted forbidden fields do not self-trigger the blocking gauge' );
+
 // 7) Status dei gauge: tutti bloccanti.
 $status = PRSTUDIO_UC_Context_Leak_Gauge::status();
 ok( 'blocking' === ( $status['gauges']['gauge_known_secret'] ?? '' ), 'known-secret gauge is blocking' );
