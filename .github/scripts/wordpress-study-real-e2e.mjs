@@ -72,7 +72,38 @@ class Cdp {
   close() { try { this.ws.close(); } catch {} }
 }
 
-async function fetchJson(url) { const response = await fetch(url); if (!response.ok) throw new Error(`${response.status} ${url}`); return response.json(); }
+/**
+ * Every request opens its own connection, and one retry survives a reset.
+ *
+ * Node's fetch (undici) keeps sockets in a pool and reuses them. The PHP
+ * built-in server that hosts WordPress here closes a connection as soon as it
+ * has answered, so undici writes the next request into a socket the server has
+ * already shut, and the reset surfaces as the entirely uninformative
+ * "TypeError: fetch failed".
+ *
+ * That is exactly what happened: in the same second, curl got HTTP 200 from
+ * this endpoint in 0s while this script could not complete a single call.
+ * curl opens a fresh connection per invocation and never meets the race.
+ *
+ * `Connection: close` opts out of pooling. The single retry covers the reset
+ * that can still arrive on a connection closed between the DNS answer and the
+ * first byte -- these calls are reads or idempotent MCP requests, so repeating
+ * one is safe.
+ */
+const NO_KEEPALIVE = { Connection: 'close' };
+
+async function fetchOnce(url, init) {
+  const options = { ...init, headers: { ...NO_KEEPALIVE, ...(init?.headers || {}) } };
+  try {
+    return await fetch(url, options);
+  } catch (error) {
+    if (String(error?.message || '') !== 'fetch failed') throw error;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    return fetch(url, options);
+  }
+}
+
+async function fetchJson(url) { const response = await fetchOnce(url); if (!response.ok) throw new Error(`${response.status} ${url}`); return response.json(); }
 async function waitForChrome() {
   let last;
   for (let i = 0; i < 150; i += 1) { try { const v = await fetchJson(`http://127.0.0.1:${debugPort}/json/version`); if (v?.webSocketDebuggerUrl) return v; } catch (e) { last = e; } await sleep(100); }
@@ -122,7 +153,7 @@ async function mcpTool(name, args) {
       },
     },
   };
-  const response = await fetch(`${wpUrl}/?rest_route=/prstudio-unified/v1/mcp`, {
+  const response = await fetchOnce(`${wpUrl}/?rest_route=/prstudio-unified/v1/mcp`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'MCP-Protocol-Version': '2026-07-28', 'Mcp-Method': 'tools/call', 'Mcp-Name': name },
     body: JSON.stringify(payload),
