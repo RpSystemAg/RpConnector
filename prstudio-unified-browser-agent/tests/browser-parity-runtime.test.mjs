@@ -103,3 +103,49 @@ test('DOM/script observation failure captures visual evidence before surfacing t
   assert.ok(stored?.prstudioLastVisualFallback?.screenshot?.startsWith('data:image/png;base64,'));
   assert.equal(attached, false, 'debugger attached only for fallback must be detached afterwards');
 });
+
+test('successful CAPTCHA/MFA detection also stores a screenshot without bypassing the challenge', async () => {
+  let attached = false;
+  let stored = null;
+  const fakeChrome = {
+    windows: {
+      async getAll() { return [{ id: 1 }]; },
+      async getLastFocused() { return { id: 1, type: 'normal' }; },
+      async get() { return { id: 1 }; },
+    },
+    tabs: {
+      async create(props) { return { id: 6, windowId: 1, ...props }; },
+      async get(id) { return { id, windowId: 1 }; },
+      async update(id, props) { return { id, ...props }; },
+      async group() { return 1; },
+    },
+    scripting: {
+      async executeScript() {
+        return [{ result: { reason: 'captcha_or_mfa', selector: "iframe[src*='recaptcha']", url: 'https://example.com/login' } }];
+      },
+    },
+    debugger: {
+      async attach() { attached = true; },
+      async detach() { attached = false; },
+      async sendCommand(_target, method) {
+        if (method === 'Page.enable' && !attached) throw new Error('Debugger is not attached');
+        if (method === 'Page.captureScreenshot') return { data: Buffer.from('captcha-shot').toString('base64') };
+        return {};
+      },
+    },
+    storage: {
+      local: {
+        async set(value) { stored = value; },
+      },
+    },
+  };
+
+  installBrowserParityRuntime(fakeChrome);
+  const result = await fakeChrome.scripting.executeScript({ target: { tabId: 6 }, func: () => null });
+  assert.equal(result[0].result.reason, 'captcha_or_mfa');
+  assert.equal(stored?.prstudioLastVisualFallback?.captured, true);
+  assert.equal(stored?.prstudioLastVisualFallback?.tabId, 6);
+  assert.match(stored?.prstudioLastVisualFallback?.reason || '', /^captcha_or_mfa:/);
+  assert.ok(stored?.prstudioLastVisualFallback?.screenshot?.startsWith('data:image/png;base64,'));
+  assert.equal(attached, false);
+});
