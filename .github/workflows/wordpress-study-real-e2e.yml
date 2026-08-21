@@ -211,16 +211,32 @@ jobs:
             tail -n 80 "$E2E_ARTIFACT_DIR/wordpress-server.log" || true
             exit 1
           fi
-          if ! curl --fail --silent --max-time 20 \
+          # Generous on purpose, and timed.
+          #
+          # At 20 seconds this reported "did not answer" while the server was
+          # demonstrably alive and had just served /wp-login.php: the MCP
+          # request was accepted and never completed. That is the signature of
+          # a cold start, not a dead process -- this endpoint assembles a
+          # 1295-entry capability registry and a 120-tool surface on a PHP
+          # built-in server with no opcache, and it pays that cost on the first
+          # request of the job.
+          #
+          # So the first call is treated as a warm-up with room to finish, and
+          # the elapsed time is recorded. If a later run is slow again, the
+          # number is in the evidence rather than in someone's memory.
+          warm_start="$(date +%s)"
+          if ! curl --fail --silent --max-time 180 \
                -H "Authorization: Bearer $MCP_ACCESS_TOKEN" \
                -H 'Content-Type: application/json' \
                -H 'MCP-Protocol-Version: 2026-07-28' \
+               -H 'Mcp-Method: tools/list' \
                --data '{"jsonrpc":"2.0","id":"preflight","method":"tools/list","params":{}}' \
                "$WP_URL/?rest_route=/prstudio-unified/v1/mcp" > /tmp/rpconnector-study-preflight.json; then
-            echo "::error::the authenticated MCP endpoint did not answer before the study started"
+            echo "::error::the authenticated MCP endpoint did not answer within 180s while its process was alive"
             tail -n 80 "$E2E_ARTIFACT_DIR/wordpress-server.log" || true
             exit 1
           fi
+          echo "MCP cold tools/list took $(( $(date +%s) - warm_start ))s" | tee "$E2E_ARTIFACT_DIR/mcp-warmup-seconds.txt"
           jq -e '.result.tools | length > 0' /tmp/rpconnector-study-preflight.json > /dev/null
           cp /tmp/rpconnector-study-preflight.json "$E2E_ARTIFACT_DIR/mcp-preflight.json"
 
