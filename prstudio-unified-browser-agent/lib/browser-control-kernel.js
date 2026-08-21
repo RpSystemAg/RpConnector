@@ -25,7 +25,7 @@ export function normalizeControllerSessionId(record = {}, context = {}) {
     record.laneId,
   ];
   for (const value of candidates) {
-    const normalized = cleanString(value);
+    const normalized = stableControllerId(value);
     if (normalized) return normalized;
   }
   return "";
@@ -40,7 +40,7 @@ export function parseControllerSessionFromGroupTitle(title = "") {
   const value = cleanString(title);
   if (value === CONTROL_GROUP_PREFIX) return "";
   const prefix = `${CONTROL_GROUP_PREFIX} · `;
-  return value.startsWith(prefix) ? value.slice(prefix.length).trim() : "";
+  return value.startsWith(prefix) ? stableControllerId(value.slice(prefix.length)) : "";
 }
 
 export function isControllerGroup(group = {}) {
@@ -105,16 +105,6 @@ function ownershipNonce(existing, groupId, tabId) {
   return current || `chrome-group:${Number(groupId || 0)}:tab:${Number(tabId || 0)}`;
 }
 
-/**
- * Pure Browser Agent 2.0 reconciliation.
- *
- * Chrome tab groups are the recoverable ownership source of truth. The registry
- * is retained as compatibility/telemetry cache, never as the only evidence that
- * a tab is controlled. A tab dragged out of a kernel-managed group is released;
- * a tab dragged into a controller-scoped group is adopted as an explicit Chrome
- * UI gesture. The bare legacy group can migrate an already-identified record,
- * but can never create unscoped ownership. Popups inherit the opener controller.
- */
 export function reconcileControlState({
   registry = {},
   groups = [],
@@ -180,8 +170,6 @@ export function reconcileControlState({
       const existing = next[String(tabId)] || safeRegistry[String(tabId)] || {};
       const controllerSessionId = cleanString(group.controllerSessionId)
         || normalizeControllerSessionId(existing, {});
-      // The generic 1.0 group is a migration staging area only. Without an
-      // existing controller identity it is insufficient evidence of ownership.
       if (!controllerSessionId) continue;
       if (!next[String(tabId)]) adoptedFromGroups += 1;
       next[String(tabId)] = {
