@@ -193,68 +193,58 @@ jobs:
           rm -f /tmp/rpconnector-study-token
 
       - name: Confirm WordPress is still answering before the study starts
-        # The study script reported only "TypeError: fetch failed", which in
-        # Node means the socket, not the response -- and says nothing about
-        # who closed it. The server log ended at the readiness check with no
-        # further requests, so the PHP built-in server was already gone by the
-        # time the first MCP call left the script, and fifteen seconds of
-        # Chrome startup sat between the two with nothing watching.
+        # Writes its whole diagnosis into the evidence directory, not just the
+        # log.
         #
-        # This step is the watcher. It fails with the server log and the
-        # process state attached, so the next failure names the thing that
-        # died instead of naming fetch.
+        # Two previous versions of this step failed in under a second and
+        # printed nothing that survived into a readable log, which is
+        # indistinguishable from the endpoint being dead and was twice read
+        # that way. A preflight whose own failure cannot be inspected is not a
+        # preflight; it is another mystery placed in front of the mystery it
+        # was added to explain.
+        #
+        # curl runs without --fail on purpose: --fail suppresses the body on an
+        # HTTP error, which is exactly the case where the body is the answer.
+        # The status code, the exit code and the first part of the response all
+        # land in a file the job uploads, so the next failure is readable even
+        # if nothing reaches the console.
         run: |
-          set -euo pipefail
-          pid="$(cat /tmp/rpconnector-study-wp.pid 2>/dev/null || echo '')"
-          if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then
-            echo "::error::the WordPress PHP server (pid $pid) is no longer running"
-            tail -n 80 "$E2E_ARTIFACT_DIR/wordpress-server.log" || true
-            exit 1
-          fi
-          # Generous on purpose, and timed.
-          #
-          # At 20 seconds this reported "did not answer" while the server was
-          # demonstrably alive and had just served /wp-login.php: the MCP
-          # request was accepted and never completed. That is the signature of
-          # a cold start, not a dead process -- this endpoint assembles a
-          # 1295-entry capability registry and a 120-tool surface on a PHP
-          # built-in server with no opcache, and it pays that cost on the first
-          # request of the job.
-          #
-          # So the first call is treated as a warm-up with room to finish, and
-          # the elapsed time is recorded. If a later run is slow again, the
-          # number is in the evidence rather than in someone's memory.
-          warm_start="$(date +%s)"
-          if ! curl --fail --silent --max-time 180 \
-               -H "Authorization: Bearer $MCP_ACCESS_TOKEN" \
-               -H 'Content-Type: application/json' \
-               -H 'MCP-Protocol-Version: 2026-07-28' \
-               -H 'Mcp-Method: tools/list' \
-               --data '{"jsonrpc":"2.0","id":"preflight","method":"tools/list","params":{}}' \
-               "$WP_URL/?rest_route=/prstudio-unified/v1/mcp" > /tmp/rpconnector-study-preflight.json; then
-            echo "::error::the authenticated MCP endpoint did not answer within 180s while its process was alive"
-            tail -n 80 "$E2E_ARTIFACT_DIR/wordpress-server.log" || true
-            exit 1
-          fi
-          echo "MCP cold tools/list took $(( $(date +%s) - warm_start ))s" | tee "$E2E_ARTIFACT_DIR/mcp-warmup-seconds.txt"
-          cp /tmp/rpconnector-study-preflight.json "$E2E_ARTIFACT_DIR/mcp-preflight.json"
-          # Show what came back before judging it.
-          #
-          # The first version of this line was `jq -e '...' > /dev/null`, which
-          # fails silently: when the assertion did not hold the step exited
-          # instantly, printed nothing, and looked exactly like the endpoint
-          # never answering. It cost a full run to work out that the request had
-          # in fact succeeded and only the shape check had failed -- a
-          # diagnostic step that hides its own evidence is worse than no
-          # diagnostic step, because it produces confident wrong conclusions.
-          if ! jq -e '.result.tools | length > 0' /tmp/rpconnector-study-preflight.json > /dev/null; then
-            echo "::error::the MCP endpoint answered but tools/list carried no tools"
-            head -c 2000 /tmp/rpconnector-study-preflight.json
+          set -uo pipefail
+          diag="$E2E_ARTIFACT_DIR/mcp-preflight-diagnosis.txt"
+          mkdir -p "$E2E_ARTIFACT_DIR"
+          {
+            echo "== preflight $(date -u +%FT%TZ) =="
+            pid="$(cat /tmp/rpconnector-study-wp.pid 2>/dev/null || echo '')"
+            echo "wordpress server pid: ${pid:-<none>}"
+            if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then echo "pid alive: yes"; else echo "pid alive: no"; fi
+            echo "token length: ${#MCP_ACCESS_TOKEN}"
+            echo "wp_url: $WP_URL"
+          } > "$diag" 2>&1
+          started="$(date +%s)"
+          status="$(curl --silent --show-error --max-time 180             -o /tmp/rpconnector-study-preflight.json -w '%{http_code}'             -H "Authorization: Bearer $MCP_ACCESS_TOKEN"             -H 'Content-Type: application/json'             -H 'MCP-Protocol-Version: 2026-07-28'             -H 'Mcp-Method: tools/list'             --data '{"jsonrpc":"2.0","id":"preflight","method":"tools/list","params":{}}'             "$WP_URL/?rest_route=/prstudio-unified/v1/mcp" 2>>"$diag")"
+          curl_exit=$?
+          {
+            echo "curl exit: $curl_exit"
+            echo "http status: ${status:-<none>}"
+            echo "elapsed: $(( $(date +%s) - started ))s"
+            echo "-- response head --"
+            head -c 3000 /tmp/rpconnector-study-preflight.json 2>/dev/null || echo "<no body>"
             echo
-            tail -n 40 "$E2E_ARTIFACT_DIR/wordpress-server.log" || true
+            echo "-- server log tail --"
+            tail -n 60 "$E2E_ARTIFACT_DIR/wordpress-server.log" 2>/dev/null || echo "<no server log>"
+          } >> "$diag" 2>&1
+          cp -f /tmp/rpconnector-study-preflight.json "$E2E_ARTIFACT_DIR/mcp-preflight.json" 2>/dev/null || true
+          cat "$diag"
+          if [ "$curl_exit" -ne 0 ] || [ "$status" != "200" ]; then
+            echo "::error::MCP preflight failed: curl exit $curl_exit, http $status -- see mcp-preflight-diagnosis.txt"
             exit 1
           fi
-          echo "MCP preflight: $(jq -r '.result.tools | length' /tmp/rpconnector-study-preflight.json) tools exposed"
+          count="$(jq -r '.result.tools | length' /tmp/rpconnector-study-preflight.json 2>/dev/null || echo 0)"
+          echo "MCP preflight exposed $count tools" | tee -a "$diag"
+          if [ "${count:-0}" -lt 1 ]; then
+            echo "::error::the MCP endpoint answered 200 but tools/list carried no tools"
+            exit 1
+          fi
 
       - name: Execute natural WordPress study through real MCP + paired Chrome
         run: |
