@@ -347,8 +347,23 @@ JS;
 
     private static function wordpress_observation_script( string $section = '' ): string {
         $section_json=json_encode($section,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
-        return '(function(){const section='.$section_json.';'.
+        return '(async function(){const section='.$section_json.';'.
 <<<'JS'
+// Wait for the list table, for the same reason the probe waits for the menu.
+//
+// This read the DOM once, at whatever moment it happened to run, and a
+// section whose table had not been laid out yet reported zero tables. The
+// study then visited all eight admin sections, clicked 78 times, took 79
+// screenshots and persisted nothing -- every batch degraded, every table
+// missing, and the module written as if WordPress had no lists in it.
+//
+// Six seconds, and only until the first list table appears. Pages that
+// genuinely have none -- Settings, Tools -- pay the wait once each and still
+// report zero, which is the correct answer for them.
+const listDeadline = Date.now() + 6000;
+while (Date.now() < listDeadline && !document.querySelector('table.wp-list-table')) {
+  await new Promise((resolve) => setTimeout(resolve, 150));
+}
 const clean=(v)=>String(v||'').replace(/\s+/g,' ').trim();
 const tables=[...document.querySelectorAll('table.wp-list-table')].map((table,ti)=>{
   const headers=[...table.querySelectorAll('thead th, thead td')].map((h)=>clean(h.textContent)).filter(Boolean);
