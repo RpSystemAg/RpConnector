@@ -7,30 +7,47 @@ function safeUrl(value) {
   try { return new URL(String(value || "")); } catch { return null; }
 }
 
+function controllerIdOf(tab = {}, options = {}) {
+  const requested = String(
+    options.controllerSessionId
+    || options.controller_session_id
+    || options._prstudio_controller_session_id
+    || options.laneId
+    || options.lane_id
+    || ""
+  ).trim();
+  const owner = String(tab.controllerSessionId || tab.controller_session_id || tab.laneId || "").trim();
+  return { requested, owner };
+}
+
 export function urlAffinityScore(tab = {}, options = {}) {
   const tabUrl = safeUrl(tab.url);
   const expectedOrigin = safeUrl(options.expectedOrigin || options.expected_origin);
   const expectedUrl = String(options.expectedUrl || options.expected_url || "").trim();
   const taskId = String(options.taskId || "");
-  const laneId = String(options.laneId || options.lane_id || "");
+  const { requested: controllerId, owner: ownerControllerId } = controllerIdOf(tab, options);
   const lastTabId = Number(options.lastTabId || 0);
   let score = 0;
 
-  if (laneId) {
-    if (tab.laneId && String(tab.laneId) !== laneId) return Number.NEGATIVE_INFINITY;
-    if (String(tab.laneId || "") === laneId) score += 240;
+  // Browser Agent 2.0: controller identity is the hard isolation boundary.
+  // A task id is telemetry/affinity only; URL/origin are navigation evidence.
+  if (controllerId) {
+    if (ownerControllerId && ownerControllerId !== controllerId) return Number.NEGATIVE_INFINITY;
+    if (ownerControllerId === controllerId) score += 300;
   }
   if (lastTabId && Number(tab.tabId) === lastTabId) score += 120;
   if (taskId && tab.taskId && String(tab.taskId) === taskId) score += 90;
   if (expectedOrigin) {
-    if (!tabUrl || tabUrl.origin !== expectedOrigin.origin) return Number.NEGATIVE_INFINITY;
-    score += 70;
+    if (tabUrl?.origin === expectedOrigin.origin) score += 70;
+    else if (controllerId && ownerControllerId === controllerId) score -= 15;
+    else return Number.NEGATIVE_INFINITY;
   }
   if (expectedUrl) {
     const actual = String(tab.url || "");
     if (actual === expectedUrl) score += 90;
     else if (actual.startsWith(expectedUrl) || expectedUrl.startsWith(actual)) score += 55;
     else if (tabUrl && safeUrl(expectedUrl)?.origin === tabUrl.origin) score += 25;
+    else if (controllerId && ownerControllerId === controllerId) score -= 20;
     else return Number.NEGATIVE_INFINITY;
   }
   score += Math.min(20, Math.max(0, Math.floor(Number(tab.updatedAt || 0) / 1000) % 20));
@@ -43,16 +60,23 @@ export function selectOwnedTabCandidate(tabs = [], options = {}) {
 
   const expectedOrigin = String(options.expectedOrigin || options.expected_origin || "").trim();
   const expectedUrl = String(options.expectedUrl || options.expected_url || "").trim();
-  const laneId = String(options.laneId || options.lane_id || "").trim();
+  const controllerId = String(
+    options.controllerSessionId
+    || options.controller_session_id
+    || options._prstudio_controller_session_id
+    || options.laneId
+    || options.lane_id
+    || ""
+  ).trim();
   const lastTabId = Number(options.lastTabId || 0);
-  const hasHint = Boolean(expectedOrigin || expectedUrl || lastTabId || options.taskId || laneId);
+  const hasHint = Boolean(expectedOrigin || expectedUrl || lastTabId || options.taskId || controllerId);
 
   if (!hasHint && rows.length === 1) {
     return { tabId: Number(rows[0].tabId), reason: "sole_owned_tab", ambiguous: false };
   }
 
   const ranked = rows
-    .map((tab) => ({ tab, score: urlAffinityScore(tab, options) }))
+    .map((tab) => ({ tab, score: urlAffinityScore(tab, { ...options, controllerSessionId: controllerId }) }))
     .filter((item) => Number.isFinite(item.score))
     .sort((a, b) => b.score - a.score || Number(b.tab.updatedAt || 0) - Number(a.tab.updatedAt || 0));
   if (!ranked.length) return { tabId: null, reason: "no_match", ambiguous: false };
@@ -63,7 +87,7 @@ export function selectOwnedTabCandidate(tabs = [], options = {}) {
   if (!hasHint && ranked.length > 1) {
     return { tabId: null, reason: "ambiguous", ambiguous: true, tabIds: ranked.map((item) => Number(item.tab.tabId)) };
   }
-  return { tabId: Number(ranked[0].tab.tabId), reason: "affinity", ambiguous: false, score: ranked[0].score };
+  return { tabId: Number(ranked[0].tab.tabId), reason: controllerId ? "controller_affinity" : "affinity", ambiguous: false, score: ranked[0].score };
 }
 
 function normalizedHeader(value) {
