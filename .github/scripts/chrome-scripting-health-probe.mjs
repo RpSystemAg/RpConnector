@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -13,6 +13,11 @@ const artifactDir = resolve('artifacts/real-e2e');
 if (!existsSync(chrome)) throw new Error(`Chrome/Chromium binary missing: ${chrome}`);
 if (!existsSync(extensionDir)) throw new Error(`Browser Agent directory missing: ${extensionDir}`);
 await mkdir(artifactDir, { recursive: true });
+
+const manifest = JSON.parse(await readFile(join(extensionDir, 'manifest.json'), 'utf8'));
+const expectedWorkerPath = String(manifest?.background?.service_worker || '').replace(/^\/+/, '');
+if (!expectedWorkerPath) throw new Error('Browser Agent manifest does not declare background.service_worker');
+const expectedWorkerSuffix = `/${expectedWorkerPath}`;
 
 const userDataDir = await mkdtemp(join(tmpdir(), 'rpconnector-scripting-probe-'));
 const debugPort = 9700 + (process.pid % 200);
@@ -131,20 +136,22 @@ async function waitForExpression(cdp, sessionId, expression, label, timeoutMs = 
   throw new Error(`Timed out waiting for ${label}; last=${JSON.stringify(last)}`);
 }
 
-async function findExtensionId(cdp) {
-  const deadline = Date.now() + 20000;
+async function findBrowserAgentWorker(cdp) {
+  const deadline = Date.now() + 30000;
   let lastTargets = [];
   while (Date.now() < deadline) {
     const { targetInfos = [] } = await cdp.send('Target.getTargets');
     lastTargets = targetInfos;
-    const worker = targetInfos.find((target) =>
-      target.type === 'service_worker'
-      && String(target.url || '').startsWith('chrome-extension://')
-      && String(target.url || '').endsWith('/service-worker.js'));
-    if (worker) return String(worker.url).split('/')[2];
+    const worker = targetInfos.find((target) => {
+      const url = String(target.url || '');
+      return target.type === 'service_worker'
+        && url.startsWith('chrome-extension://')
+        && url.endsWith(expectedWorkerSuffix);
+    });
+    if (worker) return worker;
     await sleep(200);
   }
-  throw new Error(`Browser Agent service worker not observed; targets=${JSON.stringify(lastTargets)}`);
+  throw new Error(`Browser Agent worker ${expectedWorkerPath} not observed; targets=${JSON.stringify(lastTargets)}`);
 }
 
 let cdp;
@@ -153,14 +160,21 @@ const report = {
   started_at: new Date().toISOString(),
   wp_url: wpUrl,
   chrome_binary: chrome,
+  expected_extension: {
+    name: String(manifest?.name || ''),
+    version: String(manifest?.version || ''),
+    service_worker: expectedWorkerPath,
+  },
 };
 
 try {
   const version = await waitForChromeVersion();
   report.chrome_version = version.Browser || '';
   cdp = new Cdp(version.webSocketDebuggerUrl);
-  const extensionId = await findExtensionId(cdp);
+  const worker = await findBrowserAgentWorker(cdp);
+  const extensionId = String(worker.url).split('/')[2] || '';
   report.extension_id = extensionId;
+  report.service_worker_url = worker.url;
 
   const { targetId: wpTargetId } = await cdp.send('Target.createTarget', { url: `${wpUrl}/wp-login.php` });
   const wpSessionId = await attachPage(cdp, wpTargetId);
@@ -258,7 +272,7 @@ try {
   if (!report.probe?.importedHealth?.ok || !report.probe?.importedResponsive?.ok) {
     throw new Error(`Imported scripting functions failed: health=${JSON.stringify(report.probe?.importedHealth)} responsive=${JSON.stringify(report.probe?.importedResponsive)}`);
   }
-  console.log('PASS Chrome scripting probe: inline, imported health and imported responsive functions returned real WordPress results');
+  console.log('PASS Chrome scripting probe: exact Browser Agent worker, inline scripting, imported health and imported responsive functions returned real WordPress results');
 } catch (error) {
   report.error = { message: error?.message || String(error), stack: String(error?.stack || '').slice(0, 12000) };
   report.finished_at = new Date().toISOString();
