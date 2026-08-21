@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
  * but they do not make a bare catalog action executable by themselves.
  */
 final class PRSTUDIO_UC_Backend_Executability {
-	public const VERSION = '1.2.0';
+	public const VERSION = '1.3.0';
 	private static ?array $surface = null;
 
 	private static function surface_path(): string {
@@ -160,11 +160,11 @@ final class PRSTUDIO_UC_Backend_Executability {
 				$result = PRSTUDIO_UC_Bridge::dispatch( null, $arguments, $browser_meta );
 				if ( null !== $result ) { return $result; }
 			}
-			if ( class_exists( 'PRSTUDIO_Browser_Runtime' ) ) {
-				$result = PRSTUDIO_Browser_Runtime::instance()->dispatch_adapter( null, $arguments, $browser_meta );
-				if ( null !== $result ) { return $result; }
-			}
-			return new WP_Error( 'prstudio_browser_backend_unavailable', 'L’azione Browser è implementata ma nessun Browser Agent/runtime compatibile è online.', array( 'status' => 503, 'route' => $route, 'action' => $action, 'provider' => 'browser_agent', 'catalog_only' => false ) );
+			// Browser execution is single-path by design. If the paired Chrome
+			// Agent cannot execute the request, do not silently fall through to the
+			// old local Python/Playwright worker: that creates a second browser with
+			// different cookies, tabs, window state and failure semantics.
+			return new WP_Error( 'prstudio_browser_agent_unavailable', 'L’azione Browser richiede il Browser Agent Chrome associato; il runtime Playwright locale non è più un fallback.', array( 'status' => 503, 'route' => $route, 'action' => $action, 'provider' => 'browser_agent', 'catalog_only' => false, 'legacy_runtime_fallback' => false ) );
 		}
 
 		if ( 'database_native' === $binding['provider'] ) {
