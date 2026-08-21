@@ -41,6 +41,15 @@ function sameNormalWindowQuery(options = {}) {
   return types.length === 0 || (types.length === 1 && types[0] === 'normal');
 }
 
+function authChallengeFromScriptResults(results) {
+  if (!Array.isArray(results)) return null;
+  for (const row of results) {
+    const value = row?.result;
+    if (value && typeof value === 'object' && value.reason === 'captcha_or_mfa') return value;
+  }
+  return null;
+}
+
 async function captureVisualFallback(chromeApi, originals, tabId, reason) {
   const id = Number(tabId || 0);
   if (!id || !originals.debuggerAttach || !originals.debuggerSendCommand) return null;
@@ -160,7 +169,20 @@ export function installBrowserParityRuntime(chromeApi = globalThis.chrome) {
   if (chromeApi.scripting?.executeScript) {
     const ok = replaceMethod(chromeApi.scripting, 'executeScript', (originalExecuteScript) => async (details) => {
       try {
-        return await withTimeout(originalExecuteScript(details), 30000, 'chrome.scripting.executeScript');
+        const results = await withTimeout(originalExecuteScript(details), 30000, 'chrome.scripting.executeScript');
+        // CAPTCHA/MFA/login walls are a successful detection, not an API error.
+        // Preserve visual evidence here as well so the caller can see exactly
+        // what stopped semantic crawling without trying to bypass the challenge.
+        const authChallenge = authChallengeFromScriptResults(results);
+        if (authChallenge && details?.target?.tabId) {
+          await captureVisualFallback(
+            chromeApi,
+            originals,
+            details.target.tabId,
+            `captcha_or_mfa:${authChallenge.selector || authChallenge.marker || authChallenge.url || ''}`,
+          );
+        }
+        return results;
       } catch (error) {
         const visual = await captureVisualFallback(chromeApi, originals, details?.target?.tabId, error?.message || error);
         throw augmentError(error, visual);
@@ -185,7 +207,7 @@ export function installBrowserParityRuntime(chromeApi = globalThis.chrome) {
 }
 
 export const BROWSER_PARITY_RUNTIME = Object.freeze({
-  version: '1.0.0',
+  version: '1.1.0',
   visualFallbackStorageKey: VISUAL_FALLBACK_STORAGE_KEY,
   defaultTimeoutMs: DEFAULT_TIMEOUT_MS,
 });
