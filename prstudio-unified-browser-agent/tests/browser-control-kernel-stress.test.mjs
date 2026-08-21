@@ -33,6 +33,17 @@ test("Browser Agent 2.0 kernel has an explicit certification version", () => {
   assert.equal(normalizeControllerSessionId({}, { controller_session_id: "controller-new" }), "controller-new");
 });
 
+test("bare legacy PR STUDIO group cannot create unscoped ownership", () => {
+  const state = reconcileControlState({
+    registry: {},
+    groups: [group(50, "")],
+    tabs: [tab(51, 50, "https://example.com/")],
+    now: 1,
+  });
+  assert.equal(state.registry["51"], undefined);
+  assert.equal(state.adoptedFromGroups, 0);
+});
+
 test("1000 open -> cross-origin navigate -> close cycles produce zero ownership failures", () => {
   const controller = "controller-stress-a";
   for (let cycle = 0; cycle < 1000; cycle += 1) {
