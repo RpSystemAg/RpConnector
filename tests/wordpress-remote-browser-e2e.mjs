@@ -301,7 +301,8 @@ try {
   const firstOwned = ownedRows(afterFirst).filter((row) => row.laneId === laneA);
   check('Agent-created task tab is in owned registry', firstOwned.length === 1 && firstOwned[0].tabId > 0, { registry:firstOwned });
   const tabA = firstOwned[0].tabId;
-  check('owned tab affinity is lane-scoped', JSON.stringify(afterFirst?.prstudioTabAffinity || {}).includes(laneA), { affinity: afterFirst?.prstudioTabAffinity || {} });
+  const firstTaskAffinity = afterFirst?.prstudioTabAffinity?.[first.task_uuid] || null;
+  check('task affinity points to the lane-owned tab without replacing lane ownership', firstOwned[0].laneId === laneA && Number(firstTaskAffinity?.tabId || 0) === tabA, { laneId:firstOwned[0].laneId, taskId:first.task_uuid, affinity:firstTaskAffinity });
   const pageState = await extensionEval(`(async()=>{const r=await chrome.scripting.executeScript({target:{tabId:${tabA}},func:()=>({url:location.href,value:document.querySelector('#parity-input')?.value||'',clicked:document.body.dataset.clicked||'',remoteCdp:document.body.dataset.remoteCdp||''})});return r?.[0]?.result||null;})()`);
   check('remote fill/click/CDP mutation reached real page', pageState?.value === 'remote-owned-one' && pageState?.clicked === 'yes' && pageState?.remoteCdp === 'yes', pageState || {});
 
