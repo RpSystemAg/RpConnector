@@ -465,7 +465,7 @@ jobs:
           <?php
           $path=parse_url($_SERVER['REQUEST_URI'],PHP_URL_PATH);
           $file='/tmp/prstudio-wp'.$path;
-          if($path!=='/'&&is_file($file)) return false;
+          if($path!=='/'&&(is_file($file)||is_dir($file))) return false;
           require '/tmp/prstudio-wp/index.php';
           PHP
           php -S 127.0.0.1:8082 -t /tmp/prstudio-wp /tmp/wp-router.php >/tmp/prstudio-wp-server.log 2>&1 & echo $! >/tmp/prstudio-wp-server.pid
