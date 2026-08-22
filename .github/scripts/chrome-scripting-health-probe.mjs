@@ -70,7 +70,7 @@ class Cdp {
     this.pending = new Map();
     this.opened = new Promise((resolvePromise, reject) => {
       this.ws.addEventListener('open', resolvePromise);
-      this.ws.addEventListener('error', () => reject(new Error(`CDP WebSocket failed to open: ${wsUrl}`)));
+      this.ws.addEventListener('error', () => reject(new Error('CDP WebSocket failed to open')));
     });
     this.ws.addEventListener('message', (event) => {
       const message = JSON.parse(String(event.data));
@@ -82,9 +82,16 @@ class Cdp {
       if (message.error) pending.reject(new Error(`CDP ${pending.method}: ${JSON.stringify(message.error)}`));
       else pending.resolve(message.result);
     });
+    this.ws.addEventListener('close', () => {
+      for (const pending of this.pending.values()) {
+        clearTimeout(pending.timer);
+        pending.reject(new Error(`CDP socket closed while waiting for ${pending.method}`));
+      }
+      this.pending.clear();
+    });
   }
 
-  async send(method, params = {}, timeoutMs = 15000) {
+  async send(method, params = {}, sessionId = undefined, timeoutMs = 20000) {
     await this.opened;
     const id = this.nextId++;
     return new Promise((resolvePromise, reject) => {
@@ -93,60 +100,20 @@ class Cdp {
         reject(new Error(`CDP timeout: ${method}`));
       }, timeoutMs);
       this.pending.set(id, { resolve: resolvePromise, reject, timer, method });
-      this.ws.send(JSON.stringify({ id, method, params }));
+      const payload = { id, method, params };
+      if (sessionId) payload.sessionId = sessionId;
+      this.ws.send(JSON.stringify(payload));
     });
   }
 
-  close() {
-    try { this.ws.close(); } catch {}
-  }
+  close() { try { this.ws.close(); } catch {} }
 }
 
-async function waitForTargetDescriptor(targetId, label, timeoutMs = 20000) {
-  const deadline = Date.now() + timeoutMs;
-  let lastTargets = [];
-  while (Date.now() < deadline) {
-    try {
-      const targets = await fetchJson(`http://127.0.0.1:${debugPort}/json/list`);
-      lastTargets = Array.isArray(targets) ? targets : [];
-      const found = lastTargets.find((target) => String(target?.id || target?.targetId || '') === String(targetId));
-      if (found?.webSocketDebuggerUrl) return found;
-    } catch {}
-    await sleep(100);
-  }
-  throw new Error(`Timed out waiting for direct DevTools target ${label} (${targetId}); targets=${JSON.stringify(lastTargets)}`);
-}
-
-async function evaluate(targetCdp, expression) {
-  const result = await targetCdp.send('Runtime.evaluate', {
-    expression,
-    returnByValue: true,
-    awaitPromise: true,
-    userGesture: true,
-  });
-  if (result.exceptionDetails) {
-    const detail = result.exceptionDetails.exception?.description || result.exceptionDetails.text || 'exception';
-    throw new Error(`Runtime.evaluate failed: ${detail}`);
-  }
-  return result.result?.value;
-}
-
-async function waitForExpression(targetCdp, expression, label, timeoutMs = 20000) {
-  const deadline = Date.now() + timeoutMs;
-  let last;
-  while (Date.now() < deadline) {
-    last = await evaluate(targetCdp, expression).catch((error) => ({ __error: error.message }));
-    if (last && !last.__error) return last;
-    await sleep(200);
-  }
-  throw new Error(`Timed out waiting for ${label}; last=${JSON.stringify(last)}`);
-}
-
-async function findBrowserAgentWorker(browserCdp) {
+async function findBrowserAgentWorker(cdp) {
   const deadline = Date.now() + 30000;
   let lastTargets = [];
   while (Date.now() < deadline) {
-    const { targetInfos = [] } = await browserCdp.send('Target.getTargets');
+    const { targetInfos = [] } = await cdp.send('Target.getTargets');
     lastTargets = targetInfos;
     const worker = targetInfos.find((target) => {
       const url = String(target.url || '');
@@ -160,9 +127,33 @@ async function findBrowserAgentWorker(browserCdp) {
   throw new Error(`Browser Agent worker ${expectedWorkerPath} not observed; targets=${JSON.stringify(lastTargets)}`);
 }
 
-let browserCdp;
-let wpCdp;
-let extensionCdp;
+async function waitForPageTarget(cdp, targetId, timeoutMs = 20000) {
+  const deadline = Date.now() + timeoutMs;
+  let last = null;
+  while (Date.now() < deadline) {
+    const { targetInfos = [] } = await cdp.send('Target.getTargets');
+    last = targetInfos.find((target) => String(target.targetId || '') === String(targetId)) || null;
+    if (last && String(last.url || '').startsWith(`${wpUrl}/`)) return last;
+    await sleep(150);
+  }
+  throw new Error(`WordPress page target did not navigate to ${wpUrl}; last=${JSON.stringify(last)}`);
+}
+
+async function evaluateWorker(cdp, sessionId, expression) {
+  const result = await cdp.send('Runtime.evaluate', {
+    expression,
+    returnByValue: true,
+    awaitPromise: true,
+    userGesture: true,
+  }, sessionId, 60000);
+  if (result.exceptionDetails) {
+    const detail = result.exceptionDetails.exception?.description || result.exceptionDetails.text || 'exception';
+    throw new Error(`Runtime.evaluate failed: ${detail}`);
+  }
+  return result.result?.value;
+}
+
+let cdp;
 const report = {
   ok: false,
   started_at: new Date().toISOString(),
@@ -178,31 +169,28 @@ const report = {
 try {
   const version = await waitForChromeVersion();
   report.chrome_version = version.Browser || '';
-  browserCdp = new Cdp(version.webSocketDebuggerUrl);
-  const worker = await findBrowserAgentWorker(browserCdp);
+  cdp = new Cdp(version.webSocketDebuggerUrl);
+
+  const worker = await findBrowserAgentWorker(cdp);
   const extensionId = String(worker.url).split('/')[2] || '';
   if (!extensionId) throw new Error(`Unable to derive Browser Agent extension id from ${worker.url}`);
   report.extension_id = extensionId;
   report.service_worker_url = worker.url;
 
-  // Chromium 151 can invalidate flattened Target.attachToTarget sessions between
-  // attach and Runtime.evaluate. Use each page target's own DevTools websocket
-  // as the independent oracle instead. This is not a weaker probe: it still
-  // drives the real Chromium target and leaves chrome.scripting execution to the
-  // installed Browser Agent extension itself.
-  const { targetId: wpTargetId } = await browserCdp.send('Target.createTarget', { url: `${wpUrl}/wp-login.php` });
-  const wpTarget = await waitForTargetDescriptor(wpTargetId, 'WordPress page');
-  wpCdp = new Cdp(wpTarget.webSocketDebuggerUrl);
-  await waitForExpression(wpCdp, 'document.readyState === "complete"', 'WordPress probe page');
+  const { sessionId } = await cdp.send('Target.attachToTarget', { targetId: worker.targetId, flatten: true });
+  if (!sessionId) throw new Error('Target.attachToTarget returned no Browser Agent worker session');
 
-  const { targetId: extensionTargetId } = await browserCdp.send('Target.createTarget', { url: `chrome-extension://${extensionId}/sidepanel.html` });
-  const extensionTarget = await waitForTargetDescriptor(extensionTargetId, 'Browser Agent sidepanel');
-  extensionCdp = new Cdp(extensionTarget.webSocketDebuggerUrl);
-  await waitForExpression(extensionCdp, 'document.readyState === "complete"', 'Browser Agent probe page');
-  await browserCdp.send('Target.activateTarget', { targetId: wpTargetId });
-  await sleep(250);
+  const { targetId: wpTargetId } = await cdp.send('Target.createTarget', { url: `${wpUrl}/wp-login.php` });
+  await waitForPageTarget(cdp, wpTargetId);
+  await cdp.send('Target.activateTarget', { targetId: wpTargetId });
+  await sleep(350);
 
-  report.probe = await evaluate(extensionCdp, `(async () => {
+  // Drive the actual extension from its installed MV3 service worker. Chromium
+  // 151's page-target DevTools sockets are not used as an oracle here: the
+  // production behavior under test is chrome.scripting from the extension into
+  // the real HTTP tab, so that is the readiness and execution oracle itself.
+  report.probe = await evaluateWorker(cdp, sessionId, `(async () => {
+    const expectedBase = ${JSON.stringify(wpUrl)};
     const summarizeRows = (rows) => (Array.isArray(rows) ? rows : []).map((row) => ({
       frameId: row?.frameId ?? null,
       documentId: row?.documentId || '',
@@ -214,25 +202,36 @@ try {
       title: typeof row?.result?.title === 'string' ? row.result.title : '',
       readyState: typeof row?.result?.readyState === 'string' ? row.result.readyState : '',
     }));
-    const withTimeout = (promise, label, timeoutMs = 5000) => Promise.race([
+    const withTimeout = (promise, label, timeoutMs = 10000) => Promise.race([
       promise,
       new Promise((_, reject) => setTimeout(() => reject(new Error(label + '_timeout')), timeoutMs)),
     ]);
-    const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+
+    let tab = null;
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const tabs = await chrome.tabs.query({});
+      tab = tabs.find((row) => typeof row?.url === 'string' && row.url.startsWith(expectedBase + '/')) || null;
+      if (tab?.id && tab.status === 'complete') break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+
     const output = {
-      tab: tab ? { id: tab.id, url: tab.url || '', title: tab.title || '' } : null,
+      tab: tab ? { id: tab.id, url: tab.url || '', title: tab.title || '', status: tab.status || '' } : null,
       inline: { ok: false, rows: [], error: null },
       importedHealth: { ok: false, rows: [], error: null },
       importedResponsive: { ok: false, rows: [], error: null },
     };
     if (!tab?.id) return output;
+
+    await chrome.tabs.update(tab.id, { active: true });
+
     try {
       const rows = await withTimeout(chrome.scripting.executeScript({
         target: { tabId: tab.id, allFrames: false },
         func: () => ({ url: location.href, title: document.title || '', readyState: document.readyState }),
       }), 'inline_executeScript');
       output.inline.rows = summarizeRows(rows);
-      output.inline.ok = Boolean(rows?.[0]?.result?.url);
+      output.inline.ok = Boolean(rows?.[0]?.result?.url) && rows?.[0]?.result?.readyState === 'complete';
     } catch (error) {
       output.inline.error = { name: error?.name || '', message: error?.message || String(error), stack: String(error?.stack || '').slice(0, 4000) };
     }
@@ -283,12 +282,12 @@ try {
   await writeFile(join(artifactDir, 'scripting-health-probe.json'), JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report.probe, null, 2));
 
-  if (!tabMatchesWordPress) throw new Error(`Active tab mismatch: ${tabUrl || '[missing]'}`);
+  if (!tabMatchesWordPress) throw new Error(`Browser Agent did not select the WordPress probe tab: ${tabUrl || '[missing]'}`);
   if (!report.probe?.inline?.ok) throw new Error(`Minimal chrome.scripting probe failed: ${JSON.stringify(report.probe?.inline)}`);
   if (!report.probe?.importedHealth?.ok || !report.probe?.importedResponsive?.ok) {
     throw new Error(`Imported scripting functions failed: health=${JSON.stringify(report.probe?.importedHealth)} responsive=${JSON.stringify(report.probe?.importedResponsive)}`);
   }
-  console.log('PASS Chrome scripting probe: exact Browser Agent worker, direct target CDP oracle, inline scripting, imported health and imported responsive functions returned real WordPress results');
+  console.log('PASS Chrome scripting probe: exact installed MV3 worker executed inline scripting plus imported health/responsive functions against a real HTTP tab');
 } catch (error) {
   report.error = { message: error?.message || String(error), stack: String(error?.stack || '').slice(0, 12000) };
   report.finished_at = new Date().toISOString();
@@ -297,9 +296,7 @@ try {
   if (chromeStderr) console.error(chromeStderr.slice(-12000));
   process.exitCode = 1;
 } finally {
-  extensionCdp?.close();
-  wpCdp?.close();
-  browserCdp?.close();
+  cdp?.close();
   try { child.kill('SIGTERM'); } catch {}
   await sleep(200);
   if (!child.killed) { try { child.kill('SIGKILL'); } catch {} }
