@@ -274,6 +274,8 @@ try {
     const submit = document.querySelector('#wp-submit');
     const form = submit?.form;
     if (!user || !pass || !submit || !form) return { submitted: false };
+    const originalAction = form.action;
+    form.action = ${JSON.stringify(`${wpUrl}/wp-login.php`)};
     user.value = ${JSON.stringify(adminUser)};
     pass.value = ${JSON.stringify(adminPassword)};
     user.dispatchEvent(new Event('input', { bubbles: true }));
@@ -282,7 +284,12 @@ try {
     if (redirect) redirect.value = ${JSON.stringify(`${wpUrl}/wp-admin/`)};
     if (typeof form.requestSubmit === 'function') form.requestSubmit(submit);
     else form.submit();
-    return { submitted: true, redirect: redirect?.value || '' };
+    return {
+      submitted: true,
+      original_action: originalAction,
+      effective_action: ${JSON.stringify(`${wpUrl}/wp-login.php`)},
+      redirect: redirect?.value || '',
+    };
   })()`);
   if (!loginResult?.submitted) throw new Error('Could not submit WordPress login form');
 
@@ -303,6 +310,8 @@ try {
   );
   evidence.wordpress_login = {
     form_submitted: true,
+    original_action: loginResult.original_action || '',
+    effective_action: loginResult.effective_action || '',
     requested_redirect: loginResult.redirect || adminUrl,
     protected_admin_verified: true,
   };
