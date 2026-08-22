@@ -1,0 +1,330 @@
+name: WordPress Study Real E2E
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'prstudio-unified-control/**'
+      - 'prstudio-unified-browser-agent/**'
+      - '.github/scripts/wordpress-study-real-e2e.mjs'
+      - '.github/workflows/wordpress-study-real-e2e.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wordpress-study-real-e2e-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  wordpress-study:
+    name: Natural prompt → real Chrome → WordPress → Memory/Twin/Skills
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CI: '1'
+      WP_URL: http://127.0.0.1:8080
+      WP_ADMIN_USER: rpadmin
+      WP_ADMIN_PASSWORD: Study-Real-Browser-2026!
+      RP_WP_PATH: /tmp/rpconnector-study-wp
+      CHROME_BIN: /usr/bin/chromium
+      PRSTUDIO_TEST_DB_HOST: 127.0.0.1
+      PRSTUDIO_TEST_DB_PORT: '3306'
+      PRSTUDIO_TEST_DB_USER: root
+      PRSTUDIO_TEST_DB_PASS: ''
+      PRSTUDIO_TEST_DB_NAME: wordpress_study
+      WORDPRESS_STUDY_FIXTURE: /tmp/wordpress-study-fixture.json
+      E2E_DEVICE_NAME: GitHub WordPress Study Chrome
+      E2E_ARTIFACT_DIR: ${{ github.workspace }}/artifacts/wordpress-study-real-e2e
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2.37.2
+        with:
+          php-version: '8.1'
+          extensions: mysqli, mbstring, xml
+          tools: wp-cli:2.12.0
+          coverage: none
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Start fresh MariaDB
+        run: |
+          set -euo pipefail
+          mkdir -p "$E2E_ARTIFACT_DIR"
+          docker run -d --name rpconnector-study-db \
+            -e MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=yes \
+            -e MARIADB_DATABASE="$PRSTUDIO_TEST_DB_NAME" \
+            -p 3306:3306 \
+            mariadb:11.4@sha256:a794d9eb009e20de605858a11f32f63b4075cbd197c650436f0e3b457e4caed7
+          # mysqli_report(MYSQLI_REPORT_OFF) is what makes this a probe rather
+          # than a crash. Since PHP 8.1 mysqli throws on connection failure and
+          # @ does not suppress an exception, so every attempt made while the
+          # container was still starting printed "PHP Fatal error: Uncaught
+          # mysqli_sql_exception: MySQL server has gone away". The loop still
+          # worked -- a fatal exits non-zero too -- but it wrote four fatal
+          # database errors into the log of a job whose real failure was
+          # somewhere else entirely, which is exactly the wrong thing for a
+          # diagnostic artifact to do.
+          for i in $(seq 1 90); do
+            if php -r 'mysqli_report(MYSQLI_REPORT_OFF); $m=@new mysqli("127.0.0.1","root","","",3306); exit($m->connect_errno?1:0);'; then exit 0; fi
+            sleep 1
+          done
+          docker logs rpconnector-study-db
+          exit 1
+
+      - name: Install exact PR candidate in fresh WordPress
+        run: |
+          set -euo pipefail
+          rm -rf "$RP_WP_PATH"
+          mkdir -p "$RP_WP_PATH"
+          wp core download --path="$RP_WP_PATH" --version="${RP_WP_VERSION:-7.1}" --force
+          wp config create --path="$RP_WP_PATH" --dbname="$PRSTUDIO_TEST_DB_NAME" --dbuser=root --dbpass='' --dbhost=127.0.0.1:3306 --skip-check
+          wp config set WP_ENVIRONMENT_TYPE local --path="$RP_WP_PATH"
+          wp core install --path="$RP_WP_PATH" --url="$WP_URL" --title='RP STUDIO WordPress study real E2E' --admin_user="$WP_ADMIN_USER" --admin_password="$WP_ADMIN_PASSWORD" --admin_email='study-e2e@example.invalid' --skip-email
+          cp -a prstudio-unified-control "$RP_WP_PATH/wp-content/plugins/prstudio-unified-control"
+          wp plugin activate prstudio-unified-control --path="$RP_WP_PATH"
+          wp eval --path="$RP_WP_PATH" 'if (!PRSTUDIO_UC_Store::maybe_upgrade()) { fwrite(STDERR,"store upgrade failed\n"); exit(1); } echo "store ready\n";'
+
+      - name: Seed deterministic WordPress list-table fixture
+        run: |
+          set -euo pipefail
+          existing=$(wp post list --path="$RP_WP_PATH" --post_type=post --format=ids)
+          if [ -n "$existing" ]; then wp post delete --path="$RP_WP_PATH" $existing --force >/dev/null; fi
+          wp user meta update "$WP_ADMIN_USER" edit_post_per_page 20 --path="$RP_WP_PATH" >/dev/null
+          category_a=$(wp term create category 'Study Alpha' --slug=study-alpha --path="$RP_WP_PATH" --porcelain)
+          category_b=$(wp term create category 'Study Beta' --slug=study-beta --path="$RP_WP_PATH" --porcelain)
+          : > /tmp/wordpress-study-post-ids.txt
+          for i in $(seq -w 1 37); do
+            id=$(wp post create --path="$RP_WP_PATH" --post_type=post --post_status=publish --post_title="Study Fixture Post $i" --post_content="Deterministic browser-study fixture $i" --post_category="$category_a" --porcelain)
+            echo "$id" >> /tmp/wordpress-study-post-ids.txt
+          done
+          for i in $(seq -w 1 3); do
+            wp post create --path="$RP_WP_PATH" --post_type=page --post_status=publish --post_title="Study Fixture Page $i" --post_content="Page fixture $i" >/dev/null
+          done
+          wp user create studyviewer1 studyviewer1@example.invalid --role=subscriber --user_pass='ReadOnlyFixture-1!' --path="$RP_WP_PATH" >/dev/null
+          wp user create studyviewer2 studyviewer2@example.invalid --role=author --user_pass='ReadOnlyFixture-2!' --path="$RP_WP_PATH" >/dev/null
+          jq -Rn '[inputs|select(length>0)|tonumber] | {post_ids:., expected_post_count:length, expected_min_pages:2}' < /tmp/wordpress-study-post-ids.txt > "$WORDPRESS_STUDY_FIXTURE"
+          jq -e '.expected_post_count == 37 and .expected_min_pages == 2' "$WORDPRESS_STUDY_FIXTURE"
+          # Pretty permalinks, before anything asks WordPress for /wp-json/.
+          #
+          # Without a rewrite structure WordPress serves the REST index only at
+          # /?rest_route=/, and /wp-json/ returns an ordinary 404 page. The
+          # readiness gate below pipes that page into jq, which reports
+          # "Invalid numeric literal at line 1, column 10" and exits 5 -- an
+          # error that says nothing about WordPress, the plugin, or the study
+          # mission the job exists to prove.
+          #
+          # full-surface-execution.yml already does this for the same reason.
+          # This workflow provisions its own WordPress from scratch and had
+          # inherited the router but not the rewrite rules.
+          wp rewrite structure '/%postname%/' --path="$RP_WP_PATH"
+          wp rewrite flush --path="$RP_WP_PATH"
+
+      - name: Capture independent pre-study mutation oracle
+        run: |
+          set -euo pipefail
+          {
+            echo '{"posts":'
+            wp post list --path="$RP_WP_PATH" --post_type=post,page --post_status=any --fields=ID,post_type,post_status,post_title,post_modified_gmt --orderby=ID --order=ASC --format=json
+            echo ',"users":'
+            wp user list --path="$RP_WP_PATH" --fields=ID,user_login,user_email,roles --orderby=ID --order=ASC --format=json
+            echo ',"plugins":'
+            wp plugin list --path="$RP_WP_PATH" --fields=name,status,version --format=json
+            echo ',"categories":'
+            wp term list category --path="$RP_WP_PATH" --fields=term_id,name,slug,count --orderby=term_id --order=ASC --format=json
+            echo '}'
+          } | jq -S . > "$E2E_ARTIFACT_DIR/wordpress-state-before.json"
+          sha256sum "$E2E_ARTIFACT_DIR/wordpress-state-before.json" | tee "$E2E_ARTIFACT_DIR/wordpress-state-before.sha256"
+
+      - name: Build exact Browser Agent candidate
+        run: |
+          set -euo pipefail
+          python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA"
+          python tests/build-release.py --build
+          python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA" --verify
+          python tests/build-release.py --check
+
+      - name: Serve real WordPress HTTP runtime
+        run: |
+          set -euo pipefail
+          cat > /tmp/rpconnector-study-router.php <<'PHP'
+          <?php
+          $root = rtrim((string) $_SERVER['DOCUMENT_ROOT'], '/');
+          $path = parse_url((string) $_SERVER['REQUEST_URI'], PHP_URL_PATH);
+          $path = is_string($path) ? $path : '/';
+          $candidate = $root . $path;
+          if ($path !== '/' && (is_file($candidate) || is_dir($candidate))) { return false; }
+          require $root . '/index.php';
+          PHP
+          PHP_CLI_SERVER_WORKERS=8 php -S 127.0.0.1:8080 -t "$RP_WP_PATH" /tmp/rpconnector-study-router.php > "$E2E_ARTIFACT_DIR/wordpress-server.log" 2>&1 &
+          echo $! > /tmp/rpconnector-study-wp.pid
+          for i in $(seq 1 100); do
+            if curl --fail --silent "$WP_URL/wp-login.php" >/dev/null; then break; fi
+            if [ "$i" = 100 ]; then cat "$E2E_ARTIFACT_DIR/wordpress-server.log"; exit 1; fi
+            sleep 0.2
+          done
+          curl --fail --silent "$WP_URL/wp-json/" | jq -e '.namespaces | index("prstudio-unified/v1")' >/dev/null
+
+      - name: Mint ephemeral real MCP token
+        run: |
+          set -euo pipefail
+          wp eval --path="$RP_WP_PATH" '
+            $method=(new ReflectionClass("PRSTUDIO_UC_MCP_Auth_V5"))->getMethod("issue_tokens");
+            $method->setAccessible(true);
+            $tokens=$method->invoke(null,"wordpress-study-real-e2e","prstudio.read prstudio.write offline_access",PRSTUDIO_UC_MCP_Auth_V5::mcp_url());
+            if (!is_array($tokens) || empty($tokens["access_token"])) { fwrite(STDERR,"token issuance failed\n"); exit(1); }
+            file_put_contents("/tmp/rpconnector-study-token",$tokens["access_token"]);
+          '
+          token=$(cat /tmp/rpconnector-study-token)
+          echo "::add-mask::$token"
+          echo "MCP_ACCESS_TOKEN=$token" >> "$GITHUB_ENV"
+          rm -f /tmp/rpconnector-study-token
+
+      - name: Confirm WordPress is still answering before the study starts
+        # Writes its whole diagnosis into the evidence directory, not just the
+        # log.
+        #
+        # Two previous versions of this step failed in under a second and
+        # printed nothing that survived into a readable log, which is
+        # indistinguishable from the endpoint being dead and was twice read
+        # that way. A preflight whose own failure cannot be inspected is not a
+        # preflight; it is another mystery placed in front of the mystery it
+        # was added to explain.
+        #
+        # curl runs without --fail on purpose: --fail suppresses the body on an
+        # HTTP error, which is exactly the case where the body is the answer.
+        # The status code, the exit code and the first part of the response all
+        # land in a file the job uploads, so the next failure is readable even
+        # if nothing reaches the console.
+        run: |
+          set -uo pipefail
+          diag="$E2E_ARTIFACT_DIR/mcp-preflight-diagnosis.txt"
+          mkdir -p "$E2E_ARTIFACT_DIR"
+          {
+            echo "== preflight $(date -u +%FT%TZ) =="
+            pid="$(cat /tmp/rpconnector-study-wp.pid 2>/dev/null || echo '')"
+            echo "wordpress server pid: ${pid:-<none>}"
+            if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then echo "pid alive: yes"; else echo "pid alive: no"; fi
+            echo "token length: ${#MCP_ACCESS_TOKEN}"
+            echo "wp_url: $WP_URL"
+          } > "$diag" 2>&1
+          started="$(date +%s)"
+          status="$(curl --silent --show-error --max-time 180             -o /tmp/rpconnector-study-preflight.json -w '%{http_code}'             -H "Authorization: Bearer $MCP_ACCESS_TOKEN"             -H 'Content-Type: application/json'             -H 'MCP-Protocol-Version: 2026-07-28'             -H 'Mcp-Method: tools/list'             --data '{"jsonrpc":"2.0","id":"preflight","method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/clientInfo":{"name":"wordpress-study-preflight","version":"1.0"}}}}'             "$WP_URL/?rest_route=/prstudio-unified/v1/mcp" 2>>"$diag")"
+          curl_exit=$?
+          {
+            echo "curl exit: $curl_exit"
+            echo "http status: ${status:-<none>}"
+            echo "elapsed: $(( $(date +%s) - started ))s"
+            echo "-- response head --"
+            head -c 3000 /tmp/rpconnector-study-preflight.json 2>/dev/null || echo "<no body>"
+            echo
+            echo "-- server log tail --"
+            tail -n 60 "$E2E_ARTIFACT_DIR/wordpress-server.log" 2>/dev/null || echo "<no server log>"
+          } >> "$diag" 2>&1
+          cp -f /tmp/rpconnector-study-preflight.json "$E2E_ARTIFACT_DIR/mcp-preflight.json" 2>/dev/null || true
+          cat "$diag"
+          if [ "$curl_exit" -ne 0 ] || [ "$status" != "200" ]; then
+            echo "::error::MCP preflight failed: curl exit $curl_exit, http $status -- see mcp-preflight-diagnosis.txt"
+            exit 1
+          fi
+          count="$(jq -r '.result.tools | length' /tmp/rpconnector-study-preflight.json 2>/dev/null || echo 0)"
+          echo "MCP preflight exposed $count tools" | tee -a "$diag"
+          if [ "${count:-0}" -lt 1 ]; then
+            echo "::error::the MCP endpoint answered 200 but tools/list carried no tools"
+            exit 1
+          fi
+
+      - name: Execute natural WordPress study through real MCP + paired Chrome
+        run: |
+          set -euo pipefail
+          node .github/scripts/wordpress-study-real-e2e.mjs
+
+      - name: Independent WP-CLI acceptance oracle
+        run: |
+          set -euo pipefail
+          wp eval --path="$RP_WP_PATH" '
+            $fixture=json_decode((string)file_get_contents(getenv("WORDPRESS_STUDY_FIXTURE")),true);
+            $module_id=PRSTUDIO_UC_Site_Learning::module_id_for_url(admin_url("/"));
+            $module_path=PRSTUDIO_UC_Memory::site_dir()."/site-modules/".$module_id."/module.json";
+            if (!is_readable($module_path)) { fwrite(STDERR,"site module missing\n"); exit(1); }
+            $module=json_decode((string)file_get_contents($module_path),true);
+            $posts=null;
+            foreach ((array)($module["tables"]??array()) as $table) { if ((string)($table["section"]??"")==="menu-posts") { $posts=$table; break; } }
+            if (!is_array($posts)) { fwrite(STDERR,"posts list table missing\n"); exit(1); }
+            $observed=array(); foreach ((array)($posts["rows"]??array()) as $row) { $observed[]=(string)($row["key"]??""); }
+            $missing=array_values(array_diff(array_map("strval",(array)($fixture["post_ids"]??array())),$observed));
+            $artifact_refs=0; foreach ((array)($module["evidence"]??array()) as $row) { $artifact_refs+=count((array)($row["artifacts"]??array())); }
+            $serialized=(string)file_get_contents($module_path);
+            $forbidden=preg_match("/data:image\\/|base64,[A-Za-z0-9+\\/=]{100,}|access_token|refresh_token|authorization|cookie|password/i",$serialized)===1;
+            $twin=PRSTUDIO_UC_Operational_Twin::snapshot();
+            $skills_path=PRSTUDIO_UC_Memory::site_dir()."/skills/procedural-skills-v1.json";
+            $skills=is_readable($skills_path)?json_decode((string)file_get_contents($skills_path),true):array();
+            $verified_skills=array(); foreach ((array)($skills["skills"]??array()) as $skill) { if ((string)($skill["kind"]??"")==="browser" && (int)($skill["success_count"]??0)>=1) $verified_skills[]=(string)($skill["id"]??""); }
+            $report=array(
+              "module_id"=>$module_id,"module_revision"=>(int)($module["revision"]??0),"state"=>(string)($module["state"]??""),"surface_hash"=>(string)($module["surface_hash"]??""),
+              "visited_urls"=>array_values(array_map(static fn($r)=>(string)($r["url"]??""),(array)($module["navigation"]??array()))),
+              "safe_clicks"=>(int)($module["metrics"]["safe_clicks"]??0),"mutation_count"=>(int)($module["metrics"]["mutating_clicks"]??0),"pagination_clicks"=>(int)($module["metrics"]["wordpress_pagination_clicks"]??0),
+              "table"=>array("headers"=>$posts["headers"]??array(),"rows_observed"=>(int)($posts["row_count"]??0),"pages_observed"=>(int)($posts["page_count_observed"]??0),"total_pages"=>(int)($posts["total_pages"]??0),"missing_fixture_ids"=>$missing),
+              "screenshot_artifact_refs"=>$artifact_refs,"twin"=>$twin,"procedural_skill_ids"=>$verified_skills,"memory_reuse"=>$module["reuse"]??array(),"incremental_skips"=>(int)($module["metrics"]["incremental_skips"]??0),"forbidden_persistence"=>$forbidden,
+            );
+            echo wp_json_encode($report,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES),"\n";
+            $ok=("ready"===(string)($module["state"]??""))
+              && (int)($posts["total_pages"]??0)>=2 && (int)($posts["page_count_observed"]??0)>=2 && empty($missing)
+              && $artifact_refs>0 && !$forbidden
+              && (int)($module["metrics"]["safe_clicks"]??0)>=2 && (int)($module["metrics"]["wordpress_pagination_clicks"]??0)>=1 && 0===(int)($module["metrics"]["mutating_clicks"]??0)
+              && (int)($twin["types"]["admin_section"]??0)>=1 && (int)($twin["types"]["list_table"]??0)>=1 && (int)($twin["types"]["column"]??0)>=1
+              && !empty($verified_skills) && !empty($module["reuse"]["memory_reused"]) && !empty($module["reuse"]["incremental"]) && (int)($module["metrics"]["incremental_skips"]??0)>=2;
+            if (!$ok) { fwrite(STDERR,"WordPress study oracle failed\n"); exit(1); }
+          ' | tee "$E2E_ARTIFACT_DIR/wordpress-study-oracle.json"
+
+      - name: Prove study performed zero WordPress data mutations
+        run: |
+          set -euo pipefail
+          {
+            echo '{"posts":'
+            wp post list --path="$RP_WP_PATH" --post_type=post,page --post_status=any --fields=ID,post_type,post_status,post_title,post_modified_gmt --orderby=ID --order=ASC --format=json
+            echo ',"users":'
+            wp user list --path="$RP_WP_PATH" --fields=ID,user_login,user_email,roles --orderby=ID --order=ASC --format=json
+            echo ',"plugins":'
+            wp plugin list --path="$RP_WP_PATH" --fields=name,status,version --format=json
+            echo ',"categories":'
+            wp term list category --path="$RP_WP_PATH" --fields=term_id,name,slug,count --orderby=term_id --order=ASC --format=json
+            echo '}'
+          } | jq -S . > "$E2E_ARTIFACT_DIR/wordpress-state-after.json"
+          diff -u "$E2E_ARTIFACT_DIR/wordpress-state-before.json" "$E2E_ARTIFACT_DIR/wordpress-state-after.json" | tee "$E2E_ARTIFACT_DIR/wordpress-mutation.diff"
+          printf '{"mutation_count":0,"oracle":"WP-CLI state diff","equal":true}\n' > "$E2E_ARTIFACT_DIR/mutation-oracle.json"
+
+      - name: Collect diagnostics
+        if: always()
+        run: |
+          set +e
+          docker logs rpconnector-study-db > "$E2E_ARTIFACT_DIR/mariadb.log" 2>&1
+          wp eval --path="$RP_WP_PATH" 'echo wp_json_encode(PRSTUDIO_UC_Store::queue_stats(),JSON_PRETTY_PRINT),"\n";' > "$E2E_ARTIFACT_DIR/queue-stats.json" 2>&1
+          # Counters cannot say why the chain stalls after its first hop.
+          # Two completed browser tasks and one completed job is equally
+          # consistent with "the second task was never flagged as a study
+          # task", "the job stopped pointing at it", and "something else
+          # reconciled it". Dump the rows and end the question.
+          wp eval --path="$RP_WP_PATH" 'global $wpdb; $out=array(); $jt=PRSTUDIO_UC_Store::jobs_table(); $tt=PRSTUDIO_UC_Store::tasks_table(); $jobs=$wpdb->get_results("SELECT job_uuid,status,step_index,progress,checkpoint FROM {$jt} ORDER BY id ASC LIMIT 10", ARRAY_A); foreach((array)$jobs as $j){ $cp=json_decode((string)($j["checkpoint"]??""),true); $out["jobs"][]=array("uuid"=>substr((string)$j["job_uuid"],0,8),"status"=>$j["status"],"step"=>$j["step_index"],"progress"=>$j["progress"],"browser_task"=>substr((string)($cp["browser_task_id"]??""),0,8),"next_step"=>($cp["next_step"]??null),"terminal"=>($cp["browser_terminal_status"]??null)); } $tasks=$wpdb->get_results("SELECT task_uuid,status,action,arguments FROM {$tt} ORDER BY id ASC LIMIT 20", ARRAY_A); foreach((array)$tasks as $t){ $a=json_decode((string)($t["arguments"]??""),true); $out["tasks"][]=array("uuid"=>substr((string)$t["task_uuid"],0,8),"status"=>$t["status"],"action"=>$t["action"],"site_study"=>!empty($a["_prstudio_site_study"]),"wp_study"=>!empty($a["_prstudio_wordpress_study"]),"phase"=>(string)($a["_prstudio_site_phase"]??"")); } $et=PRSTUDIO_UC_Store::events_table(); $ev=$wpdb->get_results("SELECT * FROM {$et} ORDER BY id DESC LIMIT 40", ARRAY_A); $out["events"]=array(); foreach((array)$ev as $e){ $row=array(); foreach((array)$e as $k=>$v){ $row[$k]=substr((string)$v,0,160); } $out["events"][]=$row; } echo wp_json_encode($out,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES),"\n";' > "$E2E_ARTIFACT_DIR/chain-rows.json" 2>&1
+          if [ -f /tmp/rpconnector-study-wp.pid ]; then kill "$(cat /tmp/rpconnector-study-wp.pid)" 2>/dev/null || true; fi
+
+      - name: Upload real WordPress-study evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: wordpress-study-real-e2e-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/wordpress-study-real-e2e/
+          if-no-files-found: error
+          retention-days: 30

@@ -216,6 +216,37 @@ final class PRSTUDIO_UC_Agency_Runtime {
 				if(!empty($step['requires_browser'])){
 					if(''===$task_id){if($span)PRSTUDIO_UC_Observability::finish($span,'error',array('state_to'=>'READY','error'=>'browser_task_not_created'));$error=array('code'=>'browser_task_not_created','message'=>'The browser step was not durably queued.','retryable'=>true,'class'=>'browser_task');$updated=PRSTUDIO_UC_Store::retry_leased_job((string)$job['job_uuid'],$lease,$error);return array('ok'=>false,'claimed'=>true,'job'=>$updated,'error'=>$error);}
 					if(in_array($status,array('failed','cancelled','expired'),true)){$payload=is_array($result['error']??null)?$result['error']:array();$retryable='cancelled'!==$status&&(bool)($payload['retryable']??true);$error=array_merge($payload,array('code'=>(string)($payload['code']??('browser_task_'.$status)),'message'=>(string)($payload['message']??('Browser task ended as '.$status.'.')),'retryable'=>$retryable,'class'=>'browser_task'));if($span)PRSTUDIO_UC_Observability::finish($span,'error',array('state_to'=>$retryable?'READY':'DEAD_LETTER','error'=>$error['code']));$updated=$retryable?PRSTUDIO_UC_Store::retry_leased_job((string)$job['job_uuid'],$lease,$error):(PRSTUDIO_UC_Store::dead_letter_job((string)$job['job_uuid'],$error,'browser_terminal',$lease)?PRSTUDIO_UC_Store::get_job((string)$job['job_uuid']):null);return array('ok'=>false,'claimed'=>true,'job'=>$updated,'error'=>$error);}
+					// A completed browser task is not necessarily a finished step.
+					//
+					// A site study continues by chaining: when one flow completes it
+					// queues the next and retargets this job at that child. Two paths can
+					// notice the completion -- the job engine's reconcile, which asks the
+					// study first and honours a deferral, and this resume, which did not
+					// ask at all. Whichever arrived first decided: when it was this one,
+					// the step was recorded as done, the single-step plan finished, and a
+					// study holding seven pending sections was completed at 12.5% with no
+					// error anywhere.
+					//
+					// Asking here too makes the outcome independent of which path wins.
+					// Redelivery is safe: the study ignores a task it has already
+					// accounted for.
+					if('completed'===$status&&class_exists('PRSTUDIO_UC_Site_Learning')&&method_exists('PRSTUDIO_UC_Store','get_task')){
+						$browser_task=PRSTUDIO_UC_Store::get_task($task_id);
+						if(is_array($browser_task)&&!empty($browser_task['arguments']['_prstudio_site_study'])){
+							try{$study=PRSTUDIO_UC_Site_Learning::after_browser_completion($browser_task,(array)($browser_task['result']??array()),(array)($browser_task['verification']??array()));}
+							catch(Throwable $ignored){$study=array();}
+							if(is_array($study)&&!empty($study['defer_parent'])){
+								$fresh=PRSTUDIO_UC_Store::get_job((string)$job['job_uuid']);
+								$next_task=(string)((array)($fresh['checkpoint']??array()))['browser_task_id']??'';
+								$checkpoint['browser_task_id']=''!==$next_task?$next_task:$task_id;
+								$checkpoint['browser_step_index']=$index;$checkpoint['next_step']=$index;
+								$checkpoint['browser_deadline_gmt']=gmdate('c',time()+$timeout_seconds);
+								$checkpoint=self::progress_watchdog($checkpoint,$job,$step_id,$index);
+								$waiting=PRSTUDIO_UC_Store::wait_leased_job((string)$job['job_uuid'],$lease,'WAITING_FOR_BROWSER',$checkpoint);
+								return array('ok'=>true,'claimed'=>true,'waiting_for_browser'=>true,'job'=>$waiting,'task_id'=>$checkpoint['browser_task_id'],'site_study_continues'=>true);
+							}
+						}
+					}
 					if('completed'!==$status){$checkpoint['browser_task_id']=$task_id;$checkpoint['browser_step_index']=$index;$checkpoint['next_step']=$index;$checkpoint['browser_deadline_gmt']=gmdate('c',time()+$timeout_seconds);$checkpoint=self::progress_watchdog($checkpoint,$job,$step_id,$index);if($span)PRSTUDIO_UC_Observability::finish($span,'waiting',array('state_to'=>'WAITING_FOR_BROWSER','task_uuid'=>$task_id,'browser_deadline_gmt'=>$checkpoint['browser_deadline_gmt'],'progress_signature'=>$checkpoint['progress_signature']));$waiting=PRSTUDIO_UC_Store::wait_leased_job((string)$job['job_uuid'],$lease,'WAITING_FOR_BROWSER',$checkpoint);return array('ok'=>true,'claimed'=>true,'waiting_for_browser'=>true,'job'=>$waiting,'task_id'=>$task_id);}
 				}
 				$checkpoint['results'][$step_id]=class_exists('PRSTUDIO_UC_Memory')?PRSTUDIO_UC_Memory::redact($result):$result;$checkpoint['next_step']=$index+1;$progress=(int)floor((($index+1)/max(1,count($steps)))*90);$next_id=(string)($steps[$index+1]['id']??'mission_complete');$checkpoint=self::progress_watchdog($checkpoint,$job,$next_id,$index+1);if($span)PRSTUDIO_UC_Observability::finish($span,'ok',array('state_to'=>'RUNNING','progress_signature'=>$checkpoint['progress_signature']));$saved=PRSTUDIO_UC_Store::checkpoint_leased_job((string)$job['job_uuid'],$lease,$index,$checkpoint,$progress);if(!$saved)return array('ok'=>false,'claimed'=>true,'conflict'=>true,'job_id'=>$job['job_uuid']);$job=$saved;$index++;$processed++;

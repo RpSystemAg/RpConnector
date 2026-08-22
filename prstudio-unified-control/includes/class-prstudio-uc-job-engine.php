@@ -1,10 +1,11 @@
 <?php
 
 if ( ! defined( 'ABSPATH' ) ) { exit; }
+require_once __DIR__ . '/class-prstudio-uc-site-learning.php';
 
 /** Durable job facade: retry-safe creation, nonblocking evidence and deterministic recovery. */
 final class PRSTUDIO_UC_Job_Engine {
-	public const VERSION = '1.0.0';
+	public const VERSION = '1.1.0';
 
 	public static function create_browser_task( string $action, array $arguments, ?string $device_uuid = null, string $job_uuid = '' ): array {
 		$explicit = PRSTUDIO_UC_Idempotency::explicit_key( $arguments );
@@ -18,6 +19,41 @@ final class PRSTUDIO_UC_Job_Engine {
 		if ( ! class_exists( 'PRSTUDIO_UC_Memory' ) ) { return $payload; }
 		$clean = PRSTUDIO_UC_Memory::redact( $payload );
 		return is_array( $clean ) ? $clean : array();
+	}
+
+	private static function site_learning_completion( array $task, array $result, array $verification ): array {
+		if ( ! class_exists( 'PRSTUDIO_UC_Site_Learning' ) ) { return array( 'handled'=>false, 'defer_parent'=>false ); }
+		try {
+			$out = PRSTUDIO_UC_Site_Learning::after_browser_completion( $task, $result, $verification );
+			return is_array( $out ) ? $out : array( 'handled'=>false, 'defer_parent'=>false );
+		} catch ( Throwable $error ) {
+			// Record what went wrong, not merely that something did.
+			//
+			// This logged the exception class and nothing else, and the
+			// consequence is not a missing log line: catching here returns
+			// defer_parent false, so the parent job is reconciled and completed
+			// as though the study had finished. A site study died mid-traversal
+			// on a TypeError and the only trace anywhere was the word
+			// "TypeError" -- no message, no file, no line, and a job that
+			// reported success.
+			//
+			// The message and location are ours, not the site's: this code runs
+			// inside the plugin, so nothing here can carry page content.
+			PRSTUDIO_UC_Store::event( (string)($task['task_uuid']??''), 'task.site_learning_error', array(
+				'exception_class'=>get_class($error),
+				'message'=>substr((string)$error->getMessage(),0,400),
+				'file'=>substr(basename((string)$error->getFile()),0,80),
+				'line'=>(int)$error->getLine(),
+				'phase'=>(string)($task['arguments']['_prstudio_site_phase']??''),
+			) );
+			return array( 'handled'=>true, 'defer_parent'=>false, 'error'=>'site_learning_exception' );
+		}
+	}
+
+	private static function site_learning_failure( array $task, array $error ): void {
+		if ( ! class_exists( 'PRSTUDIO_UC_Site_Learning' ) ) { return; }
+		try { PRSTUDIO_UC_Site_Learning::after_browser_failure( $task, $error ); }
+		catch ( Throwable $ignored ) { PRSTUDIO_UC_Store::event( (string)($task['task_uuid']??''), 'task.site_learning_failure_observation_error', array( 'exception_class'=>get_class($ignored) ) ); }
 	}
 
 	private static function reconcile_browser_parent( array $task, bool $ok, array $payload ): bool {
@@ -62,16 +98,21 @@ final class PRSTUDIO_UC_Job_Engine {
 		$status = (string) ( $task['status'] ?? '' );
 		if ( PRSTUDIO_UC_State_Machine::COMPLETED === $status ) {
 			$verification=(array)($task['verification']??array());
+			$site=self::site_learning_completion($task,(array)($task['result']??array()),$verification);
+			if(!empty($site['defer_parent']))return true;
 			return self::reconcile_browser_parent( $task, !empty($verification['ok']), array( 'result'=>(array)($task['result']??array()), 'verification'=>$verification ) );
 		}
 		if ( PRSTUDIO_UC_State_Machine::FAILED === $status ) {
-			return self::reconcile_browser_parent( $task, false, (array)($task['error']??array()) );
+			$error=(array)($task['error']??array());self::site_learning_failure($task,$error);
+			return self::reconcile_browser_parent( $task, false, $error );
 		}
 		if ( PRSTUDIO_UC_State_Machine::CANCELLED === $status ) {
-			return self::reconcile_browser_parent( $task, false, array( 'code'=>'browser_task_cancelled', 'message'=>'Browser task cancelled.', 'retryable'=>false ) );
+			$error=array( 'code'=>'browser_task_cancelled', 'message'=>'Browser task cancelled.', 'retryable'=>false );self::site_learning_failure($task,$error);
+			return self::reconcile_browser_parent( $task, false, $error );
 		}
 		if ( PRSTUDIO_UC_State_Machine::EXPIRED === $status ) {
-			return self::reconcile_browser_parent( $task, false, array( 'code'=>'browser_task_expired', 'message'=>'Browser task expired before completion.', 'retryable'=>true ) );
+			$error=array( 'code'=>'browser_task_expired', 'message'=>'Browser task expired before completion.', 'retryable'=>true );self::site_learning_failure($task,$error);
+			return self::reconcile_browser_parent( $task, false, $error );
 		}
 		return false;
 	}
@@ -91,12 +132,19 @@ final class PRSTUDIO_UC_Job_Engine {
 			$result['verification']=$verification; $result['degraded']=true; $result['blocking']=false;
 		}
 		$completed=PRSTUDIO_UC_Store::complete( $task_uuid, $lease_token, $result );
-		if(is_array($completed)){if(!empty($verification['ok'])&&class_exists('PRSTUDIO_UC_Procedural_Skills')){try{PRSTUDIO_UC_Procedural_Skills::learn_verified_browser_task($task,$result,$verification);}catch(Throwable $ignored){PRSTUDIO_UC_Store::event($task_uuid,'task.procedural_learning_error',array('exception_class'=>get_class($ignored)));}}self::reconcile_browser_parent($completed,!empty($verification['ok']),array('result'=>$result,'verification'=>$verification));}
+		if(is_array($completed)){
+			if(!empty($verification['ok'])&&class_exists('PRSTUDIO_UC_Procedural_Skills')){try{PRSTUDIO_UC_Procedural_Skills::learn_verified_browser_task($task,$result,$verification);}catch(Throwable $ignored){PRSTUDIO_UC_Store::event($task_uuid,'task.procedural_learning_error',array('exception_class'=>get_class($ignored)));}}
+			$site=self::site_learning_completion($task,$result,$verification);
+			if(empty($site['defer_parent']))self::reconcile_browser_parent($completed,!empty($verification['ok']),array('result'=>$result,'verification'=>$verification));
+			else PRSTUDIO_UC_Store::event($task_uuid,'task.site_learning_continues',array('module_id'=>(string)($site['module_id']??''),'next_task_id'=>(string)($site['next_task_id']??''),'coverage'=>(array)($site['coverage']??array())));
+		}
 		return $completed;
 	}
 
 	public static function fail_browser_task( string $task_uuid, string $lease_token, array $error ) {
-		$task=PRSTUDIO_UC_Store::get_task($task_uuid);if(is_array($task)&&class_exists('PRSTUDIO_UC_Procedural_Skills')){try{PRSTUDIO_UC_Procedural_Skills::observe_failure('browser',(string)($task['action']??''),(array)($task['arguments']??array()),$error);}catch(Throwable $ignored){PRSTUDIO_UC_Store::event($task_uuid,'task.procedural_failure_observation_error',array('exception_class'=>get_class($ignored)));}}
+		$task=PRSTUDIO_UC_Store::get_task($task_uuid);
+		if(is_array($task)&&class_exists('PRSTUDIO_UC_Procedural_Skills')){try{PRSTUDIO_UC_Procedural_Skills::observe_failure('browser',(string)($task['action']??''),(array)($task['arguments']??array()),$error);}catch(Throwable $ignored){PRSTUDIO_UC_Store::event($task_uuid,'task.procedural_failure_observation_error',array('exception_class'=>get_class($ignored)));}}
+		if(is_array($task))self::site_learning_failure($task,$error);
 		$failed=PRSTUDIO_UC_Store::fail($task_uuid,$lease_token,$error);
 		if(is_array($failed))self::reconcile_browser_parent($failed,false,$error);
 		return $failed;
@@ -107,7 +155,7 @@ final class PRSTUDIO_UC_Job_Engine {
 		if ( ! $task ) { return null; }
 		if ( PRSTUDIO_UC_State_Machine::CANCELLED === (string) $task['status'] ) {
 			if ( '' !== $device_uuid && ! hash_equals( (string) ( $task['device_uuid'] ?? '' ), $device_uuid ) ) { return null; }
-			self::reconcile_browser_parent( $task, false, $error ?: array( 'code'=>'browser_task_cancelled', 'message'=>'Browser task cancelled.', 'retryable'=>false ) );
+			self::reconcile_terminal_browser_task( $task );
 			$task['idempotent_replay'] = true;
 			return $task;
 		}
@@ -115,6 +163,7 @@ final class PRSTUDIO_UC_Job_Engine {
 			? PRSTUDIO_UC_Store::cancel_for_device( $task_uuid, $device_uuid )
 			: PRSTUDIO_UC_Store::cancel( $task_uuid );
 		if ( is_array( $cancelled ) ) {
+			self::site_learning_failure($task,$error ?: array( 'code'=>'browser_task_cancelled', 'message'=>'Browser task cancelled.', 'retryable'=>false ));
 			self::reconcile_browser_parent( $cancelled, false, $error ?: array( 'code'=>'browser_task_cancelled', 'message'=>'Browser task cancelled.', 'retryable'=>false ) );
 		}
 		return $cancelled;
