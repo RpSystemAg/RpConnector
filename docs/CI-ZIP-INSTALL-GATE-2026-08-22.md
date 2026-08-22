@@ -23,6 +23,6 @@ A green WordPress control-plane job must:
 3. Create a clean real WordPress 7.0.4 + MariaDB instance.
 4. Install the generated ZIP through WP-CLI `plugin install <zip> --activate`, which uses the WordPress plugin upgrader/filesystem path rather than copying the checkout.
 5. Run the existing real activation/MCP probe against the installed package.
-6. Publish the generated installable ZIP as a GitHub Actions artifact so operators never have to recompress the source folder manuallymente.
+6. Publish the generated installable ZIP as a GitHub Actions artifact so operators never have to recompress the source folder by hand.
 
 Until that gate is green on the exact candidate commit, CI must not claim that the WordPress release ZIP has been installation-tested.
