@@ -482,7 +482,12 @@ try {
   pass('Browser Agent executed a real audit against WordPress', { message: auditMessage });
 
   await cdp.send('Target.activateTarget', { targetId: wpTargetId });
-  await navigate(cdp, wpSessionId, pluginAdminUrl);
+  const currentAdminHref = await evaluate(cdp, wpSessionId, 'location.href');
+  if (currentAdminHref !== pluginAdminUrl) {
+    await navigate(cdp, wpSessionId, pluginAdminUrl);
+  } else {
+    await waitForExpression(cdp, wpSessionId, 'document.readyState === "complete"', 'paired WordPress admin remains loaded', 10000);
+  }
   const adminAfterPair = await evaluate(cdp, wpSessionId, `(() => ({
     title: document.querySelector('.prstudio-connect h1')?.textContent?.trim() || '',
     hasDeviceGrid: Boolean(document.querySelector('table.prstudio-grid')),
@@ -491,7 +496,11 @@ try {
   if (!adminAfterPair?.title?.startsWith('PR STUDIO — Collegamenti') || adminAfterPair.hasDeviceGrid || /Browser collegati|Cronologia dispositivi revocati|Attività recenti/.test(adminAfterPair.text || '')) {
     throw new Error(`P32 admin exposed operational history after pairing: ${JSON.stringify(adminAfterPair)}`);
   }
-  evidence.wordpress_admin_after_pair = { title: adminAfterPair.title, history_visible: false };
+  evidence.wordpress_admin_after_pair = {
+    title: adminAfterPair.title,
+    history_visible: false,
+    reused_existing_page: currentAdminHref === pluginAdminUrl,
+  };
   await screenshot(cdp, wpSessionId, '05-wordpress-pairing-only.png');
   pass('WordPress admin remains pairing-only after Chrome connection');
 
