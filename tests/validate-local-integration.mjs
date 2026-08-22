@@ -47,7 +47,7 @@ for (const token of [
 assert.doesNotMatch(worker, /local_remote_lane_busy/, 'local site scans are not vetoed merely because remote work exists');
 assert.match(worker, /validateCdpCommand\(method, params, "internal"\)/, 'Local debugger must use the existing CDP allowlist');
 assert.match(worker, /async function localDebugCapture[\s\S]{0,5000}let operationError = null;[\s\S]{0,5000}let cleanupError = null;/, 'Local debug capture must track operation and cleanup failures separately');
-assert.match(worker, /finally \{[\s\S]{0,500}if \(attached\) \{[\s\S]{0,500}await detachDebugger\(tab\.id, "local_debug_capture_complete"\)[\s\S]{0,500}catch \(error\) \{ cleanupError = error; \}/, 'Local debugger capture must attempt evidence-aware detach in finally and retain detach failure');
+assert.match(worker, /finally \{[\s\S]{0,500}if \(attached\) \{[\s\S]{0,500}await detachDebugger\(tab\.id, "local_debug_capture_complete"\)[\s\S]{0,500}catch \(error\) \{ cleanupError = error; \}/, 'Local debug capture must attempt evidence-aware detach in finally and retain detach failure');
 assert.match(worker, /if \(operationError && cleanupError\) throw codedError\("LOCAL_DEBUG_CAPTURE_CLEANUP_FAILED"[\s\S]{0,500}if \(cleanupError\) throw cleanupError;[\s\S]{0,500}if \(operationError\) throw operationError;/, 'Local debugger capture returns a typed technical error when operation or detach cleanup fails');
 assert.match(worker, /chrome\.debugger\.detach\(\{\s*tabId:\s*id\s*\}\)/, 'Debugger cleanup helper must detach the owned tab through the bounded helper');
 assert.match(worker, /function debuggerDetachWithTimeout[\s\S]{0,700}promiseWithTimeout[\s\S]{0,700}CDP_DETACH_TIMEOUT/, 'Debugger detach must remain timeout-bounded and fail with a typed error');
@@ -73,8 +73,8 @@ for (const token of [
 
 assert.ok(bridge.includes("'browser_extension' => class_exists( 'PRSTUDIO_UC_REST' ) ? PRSTUDIO_UC_REST::browser_extension_summary()"));
 assert.ok(bridge.includes("'integration_chain' => class_exists( 'PRSTUDIO_UC_REST' ) ? PRSTUDIO_UC_REST::integration_capabilities()"));
-assert.ok(browserBridge.includes("'extension_local_studio' => class_exists( 'PRSTUDIO_UC_REST' ) ? PRSTUDIO_UC_REST::browser_extension_summary( $include_history )"));
-assert.ok(browserBridge.includes("'integration_chain' => class_exists( 'PRSTUDIO_UC_REST' ) ? PRSTUDIO_UC_REST::integration_capabilities()"));
+assert.match(browserBridge, /'extension_local_studio'\s*=>\s*class_exists\(\s*'PRSTUDIO_UC_REST'\s*\)\s*\?\s*PRSTUDIO_UC_REST::browser_extension_summary\(\s*\$include_history\s*\)/);
+assert.match(browserBridge, /'integration_chain'\s*=>\s*class_exists\(\s*'PRSTUDIO_UC_REST'\s*\)\s*\?\s*PRSTUDIO_UC_REST::integration_capabilities\(\s*\)/);
 
 // Local Studio remains off the public REST surface but is now remotely invokable through the lane-isolated MCP→Browser gateway.
 assert.doesNotMatch(rest, /register_rest_route[\s\S]{0,120}local_studio/i);
