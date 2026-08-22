@@ -116,8 +116,13 @@ await check("Chrome manifest uses exact lowercase MV3 parity bootstrap", () => {
     "installBrowserParityRuntime",
     "installBrowserParityRuntime(globalThis.chrome)",
     "globalThis.__PRSTUDIO_BROWSER_PARITY__ = parity",
-    "await import('./service-worker.js')",
+    "import './service-worker.js'",
   ], "Browser parity bootstrap");
+  assert.ok(
+    !browserBootstrapSource.includes("await import('./service-worker.js')")
+      && !browserBootstrapSource.includes("import('./service-worker.js')"),
+    "MV3 wake listeners must not be delayed behind a dynamic service-worker import",
+  );
   assert.deepEqual(manifest.permissions, [
     "storage", "alarms", "tabs", "scripting", "debugger", "activeTab",
     "downloads", "webNavigation", "sidePanel", "tabGroups", "system.display", "notifications",
@@ -509,7 +514,6 @@ await check("MCP tool catalog preserves the 81-tool 10.0 baseline and allows add
     "engineering_validate",
   ]) assert.ok(unique.has(name), `missing additive MCP tool: ${name}`);
 });
-
 
 await check("bounded browser runtime and public execution credentials", () => {
   requireTokens(browserSource, ["API_DEFAULT_TIMEOUT_MS", "CDP_DEFAULT_TIMEOUT_MS", "debuggerCommandWithTimeout", "captureExactVisibleTab", "chrome.tabs.onCreated.addListener", "RUNTIME_SESSIONS", "detectExternalAuthChallenge", "waitForExternalAuthChallenge"], "Browser Agent runtime hardening");
