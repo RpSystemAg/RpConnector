@@ -221,31 +221,14 @@ function assertAuthoritativePairResponse(response, siteOrigin, fallbackUrl) {
 /**
  * Install the compatibility transport used by the real MV3 bootstrap.
  * Discovery GETs never carry the pairing body; the original one-time POST is
- * issued exactly once after a REST route has been proven.
+ * issued exactly once after a REST route has been proven. The transport stays
+ * below runtime messaging: it does not register a competing onMessage listener.
  */
 export function installWordPressRestTransport(scope = globalThis) {
   if (!scope || typeof scope.fetch !== "function") return { installed: false };
   if (scope.__PRSTUDIO_WORDPRESS_REST_TRANSPORT__?.installed) return scope.__PRSTUDIO_WORDPRESS_REST_TRANSPORT__;
 
   const nativeFetch = scope.fetch.bind(scope);
-  const pendingByOrigin = new Map();
-  const rememberPairSite = (siteUrl) => {
-    try {
-      const base = normalizeWordPressSiteBase(siteUrl);
-      const queue = pendingByOrigin.get(base.origin) || [];
-      queue.push(base.href);
-      while (queue.length > 4) queue.shift();
-      pendingByOrigin.set(base.origin, queue);
-    } catch {
-      // service-worker.js remains authoritative for reporting invalid site input.
-    }
-  };
-
-  const runtimeListener = (message) => {
-    if (message?.type === "pair" && message.siteUrl) rememberPairSite(message.siteUrl);
-  };
-  scope.chrome?.runtime?.onMessage?.addListener?.(runtimeListener);
-
   const wrappedFetch = async (input, init = undefined) => {
     const href = requestHref(input);
     let parsed;
@@ -253,10 +236,7 @@ export function installWordPressRestTransport(scope = globalThis) {
     const method = requestMethod(input, init);
 
     if (isPrettyPairRequest(parsed, method)) {
-      const queue = pendingByOrigin.get(parsed.origin) || [];
-      const remembered = queue.shift();
-      if (queue.length) pendingByOrigin.set(parsed.origin, queue); else pendingByOrigin.delete(parsed.origin);
-      const siteUrl = remembered || deriveSiteBaseFromPrettyPair(parsed);
+      const siteUrl = deriveSiteBaseFromPrettyPair(parsed);
       const discovered = await discoverPairingEndpoint(nativeFetch, siteUrl, { signal: init?.signal });
       const response = await nativeFetch(discovered.pairUrl, init);
       assertAuthoritativePairResponse(response, discovered.base.origin, discovered.pairUrl);
@@ -272,7 +252,7 @@ export function installWordPressRestTransport(scope = globalThis) {
   };
 
   scope.fetch = wrappedFetch;
-  const state = { installed: true, nativeFetch, wrappedFetch, rememberPairSite };
+  const state = { installed: true, nativeFetch, wrappedFetch };
   scope.__PRSTUDIO_WORDPRESS_REST_TRANSPORT__ = state;
   return state;
 }
