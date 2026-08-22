@@ -578,7 +578,28 @@ async function domExecutor(action, args) {
     }
     if (action === "locate") return { ok: true, matched: true, element: describe(element), match: lastMatch };
     if (action === "click") {
-      for (let i = 0; i < args.clickCount; i += 1) element.click();
+      const clickCount = Number(args.clickCount ?? args.click_count ?? 1);
+      if (!Number.isSafeInteger(clickCount) || clickCount < 1 || clickCount > 3) {
+        return { ok: false, error: "click_count_invalid", message: "clickCount deve essere un intero tra 1 e 3." };
+      }
+      if (isDisabled(element)) {
+        return { ok: false, error: "element_disabled", message: "Il target del click è disabilitato." };
+      }
+      if (!(element instanceof HTMLElement) || typeof HTMLElement.prototype.click !== "function") {
+        return { ok: false, error: "element_click_unsupported", message: "Il target non supporta HTMLElement.click()." };
+      }
+      for (let i = 0; i < clickCount; i += 1) HTMLElement.prototype.click.call(element);
+      return {
+        ok: true,
+        matched: true,
+        action,
+        element: before,
+        after: describe(element),
+        match: lastMatch,
+        dispatch: { transport: "dom_click", dispatched: clickCount, trusted: false },
+        url: location.href,
+        title: document.title,
+      };
     } else if (action === "hover") {
       element.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
       element.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
