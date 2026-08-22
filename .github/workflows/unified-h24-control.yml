@@ -177,12 +177,14 @@ jobs:
           "$CHROME_BIN" --version
           node .github/scripts/chrome-scripting-health-probe.mjs
           node .github/scripts/browser-parity-live-probe.mjs
-      - name: Upload browser parity evidence
+      - name: Upload browser evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: browser-parity-${{ github.sha }}
-          path: artifacts/browser-parity/browser-parity-live-probe.json
+          name: browser-evidence-${{ github.sha }}
+          path: |
+            artifacts/real-e2e/scripting-health-probe.json
+            artifacts/browser-parity/browser-parity-live-probe.json
           if-no-files-found: warn
           retention-days: 30
 
@@ -252,6 +254,14 @@ jobs:
           python tests/build-release.py --build
           python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA" --verify
           python tests/generate-web-research-ledger.py
+          python - <<'PY'
+          import importlib.util, json
+          spec = importlib.util.spec_from_file_location('rigorous_audit', 'tests/rigorous-audit-controller.py')
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          summary, _, _ = module.generate()
+          print('RIGOROUS_HARD_FAILURES=' + json.dumps(summary['hard_failures'], ensure_ascii=False))
+          PY
           node tests/validate-release.mjs --strict --php-smoke
 
   gate:
