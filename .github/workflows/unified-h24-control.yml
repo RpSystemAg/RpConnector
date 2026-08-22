@@ -174,13 +174,27 @@ jobs:
           for candidate in google-chrome-stable google-chrome chromium chromium-browser; do
             if command -v "$candidate" >/dev/null 2>&1; then "$candidate" --version || true; fi
           done
-          CHROME_BIN="$(command -v google-chrome-stable || command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
-          test -n "$CHROME_BIN"
-          export CHROME_BIN
+          REAL_CHROME="$(command -v google-chrome-stable || command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          test -n "$REAL_CHROME"
+          command -v xvfb-run
+          cat > /tmp/rpconnector-real-chrome <<'SH'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          real="${PRSTUDIO_REAL_CHROME:?}"
+          args=()
+          for arg in "$@"; do
+            if [ "$arg" = '--headless=new' ]; then continue; fi
+            args+=("$arg")
+          done
+          exec "$real" "${args[@]}"
+          SH
+          chmod +x /tmp/rpconnector-real-chrome
+          export PRSTUDIO_REAL_CHROME="$REAL_CHROME"
+          export CHROME_BIN=/tmp/rpconnector-real-chrome
           export WP_URL=http://127.0.0.1:8080
           "$CHROME_BIN" --version
-          node .github/scripts/chrome-scripting-health-probe.mjs
-          node .github/scripts/browser-parity-live-probe.mjs
+          xvfb-run -a node .github/scripts/chrome-scripting-health-probe.mjs
+          xvfb-run -a node .github/scripts/browser-parity-live-probe.mjs
       - name: Upload browser evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
