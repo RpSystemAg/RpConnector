@@ -84,7 +84,7 @@ const createControlledTab = async (url, label, active = false) => {
 
 try {
   browser = await withTimeout('browser_launch', puppeteer.launch({
-    headless: 'new',
+    headless: false,
     pipe: true,
     enableExtensions: [extensionDir],
     args: ['--no-sandbox', '--disable-dev-shm-usage'],
@@ -168,6 +168,23 @@ try {
   await extEval(async (tabId) => chrome.tabs.update(tabId, { active: true }), tabC.id, 'tab_c_activate_for_capture');
   const capture = await extEval(async (windowId) => chrome.tabs.captureVisibleTab(windowId, { format: 'png' }), tabC.windowId, 'capture_visible_tab', 15000);
   record('visible_tab_screenshot_real', typeof capture === 'string' && capture.startsWith('data:image/png;base64,') && capture.length > 1000, { bytes: typeof capture === 'string' ? capture.length : 0 });
+
+  const focusPreflight = await extEval(async () => {
+    const win = await chrome.windows.getLastFocused({ windowTypes: ['normal'] });
+    const active = Number.isInteger(win?.id) ? await chrome.tabs.query({ active: true, windowId: win.id }) : [];
+    return { windowId: win?.id ?? null, focused: win?.focused ?? null, active: active.map((tab) => ({ id: tab.id, url: tab.url || '', active: tab.active })) };
+  }, null, 'focused_window_preflight', 5000);
+  record('focused_window_resolves_for_local_lane', Number.isInteger(focusPreflight.windowId) && focusPreflight.active.some((tab) => tab.id === tabC.id), { focusPreflight });
+
+  const localStatus = await extEval(async () => chrome.runtime.sendMessage({ type: 'local_status' }), null, 'local_status_preflight', 7000);
+  record('local_status_worker_message_real', Boolean(localStatus?.ok), { localStatus });
+
+  const directHealth = await extEval(async (tabId) => {
+    const module = await import(chrome.runtime.getURL('lib/local-page-functions.js'));
+    const rows = await chrome.scripting.executeScript({ target: { tabId, allFrames: false }, func: module.collectLocalPageHealth });
+    return rows?.[0]?.result || null;
+  }, tabC.id, 'direct_local_health_scripting', 7000);
+  record('direct_local_health_scripting_real', Boolean(directHealth?.url) && String(directHealth.url).startsWith(baseUrl), { directHealth });
 
   const localHealth = await extEval(async () => {
     const response = await chrome.runtime.sendMessage({ type: 'local_page_health' });
