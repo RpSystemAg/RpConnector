@@ -267,9 +267,15 @@ try {
   const pairingCode = wpEval(`echo PRSTUDIO_UC_Auth::create_pairing_code();`);
   if (!/^[A-Z0-9_-]{4,}$/.test(pairingCode)) throw new Error(`pairing_code_invalid_length:${pairingCode.length}`);
   const pairResult = await extensionEval(`chrome.runtime.sendMessage(${JSON.stringify({type:'pair', siteUrl:wpUrl, code:pairingCode, name:'CI Remote Ownership Certification'})})`, 25000);
-  check('real WordPress pairing succeeds', pairResult?.ok === true && Boolean(pairResult?.deviceId), { deviceId: pairResult?.deviceId || '' });
-  const paired = await storageSnapshot();
-  deviceId = String(paired?.prstudioConfig?.deviceId || pairResult?.deviceId || '');
+  check('real WordPress pairing request is accepted', pairResult?.ok === true, { responseOk: pairResult?.ok === true, responseHasDeviceId: Boolean(pairResult?.deviceId) });
+  const paired = await waitExpression(
+    cdp,
+    extensionSessionId,
+    `(async()=>{const s=await chrome.storage.local.get(['prstudioConfig']);return s?.prstudioConfig?.deviceId?s:null;})()`,
+    'paired Browser Agent config persisted',
+    10000,
+  );
+  deviceId = String(paired?.prstudioConfig?.deviceId || '');
   evidence.device_uuid = deviceId;
   check('paired device UUID is persisted', /^[a-f0-9-]{20,64}$/i.test(deviceId), { deviceId });
   await assertNoForbiddenErrors('pairing');
