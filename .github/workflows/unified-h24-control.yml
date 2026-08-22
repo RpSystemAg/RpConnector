@@ -170,7 +170,11 @@ jobs:
             if [ "$i" = 50 ]; then cat /tmp/rpconnector-h24-web.log; exit 1; fi
             sleep 0.2
           done
-          CHROME_BIN="$(command -v chromium || command -v chromium-browser || command -v google-chrome || true)"
+          echo "Available browser binaries:"
+          for candidate in google-chrome-stable google-chrome chromium chromium-browser; do
+            if command -v "$candidate" >/dev/null 2>&1; then "$candidate" --version || true; fi
+          done
+          CHROME_BIN="$(command -v google-chrome-stable || command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
           test -n "$CHROME_BIN"
           export CHROME_BIN
           export WP_URL=http://127.0.0.1:8080
