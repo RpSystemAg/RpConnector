@@ -88,6 +88,20 @@ jobs:
         env:
           PRSTUDIO_TEST_DB_NAME: prstudio_runtime_liveness
         run: php -d auto_prepend_file=tests/strict-php-errors.php tests/php-runtime-db-liveness-integration.php
+      - name: Real WordPress 7.0.4 activation and MCP route
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -r '$m=new mysqli("127.0.0.1","root","","",3306); if($m->connect_errno){fwrite(STDERR,$m->connect_error); exit(1);} if(!$m->query("CREATE DATABASE IF NOT EXISTS prstudio_wp_real CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")){fwrite(STDERR,$m->error); exit(1);}'
+          curl --fail --location --silent --show-error https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar --output /tmp/wp-cli.phar
+          php /tmp/wp-cli.phar --info
+          rm -rf /tmp/prstudio-wp
+          php /tmp/wp-cli.phar core download --version=7.0.4 --path=/tmp/prstudio-wp --force
+          php /tmp/wp-cli.phar config create --path=/tmp/prstudio-wp --dbname=prstudio_wp_real --dbuser=root --dbpass= --dbhost=127.0.0.1:3306 --skip-check
+          php /tmp/wp-cli.phar core install --path=/tmp/prstudio-wp --url=http://127.0.0.1:8082 --title='PR STUDIO H24' --admin_user=prstudio --admin_password='H24-Test-Only-2026!' --admin_email=ci@example.invalid --skip-email
+          cp -a "$GITHUB_WORKSPACE/prstudio-unified-control" /tmp/prstudio-wp/wp-content/plugins/prstudio-unified-control
+          php /tmp/wp-cli.phar plugin activate prstudio-unified-control --path=/tmp/prstudio-wp
+          php /tmp/wp-cli.phar eval-file "$GITHUB_WORKSPACE/tests/wp-real-activation-probe.php" --path=/tmp/prstudio-wp
 
   extension:
     name: Chrome extension / Browser Agent
