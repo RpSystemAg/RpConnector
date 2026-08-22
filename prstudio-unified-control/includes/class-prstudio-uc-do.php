@@ -9,25 +9,15 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
  * *names to choose between* — and choosing is where a model with a truncated
  * tool list fails.
  *
- * `prstudio_do` is that front door. Every one of the 111 typed tools, 1,378
- * capabilities and 1,076 catalog actions stays exactly where it was and remains
- * directly callable by name; nothing here removes or hides anything. This adds
- * a route for the common case: the caller states an intent in plain words plus
- * a target, and the router resolves it to the canonical tool with the canonical
- * arguments, then hands it to the normal dispatcher.
- *
- * The router is deliberately literal. It never guesses at a mutation: when the
- * intent is ambiguous it returns the candidates it considered and refuses to
- * pick, because a wrong guess that writes is far more expensive than a question.
+ * `prstudio_do` is that front door. Every typed tool and capability remains
+ * directly callable by name. This adds an ergonomic route for common intents,
+ * and also guarantees that a canonical tool name withheld from tools/list by
+ * the token budget remains directly routable through this front door.
  */
 final class PRSTUDIO_UC_Do {
-    public const VERSION = '1.1.0';
+    public const VERSION = '1.2.0';
 
-    /**
-     * Direct intent synonyms. Order matters only for readability; matching is
-     * exact-first, then longest-phrase, so "open tab" cannot be shadowed by
-     * "open".
-     */
+    /** Direct intent synonyms. */
     private static function intent_map(): array {
         return array(
             // Browser navigation and interaction.
@@ -218,6 +208,22 @@ final class PRSTUDIO_UC_Do {
         return trim( (string) $value );
     }
 
+    /** Exact canonical MCP tool, if the raw intent names one. */
+    private static function canonical_tool_match( string $underscored ): ?array {
+        if ( '' === $underscored || 'prstudio_do' === $underscored || ! class_exists( 'PRSTUDIO_UC_MCP_V5' ) ) { return null; }
+        foreach ( PRSTUDIO_UC_MCP_V5::tools() as $tool ) {
+            $name = sanitize_key( (string) ( $tool['name'] ?? '' ) );
+            if ( '' !== $name && hash_equals( $name, $underscored ) ) {
+                return array(
+                    'key' => $name,
+                    'spec' => array( 'tool' => $name ),
+                    'confidence' => 'canonical_tool',
+                );
+            }
+        }
+        return null;
+    }
+
     /**
      * Resolves an intent to a concrete { tool, arguments } call.
      *
@@ -226,11 +232,6 @@ final class PRSTUDIO_UC_Do {
     public static function resolve( array $args ) {
         $raw_intent = (string) ( $args['intent'] ?? '' );
         if ( '' === trim( $raw_intent ) ) {
-            // The tool manual documents "call with no arguments to list known
-            // intents", so do exactly that. Returning an error here contradicted
-            // the manual and turned the cheapest discovery path in the suite into
-            // a dead end -- the model would fall back to a capability search that
-            // costs a round trip and often lands somewhere less direct.
             $map = self::bilingual_intent_map();
             $intents = array();
             foreach ( $map as $key => $spec ) {
@@ -242,8 +243,8 @@ final class PRSTUDIO_UC_Do {
                 'listing' => 'intents',
                 'count' => count( $intents ),
                 'intents' => $intents,
-                'usage' => 'Call again with intent="<one of the keys above>" plus that tool\'s arguments.',
-                'note' => 'These are fast paths to a single typed tool. For an operation not listed here use prstudio_capability_search.',
+                'usage' => 'Call again with intent="<one of the keys above or an exact canonical tool name>" plus that tool\'s arguments.',
+                'note' => 'Fast paths are listed here; every canonical MCP tool name is also directly routable through prstudio_do, including tools withheld from tools/list.',
                 'version' => self::VERSION,
                 'component' => 'prstudio_do',
                 'suite_version' => defined( 'PRSTUDIO_UC_VERSION' ) ? PRSTUDIO_UC_VERSION : '',
@@ -258,6 +259,10 @@ final class PRSTUDIO_UC_Do {
         if ( isset( $map[ $underscored ] ) ) {
             $match = array( 'key' => $underscored, 'spec' => $map[ $underscored ], 'confidence' => 'exact' );
         }
+        // Canonical tool names have stronger semantics than fuzzy intent terms.
+        // This closes the budget dead-end: a tool can be omitted from tools/list
+        // yet still be addressed exactly through the advertised prstudio_do.
+        if ( ! $match ) { $match = self::canonical_tool_match( $underscored ); }
         if ( ! $match ) {
             $tokens = array_values( array_diff( explode( ' ', $normalized ), self::noise() ) );
             $scored = array();
@@ -265,7 +270,6 @@ final class PRSTUDIO_UC_Do {
                 $key_tokens = explode( '_', $key );
                 $overlap = count( array_intersect( $key_tokens, $tokens ) );
                 if ( $overlap < 1 ) { continue; }
-                // Longer intent keys that match fully rank above single-word hits.
                 $scored[ $key ] = ( $overlap * 10 ) + ( $overlap === count( $key_tokens ) ? 5 : 0 ) - count( $key_tokens );
             }
             arsort( $scored, SORT_NUMERIC );
@@ -281,14 +285,12 @@ final class PRSTUDIO_UC_Do {
         }
 
         if ( ! $match ) {
-            // Falling through to capability search is better than failing: the
-            // capability registry knows about operations this map does not.
             return array(
                 'tool'      => 'prstudio_capability_search',
                 'arguments' => array( 'query' => $raw_intent, 'limit' => 10, 'include_legacy' => true ),
                 'routing'   => array(
                     'confidence' => 'fallback',
-                    'note'       => 'No direct intent match. Searching the capability registry; run prstudio_execute with the chosen capability.',
+                    'note'       => 'No direct intent or canonical tool match. Searching the capability registry; run prstudio_execute with the chosen capability.',
                 ),
             );
         }
@@ -298,8 +300,6 @@ final class PRSTUDIO_UC_Do {
         if ( isset( $spec['defaults'] ) && is_array( $spec['defaults'] ) ) {
             $call_args = array_merge( $spec['defaults'], $call_args );
         }
-        // A bare `target` is placed on the argument the chosen tool actually
-        // expects, so a caller never has to know each tool's parameter names.
         $target = $args['target'] ?? null;
         if ( null !== $target && '' !== $target ) {
             $target_arg = (string) ( $spec['target_arg'] ?? '' );
@@ -338,7 +338,7 @@ final class PRSTUDIO_UC_Do {
                 'status'     => 409,
                 'intent'     => $intent,
                 'candidates' => $options,
-                'remedy'     => 'Repeat prstudio_do with one of the listed intent values, or call the tool directly by name.',
+                'remedy'     => 'Repeat prstudio_do with one of the listed intent values, an exact canonical tool name, or call the tool directly by name.',
             )
         );
     }
@@ -352,11 +352,21 @@ final class PRSTUDIO_UC_Do {
             if ( ! isset( $by_tool[ $tool ] ) ) { $by_tool[ $tool ] = array(); }
             $by_tool[ $tool ][] = $intent;
         }
+        $canonical = array();
+        if ( class_exists( 'PRSTUDIO_UC_MCP_V5' ) ) {
+            foreach ( PRSTUDIO_UC_MCP_V5::tools() as $tool ) {
+                $name = (string) ( $tool['name'] ?? '' );
+                if ( '' !== $name && 'prstudio_do' !== $name ) { $canonical[] = $name; }
+            }
+            sort( $canonical );
+        }
         return array(
             'intent_count' => count( $map ),
             'intents'      => array_keys( $map ),
             'by_tool'      => $by_tool,
-            'note'         => 'Every typed tool remains directly callable by name. prstudio_do is an additional route, not a replacement.',
+            'canonical_tool_count' => count( $canonical ),
+            'canonical_tools' => $canonical,
+            'note'         => 'Every typed tool remains directly callable by name and exact canonical names are routable through prstudio_do.',
         );
     }
 }
