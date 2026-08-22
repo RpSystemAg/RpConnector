@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -30,15 +30,19 @@ const chromeCandidates = process.platform === 'darwin'
       ]
     : [
         process.env.CHROME_BIN,
-        '/usr/bin/google-chrome',
         '/usr/bin/google-chrome-stable',
-        '/usr/bin/chromium',
-        '/usr/bin/chromium-browser',
+        '/usr/bin/google-chrome',
       ];
 
 const chrome = chromeCandidates.filter(Boolean).find((candidate) => existsSync(candidate));
 if (!chrome) {
-  console.error('FAIL real Chrome/Chromium binary not found');
+  console.error('FAIL real Google Chrome binary not found');
+  process.exit(2);
+}
+const versionProbe = spawnSync(chrome, ['--version'], { encoding: 'utf8' });
+const binaryVersion = `${versionProbe.stdout || ''}${versionProbe.stderr || ''}`.trim();
+if (versionProbe.status !== 0 || !/Google Chrome|Chrome for Testing/i.test(binaryVersion) || /Chromium/i.test(binaryVersion)) {
+  console.error(`FAIL certification requires Google Chrome/Chrome for Testing: ${binaryVersion}`);
   process.exit(2);
 }
 if (!existsSync(extensionDir)) {
@@ -204,13 +208,13 @@ async function findExtensionId(cdp) {
     const worker = lastTargets.find((target) =>
       target.type === 'service_worker'
       && String(target.url || '').startsWith('chrome-extension://')
-      && String(target.url || '').endsWith('/service-worker.js'));
+      && String(target.url || '').endsWith('/service-worker-bootstrap.js'));
     if (worker) {
       return String(worker.url).split('/')[2];
     }
     await sleep(200);
   }
-  throw new Error(`Browser Agent service worker not observed; targets=${JSON.stringify(lastTargets)}`);
+  throw new Error(`Browser Agent MV3 bootstrap service worker not observed; targets=${JSON.stringify(lastTargets)}`);
 }
 
 const evidence = {
@@ -219,6 +223,7 @@ const evidence = {
   wp_url: wpUrl,
   device_name: deviceName,
   chrome_binary: chrome,
+  chrome_binary_version: binaryVersion,
   steps: [],
 };
 
@@ -235,12 +240,15 @@ function pass(step, detail = {}) {
 try {
   const version = await waitForChromeVersion();
   evidence.chrome_version = version.Browser || '';
+  if (!/Chrome\//.test(evidence.chrome_version) || /Chromium/i.test(evidence.chrome_version)) {
+    throw new Error(`Certification browser is not Google Chrome: ${evidence.chrome_version}`);
+  }
   cdp = new Cdp(version.webSocketDebuggerUrl);
-  pass('real Chrome started', { message: evidence.chrome_version });
+  pass('real Google Chrome started', { message: `${binaryVersion} / ${evidence.chrome_version}` });
 
   const extensionId = await findExtensionId(cdp);
   evidence.extension_id = extensionId;
-  pass('Browser Agent extension loaded', { message: `extension ${extensionId.slice(0, 8)}…` });
+  pass('Browser Agent MV3 bootstrap extension loaded', { message: `extension ${extensionId.slice(0, 8)}…` });
 
   const wpTarget = await cdp.send('Target.createTarget', { url: `${wpUrl}/wp-login.php` });
   wpTargetId = wpTarget.targetId;
@@ -417,9 +425,6 @@ try {
   await screenshot(cdp, extensionSessionId, '04-browser-agent-audit.png');
   pass('Browser Agent executed a real audit against WordPress', { message: auditMessage });
 
-  // P32 intentionally does not expose device/session history in wp-admin. The
-  // workflow's independent WordPress oracle verifies the paired device in the
-  // Store after this script returns; here we prove the UI stays pairing-only.
   await cdp.send('Target.activateTarget', { targetId: wpTargetId });
   await navigate(cdp, wpSessionId, pluginAdminUrl);
   const adminAfterPair = await evaluate(cdp, wpSessionId, `(() => ({
@@ -437,7 +442,7 @@ try {
   evidence.ok = true;
   evidence.finished_at = new Date().toISOString();
   await writeFile(join(artifactDir, 'evidence.json'), JSON.stringify(evidence, null, 2));
-  console.log('PASS real WordPress + Chrome + Browser Agent end-to-end');
+  console.log('PASS real WordPress + Google Chrome + Browser Agent end-to-end');
 } catch (error) {
   evidence.error = {
     message: error?.message || String(error),
