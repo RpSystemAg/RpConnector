@@ -16,7 +16,7 @@ const manifest = JSON.parse(await read('prstudio-unified-browser-agent/manifest.
 
 assert.match(toolchain, /public const VERSION = '1\.0\.0'/);
 assert.equal(manifest.version, '1.0.0');
-assert.deepEqual(manifest.permissions, ['tabs','tabGroups','scripting','storage','debugger','sidePanel','notifications','alarms','windows','system.display','activeTab','tabCapture','offscreen','contextMenus']);
+assert.deepEqual(manifest.permissions, ['storage','alarms','tabs','scripting','debugger','activeTab','downloads','webNavigation','sidePanel','tabGroups','system.display','notifications']);
 
 const requiredCaps = [
   'toolchain.status', 'toolchain.filesystem.inspect', 'toolchain.filesystem.write', 'toolchain.git.inspect',
@@ -110,4 +110,4 @@ assert.doesNotMatch(rest, /register_rest_route[\s\S]{0,160}toolchain/i);
 assert.equal(overlay.schema_version, '1.0.0');
 assert.equal(overlay.suite_version, '1.0.0');
 
-console.log('PASS MCP toolchain integration: native-first, pinned optional sidecars, sandboxed processes, unchanged 1.0.0 install/pairing with audited WebRTC Chrome permission expansion.');
+console.log('PASS MCP toolchain integration: native-first, pinned optional sidecars, sandboxed processes, unchanged 1.0.0 install/pairing with the current audited Chrome permission surface.');
