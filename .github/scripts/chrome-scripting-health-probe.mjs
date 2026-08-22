@@ -70,7 +70,7 @@ class Cdp {
     this.pending = new Map();
     this.opened = new Promise((resolvePromise, reject) => {
       this.ws.addEventListener('open', resolvePromise);
-      this.ws.addEventListener('error', () => reject(new Error('CDP WebSocket failed to open')));
+      this.ws.addEventListener('error', () => reject(new Error(`CDP WebSocket failed to open: ${wsUrl}`)));
     });
     this.ws.addEventListener('message', (event) => {
       const message = JSON.parse(String(event.data));
@@ -84,7 +84,7 @@ class Cdp {
     });
   }
 
-  async send(method, params = {}, sessionId = undefined, timeoutMs = 15000) {
+  async send(method, params = {}, timeoutMs = 15000) {
     await this.opened;
     const id = this.nextId++;
     return new Promise((resolvePromise, reject) => {
@@ -93,9 +93,7 @@ class Cdp {
         reject(new Error(`CDP timeout: ${method}`));
       }, timeoutMs);
       this.pending.set(id, { resolve: resolvePromise, reject, timer, method });
-      const payload = { id, method, params };
-      if (sessionId) payload.sessionId = sessionId;
-      this.ws.send(JSON.stringify(payload));
+      this.ws.send(JSON.stringify({ id, method, params }));
     });
   }
 
@@ -104,19 +102,28 @@ class Cdp {
   }
 }
 
-async function attachPage(cdp, targetId) {
-  const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
-  if (!sessionId) throw new Error(`Target.attachToTarget returned no session for ${targetId}`);
-  return sessionId;
+async function waitForTargetDescriptor(targetId, label, timeoutMs = 20000) {
+  const deadline = Date.now() + timeoutMs;
+  let lastTargets = [];
+  while (Date.now() < deadline) {
+    try {
+      const targets = await fetchJson(`http://127.0.0.1:${debugPort}/json/list`);
+      lastTargets = Array.isArray(targets) ? targets : [];
+      const found = lastTargets.find((target) => String(target?.id || target?.targetId || '') === String(targetId));
+      if (found?.webSocketDebuggerUrl) return found;
+    } catch {}
+    await sleep(100);
+  }
+  throw new Error(`Timed out waiting for direct DevTools target ${label} (${targetId}); targets=${JSON.stringify(lastTargets)}`);
 }
 
-async function evaluate(cdp, sessionId, expression) {
-  const result = await cdp.send('Runtime.evaluate', {
+async function evaluate(targetCdp, expression) {
+  const result = await targetCdp.send('Runtime.evaluate', {
     expression,
     returnByValue: true,
     awaitPromise: true,
     userGesture: true,
-  }, sessionId);
+  });
   if (result.exceptionDetails) {
     const detail = result.exceptionDetails.exception?.description || result.exceptionDetails.text || 'exception';
     throw new Error(`Runtime.evaluate failed: ${detail}`);
@@ -124,22 +131,22 @@ async function evaluate(cdp, sessionId, expression) {
   return result.result?.value;
 }
 
-async function waitForExpression(cdp, sessionId, expression, label, timeoutMs = 20000) {
+async function waitForExpression(targetCdp, expression, label, timeoutMs = 20000) {
   const deadline = Date.now() + timeoutMs;
   let last;
   while (Date.now() < deadline) {
-    last = await evaluate(cdp, sessionId, expression).catch((error) => ({ __error: error.message }));
+    last = await evaluate(targetCdp, expression).catch((error) => ({ __error: error.message }));
     if (last && !last.__error) return last;
     await sleep(200);
   }
   throw new Error(`Timed out waiting for ${label}; last=${JSON.stringify(last)}`);
 }
 
-async function findBrowserAgentWorker(cdp) {
+async function findBrowserAgentWorker(browserCdp) {
   const deadline = Date.now() + 30000;
   let lastTargets = [];
   while (Date.now() < deadline) {
-    const { targetInfos = [] } = await cdp.send('Target.getTargets');
+    const { targetInfos = [] } = await browserCdp.send('Target.getTargets');
     lastTargets = targetInfos;
     const worker = targetInfos.find((target) => {
       const url = String(target.url || '');
@@ -153,7 +160,9 @@ async function findBrowserAgentWorker(cdp) {
   throw new Error(`Browser Agent worker ${expectedWorkerPath} not observed; targets=${JSON.stringify(lastTargets)}`);
 }
 
-let cdp;
+let browserCdp;
+let wpCdp;
+let extensionCdp;
 const report = {
   ok: false,
   started_at: new Date().toISOString(),
@@ -169,23 +178,31 @@ const report = {
 try {
   const version = await waitForChromeVersion();
   report.chrome_version = version.Browser || '';
-  cdp = new Cdp(version.webSocketDebuggerUrl);
-  const worker = await findBrowserAgentWorker(cdp);
+  browserCdp = new Cdp(version.webSocketDebuggerUrl);
+  const worker = await findBrowserAgentWorker(browserCdp);
   const extensionId = String(worker.url).split('/')[2] || '';
+  if (!extensionId) throw new Error(`Unable to derive Browser Agent extension id from ${worker.url}`);
   report.extension_id = extensionId;
   report.service_worker_url = worker.url;
 
-  const { targetId: wpTargetId } = await cdp.send('Target.createTarget', { url: `${wpUrl}/wp-login.php` });
-  const wpSessionId = await attachPage(cdp, wpTargetId);
-  await waitForExpression(cdp, wpSessionId, 'document.readyState === "complete"', 'WordPress probe page');
+  // Chromium 151 can invalidate flattened Target.attachToTarget sessions between
+  // attach and Runtime.evaluate. Use each page target's own DevTools websocket
+  // as the independent oracle instead. This is not a weaker probe: it still
+  // drives the real Chromium target and leaves chrome.scripting execution to the
+  // installed Browser Agent extension itself.
+  const { targetId: wpTargetId } = await browserCdp.send('Target.createTarget', { url: `${wpUrl}/wp-login.php` });
+  const wpTarget = await waitForTargetDescriptor(wpTargetId, 'WordPress page');
+  wpCdp = new Cdp(wpTarget.webSocketDebuggerUrl);
+  await waitForExpression(wpCdp, 'document.readyState === "complete"', 'WordPress probe page');
 
-  const { targetId: extensionTargetId } = await cdp.send('Target.createTarget', { url: `chrome-extension://${extensionId}/sidepanel.html` });
-  const extensionSessionId = await attachPage(cdp, extensionTargetId);
-  await waitForExpression(cdp, extensionSessionId, 'document.readyState === "complete"', 'Browser Agent probe page');
-  await cdp.send('Target.activateTarget', { targetId: wpTargetId });
+  const { targetId: extensionTargetId } = await browserCdp.send('Target.createTarget', { url: `chrome-extension://${extensionId}/sidepanel.html` });
+  const extensionTarget = await waitForTargetDescriptor(extensionTargetId, 'Browser Agent sidepanel');
+  extensionCdp = new Cdp(extensionTarget.webSocketDebuggerUrl);
+  await waitForExpression(extensionCdp, 'document.readyState === "complete"', 'Browser Agent probe page');
+  await browserCdp.send('Target.activateTarget', { targetId: wpTargetId });
   await sleep(250);
 
-  report.probe = await evaluate(cdp, extensionSessionId, `(async () => {
+  report.probe = await evaluate(extensionCdp, `(async () => {
     const summarizeRows = (rows) => (Array.isArray(rows) ? rows : []).map((row) => ({
       frameId: row?.frameId ?? null,
       documentId: row?.documentId || '',
@@ -271,7 +288,7 @@ try {
   if (!report.probe?.importedHealth?.ok || !report.probe?.importedResponsive?.ok) {
     throw new Error(`Imported scripting functions failed: health=${JSON.stringify(report.probe?.importedHealth)} responsive=${JSON.stringify(report.probe?.importedResponsive)}`);
   }
-  console.log('PASS Chrome scripting probe: exact Browser Agent worker, inline scripting, imported health and imported responsive functions returned real WordPress results');
+  console.log('PASS Chrome scripting probe: exact Browser Agent worker, direct target CDP oracle, inline scripting, imported health and imported responsive functions returned real WordPress results');
 } catch (error) {
   report.error = { message: error?.message || String(error), stack: String(error?.stack || '').slice(0, 12000) };
   report.finished_at = new Date().toISOString();
@@ -280,7 +297,9 @@ try {
   if (chromeStderr) console.error(chromeStderr.slice(-12000));
   process.exitCode = 1;
 } finally {
-  cdp?.close();
+  extensionCdp?.close();
+  wpCdp?.close();
+  browserCdp?.close();
   try { child.kill('SIGTERM'); } catch {}
   await sleep(200);
   if (!child.killed) { try { child.kill('SIGKILL'); } catch {} }
