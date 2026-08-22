@@ -195,10 +195,10 @@ try {
         await chrome.debugger.attach(debuggee, '1.3');
         attached = true;
         await chrome.debugger.sendCommand(debuggee, 'Page.enable');
-        const result = await chrome.debugger.sendCommand(debuggee, 'Page.captureScreenshot', { format: 'png', fromSurface: false });
+        const result = await chrome.debugger.sendCommand(debuggee, 'Page.captureScreenshot', { format: 'png' });
         return {
           dataUrl: `data:image/png;base64,${String(result?.data || '')}`,
-          transport: 'chrome.debugger/Page.captureScreenshot-renderer',
+          transport: 'chrome.debugger/Page.captureScreenshot-surface',
           captureVisibleTabError: initialError,
         };
       } finally {
