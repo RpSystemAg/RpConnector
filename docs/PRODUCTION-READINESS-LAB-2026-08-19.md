@@ -4,6 +4,14 @@ Stato: **evidenza di laboratorio raccolta; `production_proven` resta `false`**
 (per `ENTERPRISE-VERIFICATION-PROTOCOL-2026-08-18.md` la promozione richiede i
 tier E6–E8 con evidenza esterna riproducibile).
 
+> **Correzione evidenza — 2026-08-22.** Il laboratorio descritto qui installava
+> WordPress core e poi copiava il checkout del plugin nel filesystem prima di
+> chiamare `activate_plugin()`. Quindi prova attivazione/runtime del plugin su
+> WordPress reale, **non** il percorso di installazione del pacchetto release
+> `ZIP -> ZipArchive -> WP_Filesystem -> wp-content/plugins`. Il gap è
+> documentato in `docs/CI-ZIP-INSTALL-GATE-2026-08-22.md` e deve essere coperto
+> dal gate Unified H24 prima di qualificare il release ZIP come installation-tested.
+
 ## 1. Ambiente creato nel sandbox
 
 | Componente | Versione | Origine |
@@ -33,8 +41,9 @@ del plugin PR STUDIO è stato modificato per far passare i test.
 
 ## 2. Evidenza raccolta
 
-### 2.1 Installazione WordPress reale (tier E4 parziale)
+### 2.1 WordPress reale: attivazione da checkout (tier E4 parziale)
 - `wp_install()` completato: sito installato, `DB class: WP_SQLite_DB`.
+- Checkout plugin copiato nel filesystem; installazione del release ZIP non esercitata in questo lab.
 - Plugin attivato (`activate_plugin`): OK.
 - `PRSTUDIO_UC_Store::maybe_upgrade()`: OK, schema 4.0.0, `schema_ready=yes`.
 - Tabelle create (tradotte dal layer): `wp_prstudio_uc_dead_letters`,
@@ -95,7 +104,7 @@ Eseguiti **tutti gli 81 file PHP di `tests/`** con `strict-php-errors`
 | E1 | unit/contract | ✅ ~66 suite eseguite | 3 suite subprocess-only |
 | E2 | modello finito | ⚠️ parziale (state machine, exhaustive-checkpoint su CI) | — |
 | E3 | database reale | ⚠️ **MySQL-on-SQLite** (layer ufficiale) invece di MySQL/MariaDB: DDL, opzioni, ledger, lock OAuth emulati | server MySQL/MariaDB non scaricabile (CDN bloccate); `GET_LOCK`/`CONNECTION_ID` emulati |
-| E4 | WordPress reale | ✅ WP 7.0.4 installato + plugin attivato + MCP E2E (36 tool, write reale) | backend SQLite invece di MySQL; REST via dispatch (niente socket HTTP) |
+| E4 | WordPress reale | ⚠️ WP 7.0.4 installato + plugin attivato da checkout + MCP E2E (36 tool, write reale) | installazione release ZIP non coperta da questo lab; backend SQLite invece di MySQL; REST via dispatch (niente socket HTTP) |
 | E5 | Chrome reale | ❌ | binario Chrome non scaricabile (dl.google.com bloccato); estensione non caricabile |
 | E6 | MCP/OAuth remoto | ❌ (flusso OAuth esercitato localmente, token reali) | endpoint HTTPS esterno + client ChatGPT reale |
 | E7 | soak/chaos | ❌ | 24h di runtime continuo; toxiproxy non scaricabile |
@@ -106,8 +115,9 @@ Eseguiti **tutti gli 81 file PHP di `tests/`** con `strict-php-errors`
 1. **E3**: rieseguire §2.1–2.3 su MySQL/MariaDB reale (CI lo fa già:
    `full-surface-execution.yml` monta MariaDB 11.4 — il gate resta il
    riferimento per il 100%).
-2. **E4**: rieseguire il flusso MCP E2E su un WordPress con MySQL reale
-   (workflow `wordpress-live-acceptance.yml`).
+2. **E4**: richiedere sia runtime/MCP su WordPress reale sia installazione del
+   release ZIP tramite il WordPress upgrader/filesystem path; il gap ZIP è
+   descritto in `docs/CI-ZIP-INSTALL-GATE-2026-08-22.md`.
 3. **E5**: caricare l'estensione in un Chrome reale (pairing, owned-tab,
    screenshot, WebRTC LIVE) — richiede un runner con Chrome.
 4. **E6**: OAuth 2.1 + PKCE reale contro l'endpoint HTTPS pubblico con un
@@ -122,6 +132,7 @@ commit esatto (regola non negoziabile §1 del protocollo).
 ## 5. File di riferimento
 
 - Questo report: `docs/PRODUCTION-READINESS-LAB-2026-08-19.md`
+- Correzione gate ZIP: `docs/CI-ZIP-INSTALL-GATE-2026-08-22.md`
 - Protocollo: `ENTERPRISE-VERIFICATION-PROTOCOL-2026-08-18.md`
 - Corpus risultati: `/tmp/php-corpus-results/*.txt` (sandbox)
 - Script lab: `/tmp/wp-*.php`, `/tmp/wp-core/` (sandbox)
