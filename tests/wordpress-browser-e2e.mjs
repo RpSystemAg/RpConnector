@@ -41,8 +41,8 @@ if (
   runWpCli(['config', 'set', 'WP_SITEURL', wpUrl, '--type=constant']);
   const home = runWpCli(['option', 'get', 'home']);
   const siteurl = runWpCli(['option', 'get', 'siteurl']);
-  const configHome = runWpCli(['config', 'get', 'WP_HOME', '--type=constant', '--format=json']).replace(/^"|"$/g, '');
-  const configSiteUrl = runWpCli(['config', 'get', 'WP_SITEURL', '--type=constant', '--format=json']).replace(/^"|"$/g, '');
+  const configHome = JSON.parse(runWpCli(['config', 'get', 'WP_HOME', '--type=constant', '--format=json']));
+  const configSiteUrl = JSON.parse(runWpCli(['config', 'get', 'WP_SITEURL', '--type=constant', '--format=json']));
   if (home !== wpUrl || siteurl !== wpUrl || configHome !== wpUrl || configSiteUrl !== wpUrl) {
     throw new Error(`WordPress CI fixture URL mismatch: ${JSON.stringify({ home, siteurl, configHome, configSiteUrl, expected: wpUrl })}`);
   }
