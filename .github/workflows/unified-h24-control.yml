@@ -234,7 +234,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA"
           python tests/build-release.py --build
+          python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA" --verify
+          python tests/generate-web-research-ledger.py
           node tests/validate-release.mjs --strict --php-smoke
 
   gate:
