@@ -62,6 +62,7 @@ jobs:
           python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA" --verify
           python tests/build-release.py --check
           test -f "$GITHUB_WORKSPACE/prstudio-unified-control-1.0.0.zip"
+          sha256sum prstudio-unified-control-1.0.0.zip > WORDPRESS-ZIP-SHA256.txt
       - name: Install SQL parser
         run: python -m pip install --disable-pip-version-check --no-input 'sqlglot==30.14.0'
       - name: PHP syntax and project metadata
@@ -122,8 +123,7 @@ jobs:
           name: wordpress-release-${{ github.sha }}
           path: |
             prstudio-unified-control-1.0.0.zip
-            COMPONENT-SHA256SUMS-1.0.0.txt
-            RELEASE-MANIFEST-1.0.0.json
+            WORDPRESS-ZIP-SHA256.txt
           if-no-files-found: error
           retention-days: 30
 
