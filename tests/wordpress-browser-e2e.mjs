@@ -20,6 +20,35 @@ if (!adminPassword) {
 
 await mkdir(artifactDir, { recursive: true });
 
+let ciFixtureUrlNormalized = false;
+if (
+  process.env.CI === 'true'
+  && /^http:\/\/127\.0\.0\.1(?::\d+)?$/.test(wpUrl)
+  && existsSync('/tmp/wp-cli.phar')
+  && existsSync('/tmp/prstudio-wp/wp-config.php')
+) {
+  const wpPath = '/tmp/prstudio-wp';
+  const runWpCli = (args) => {
+    const result = spawnSync('php', ['/tmp/wp-cli.phar', ...args, `--path=${wpPath}`], { encoding: 'utf8' });
+    if (result.status !== 0) {
+      throw new Error(`WP-CLI fixture normalization failed: ${args.join(' ')}: ${result.stderr || result.stdout}`);
+    }
+    return String(result.stdout || '').trim();
+  };
+  runWpCli(['option', 'update', 'home', wpUrl]);
+  runWpCli(['option', 'update', 'siteurl', wpUrl]);
+  runWpCli(['config', 'set', 'WP_HOME', wpUrl, '--type=constant']);
+  runWpCli(['config', 'set', 'WP_SITEURL', wpUrl, '--type=constant']);
+  const home = runWpCli(['option', 'get', 'home']);
+  const siteurl = runWpCli(['option', 'get', 'siteurl']);
+  const configHome = runWpCli(['config', 'get', 'WP_HOME', '--type=constant', '--format=json']).replace(/^"|"$/g, '');
+  const configSiteUrl = runWpCli(['config', 'get', 'WP_SITEURL', '--type=constant', '--format=json']).replace(/^"|"$/g, '');
+  if (home !== wpUrl || siteurl !== wpUrl || configHome !== wpUrl || configSiteUrl !== wpUrl) {
+    throw new Error(`WordPress CI fixture URL mismatch: ${JSON.stringify({ home, siteurl, configHome, configSiteUrl, expected: wpUrl })}`);
+  }
+  ciFixtureUrlNormalized = true;
+}
+
 const chromeCandidates = process.platform === 'darwin'
   ? ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome']
   : process.platform === 'win32'
@@ -224,6 +253,7 @@ const evidence = {
   device_name: deviceName,
   chrome_binary: chrome,
   chrome_binary_version: binaryVersion,
+  ci_fixture_url_normalized: ciFixtureUrlNormalized,
   steps: [],
 };
 
@@ -293,9 +323,6 @@ try {
   })()`);
   if (!loginResult?.submitted) throw new Error('Could not submit WordPress login form');
 
-  // The POST may legally land outside wp-admin depending on WordPress redirect filters.
-  // Prove authentication by entering a protected admin route with the browser session
-  // created by the real login form. A failed login is redirected back to wp-login.php.
   await sleep(750);
   await navigate(cdp, wpSessionId, adminUrl);
   await waitForExpression(
