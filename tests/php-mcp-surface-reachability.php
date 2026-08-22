@@ -44,10 +44,15 @@ $deadEndNames = array_values(array_diff($builtNames, $executableNames));
 
 $routableNames = array();
 $unroutableNames = array();
+$routeKinds = array();
 foreach ($hiddenNames as $name) {
     $route = PRSTUDIO_UC_Do::resolve(array('intent'=>$name, 'params'=>array()));
-    if (!is_wp_error($route) && (string)($route['tool'] ?? '') === $name && (string)($route['routing']['confidence'] ?? '') === 'canonical_tool') {
+    // A canonical name is reachable when the router resolves it to that exact
+    // executor. It may be an existing fast-path alias (for example gsc_sitemaps)
+    // or the generic canonical_tool branch; both are valid, non-dead-end routes.
+    if (!is_wp_error($route) && (string)($route['tool'] ?? '') === $name) {
         $routableNames[] = $name;
+        $routeKinds[$name] = (string)($route['routing']['confidence'] ?? 'exact');
     } else {
         $unroutableNames[] = $name;
     }
@@ -78,6 +83,7 @@ $report = array(
     'tools_list_approx_tokens' => (int)($budget['tokens'] ?? 0),
     'hidden_tools' => $hiddenNames,
     'routable_hidden_tools' => $routableNames,
+    'hidden_route_kinds' => $routeKinds,
     'unroutable_tools' => $unroutableNames,
     'non_executable_tools' => $deadEndNames,
     'advertised_not_executable' => $advertisedNotExecutable,
