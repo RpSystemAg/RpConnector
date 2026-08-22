@@ -11,10 +11,12 @@ test('browser execution cannot silently fall back to local Playwright/Python run
   assert.match(source, /richiede il Browser Agent Chrome associato/);
 });
 
-test('production Browser Agent is bootstrapped through Chrome-native runtime hardening', () => {
+test('production Browser Agent registers MV3 wake listeners through a synchronous static dependency', () => {
   const manifest = JSON.parse(read('prstudio-unified-browser-agent/manifest.json'));
   assert.equal(manifest.background?.service_worker, 'service-worker-bootstrap.js');
   const bootstrap = read('prstudio-unified-browser-agent/service-worker-bootstrap.js');
   assert.match(bootstrap, /installBrowserParityRuntime/);
-  assert.match(bootstrap, /import\('\.\/service-worker\.js'\)/);
+  assert.match(bootstrap, /import ['"]\.\/service-worker\.js['"];?/);
+  assert.doesNotMatch(bootstrap, /await\s+import\(['"]\.\/service-worker\.js['"]\)/);
+  assert.doesNotMatch(bootstrap, /import\(['"]\.\/service-worker\.js['"]\)/);
 });
