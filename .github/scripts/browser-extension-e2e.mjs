@@ -58,8 +58,14 @@ const runtimeCall = (tabId, payload, label, timeoutMs = 10000) => extEval(async 
         chrome.tabs.sendMessage(id, { channel: 'prstudio-page-runtime', ...body }),
         new Promise((_, reject) => setTimeout(() => reject(new Error('tabs_sendMessage_timeout')), 2500)),
       ]);
-      if (response?.ok) return response.result;
-      last = response || null;
+      if (response?.ok) {
+        const result = response.result;
+        const expectedUrlIncludes = String(body.expectedUrlIncludes || '');
+        if (!expectedUrlIncludes || String(result?.url || '').includes(expectedUrlIncludes)) return result;
+        last = { error: 'page_runtime_stale_document', expectedUrlIncludes, actualUrl: String(result?.url || '') };
+      } else {
+        last = response || null;
+      }
     } catch (error) {
       last = { error: String(error?.message || error) };
     }
@@ -67,6 +73,26 @@ const runtimeCall = (tabId, payload, label, timeoutMs = 10000) => extEval(async 
   }
   throw new Error(`page_runtime_unavailable:${JSON.stringify(last)}`);
 }, { tabId, payload, timeoutMs }, label, timeoutMs + 2000);
+
+const waitForReloadBoundary = async (tabId, marker, label, timeoutMs = 10000) => extEval(async ({ tabId: id, marker: expectedMarker, timeoutMs: bounded }) => {
+  const deadline = Date.now() + bounded;
+  let last = null;
+  while (Date.now() < deadline) {
+    try {
+      const rows = await chrome.scripting.executeScript({
+        target: { tabId: id, allFrames: false },
+        func: (value) => ({ marker: globalThis.__rpstudioReloadMarker || '', readyState: document.readyState, url: location.href, expected: value }),
+        args: [expectedMarker],
+      });
+      last = rows?.[0]?.result || null;
+      if (last && last.marker !== expectedMarker && last.readyState === 'complete') return last;
+    } catch (error) {
+      last = { error: String(error?.message || error) };
+    }
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
+  }
+  throw new Error(`reload_boundary_timeout:${JSON.stringify(last)}`);
+}, { tabId, marker, timeoutMs }, label, timeoutMs + 2000);
 
 const createControlledTab = async (url, label, active = false) => {
   const tab = await extEval(async ({ url: targetUrl, active: makeActive }) => {
@@ -77,7 +103,7 @@ const createControlledTab = async (url, label, active = false) => {
   }, { url, active }, `${label}_create`, 10000);
   record(`${label}_created`, Number.isInteger(tab.id), tab);
   controlledTabIds.push(tab.id);
-  const ping = await runtimeCall(tab.id, { kind: 'ping' }, `${label}_runtime_ping`, 12000);
+  const ping = await runtimeCall(tab.id, { kind: 'ping', expectedUrlIncludes: new URL(url).pathname }, `${label}_runtime_ping`, 12000);
   record(`${label}_page_runtime_ready`, ping?.pong === true && String(ping?.url || '').startsWith(baseUrl), { ping });
   return tab;
 };
@@ -123,14 +149,14 @@ try {
   }, [tabA.id, tabB.id, tabC.id], 'tabs_query');
   record('tabs_query_sees_all_controlled_tabs', queried.length === 3, { queried });
 
-  const ready = await runtimeCall(tabA.id, { kind: 'wait_ready', selector: '#parity-button', timeoutMs: 5000 }, 'tab_a_wait_ready', 7000);
+  const ready = await runtimeCall(tabA.id, { kind: 'wait_ready', selector: '#parity-button', timeoutMs: 5000, expectedUrlIncludes: 'parity-a.html' }, 'tab_a_wait_ready', 7000);
   record('wait_ready_real_page', ready?.ready === true && ready?.selectorReady === true, { ready });
 
-  const fill = await runtimeCall(tabA.id, { kind: 'dom_action', action: 'fill', args: { selector: '#parity-input', value: 'rpstudio-live' } }, 'tab_a_fill');
+  const fill = await runtimeCall(tabA.id, { kind: 'dom_action', action: 'fill', args: { selector: '#parity-input', value: 'rpstudio-live' }, expectedUrlIncludes: 'parity-a.html' }, 'tab_a_fill');
   record('fill_through_page_runtime', fill?.ok === true, { fill });
-  const click = await runtimeCall(tabA.id, { kind: 'dom_action', action: 'click', args: { selector: '#parity-button', clickCount: 1 } }, 'tab_a_click');
+  const click = await runtimeCall(tabA.id, { kind: 'dom_action', action: 'click', args: { selector: '#parity-button', clickCount: 1 }, expectedUrlIncludes: 'parity-a.html' }, 'tab_a_click');
   record('click_through_page_runtime', click?.ok === true, { click });
-  const read = await runtimeCall(tabA.id, { kind: 'read_value', selector: '#parity-input' }, 'tab_a_read_value');
+  const read = await runtimeCall(tabA.id, { kind: 'read_value', selector: '#parity-input', expectedUrlIncludes: 'parity-a.html' }, 'tab_a_read_value');
   record('read_value_after_fill', read?.supported === true && read?.value === 'rpstudio-live', { read });
 
   const scriptResult = await extEval(async (tabId) => {
@@ -140,7 +166,7 @@ try {
   record('chrome_scripting_observes_real_mutation', scriptResult?.value === 'rpstudio-live' && scriptResult?.clicked === 'yes', { scriptResult });
 
   await extEval(async (tabId) => chrome.tabs.update(tabId, { active: true }), tabC.id, 'tab_switch_to_c');
-  const backgroundFill = await runtimeCall(tabA.id, { kind: 'dom_action', action: 'fill', args: { selector: '#parity-input', value: 'background-controlled' } }, 'background_tab_fill');
+  const backgroundFill = await runtimeCall(tabA.id, { kind: 'dom_action', action: 'fill', args: { selector: '#parity-input', value: 'background-controlled' }, expectedUrlIncludes: 'parity-a.html' }, 'background_tab_fill');
   record('background_tab_remains_controllable', backgroundFill?.ok === true, { backgroundFill });
 
   const groupId = await extEval(async (ids) => chrome.tabs.group({ tabIds: ids }), [tabA.id, tabB.id, tabC.id], 'tab_group');
@@ -149,20 +175,27 @@ try {
   record('tab_group_roundtrip', true, { groupId });
 
   await extEval(async ({ id, url }) => { await chrome.tabs.update(id, { url }); return true; }, { id: tabA.id, url: `${baseUrl}/parity-b.html?nav=1` }, 'tab_a_navigate');
-  const navPing = await runtimeCall(tabA.id, { kind: 'ping' }, 'tab_a_after_navigation_ping', 12000);
+  const navPing = await runtimeCall(tabA.id, { kind: 'ping', expectedUrlIncludes: 'parity-b.html?nav=1' }, 'tab_a_after_navigation_ping', 12000);
   record('page_runtime_reconnects_after_navigation', navPing?.pong === true && String(navPing?.url || '').includes('parity-b.html'), { navPing });
 
-  await extEval(async (id) => { await chrome.tabs.reload(id); return true; }, tabA.id, 'tab_a_reload');
-  const reloadPing = await runtimeCall(tabA.id, { kind: 'ping' }, 'tab_a_after_reload_ping', 12000);
+  const reloadMarker = `reload-${Date.now()}-${Math.random()}`;
+  await extEval(async ({ id, marker }) => {
+    await chrome.scripting.executeScript({ target: { tabId: id, allFrames: false }, func: (value) => { globalThis.__rpstudioReloadMarker = value; return value; }, args: [marker] });
+    await chrome.tabs.reload(id);
+    return true;
+  }, { id: tabA.id, marker: reloadMarker }, 'tab_a_reload');
+  const reloadBoundary = await waitForReloadBoundary(tabA.id, reloadMarker, 'tab_a_reload_boundary', 12000);
+  record('real_reload_boundary_observed', reloadBoundary?.marker !== reloadMarker && reloadBoundary?.readyState === 'complete', { reloadBoundary });
+  const reloadPing = await runtimeCall(tabA.id, { kind: 'ping', expectedUrlIncludes: 'parity-b.html?nav=1' }, 'tab_a_after_reload_ping', 12000);
   record('page_runtime_reconnects_after_reload', reloadPing?.pong === true && String(reloadPing?.url || '').includes('parity-b.html'), { reloadPing });
 
   await extEval(async ({ id, url }) => { await chrome.tabs.update(id, { url }); return true; }, { id: tabA.id, url: `${baseUrl}/parity-c.html?history=1` }, 'tab_a_second_navigation');
-  await runtimeCall(tabA.id, { kind: 'ping' }, 'tab_a_second_navigation_ping', 12000);
+  await runtimeCall(tabA.id, { kind: 'ping', expectedUrlIncludes: 'parity-c.html?history=1' }, 'tab_a_second_navigation_ping', 12000);
   await extEval(async (id) => { await chrome.tabs.goBack(id); return true; }, tabA.id, 'tab_a_go_back');
-  const backPing = await runtimeCall(tabA.id, { kind: 'ping' }, 'tab_a_after_back_ping', 12000);
+  const backPing = await runtimeCall(tabA.id, { kind: 'ping', expectedUrlIncludes: 'parity-b.html?nav=1' }, 'tab_a_after_back_ping', 12000);
   record('tab_go_back_keeps_runtime', backPing?.pong === true && String(backPing?.url || '').includes('parity-b.html'), { backPing });
   await extEval(async (id) => { await chrome.tabs.goForward(id); return true; }, tabA.id, 'tab_a_go_forward');
-  const forwardPing = await runtimeCall(tabA.id, { kind: 'ping' }, 'tab_a_after_forward_ping', 12000);
+  const forwardPing = await runtimeCall(tabA.id, { kind: 'ping', expectedUrlIncludes: 'parity-c.html?history=1' }, 'tab_a_after_forward_ping', 12000);
   record('tab_go_forward_keeps_runtime', forwardPing?.pong === true && String(forwardPing?.url || '').includes('parity-c.html'), { forwardPing });
 
   await extEval(async (tabId) => chrome.tabs.update(tabId, { active: true }), tabC.id, 'tab_c_activate_for_capture');
@@ -214,7 +247,7 @@ try {
   }, null, 'status_after_worker_restart', 12000);
   record('worker_accepts_messages_after_restart', Boolean(postRestartStatus), { status_keys: Object.keys(postRestartStatus || {}).slice(0, 20) });
 
-  const postRestartPing = await runtimeCall(tabC.id, { kind: 'ping' }, 'existing_tab_after_worker_restart_ping', 12000);
+  const postRestartPing = await runtimeCall(tabC.id, { kind: 'ping', expectedUrlIncludes: 'parity-c.html' }, 'existing_tab_after_worker_restart_ping', 12000);
   record('existing_page_runtime_survives_worker_restart', postRestartPing?.pong === true, { postRestartPing });
   const healthAfterRestart = await extEval(async () => chrome.runtime.sendMessage({ type: 'local_page_health' }), null, 'local_health_after_worker_restart', 15000);
   record('service_worker_pipeline_recovers_after_restart', healthAfterRestart?.ok === true, { healthAfterRestart });
@@ -225,11 +258,11 @@ try {
     try { await chrome.tabs.get(id); return { exists: true }; } catch (error) { return { exists: false, error: String(error?.message || error) }; }
   }, tabB.id, 'tab_b_verify_closed');
   record('closed_tab_is_really_gone', closedState.exists === false, closedState);
-  const survivorPing = await runtimeCall(tabC.id, { kind: 'ping' }, 'survivor_tab_ping');
+  const survivorPing = await runtimeCall(tabC.id, { kind: 'ping', expectedUrlIncludes: 'parity-c.html' }, 'survivor_tab_ping');
   record('closing_one_tab_does_not_break_others', survivorPing?.pong === true, { survivorPing });
 
   const replacement = await createControlledTab(`${baseUrl}/parity-a.html?replacement=1`, 'replacement_tab', false);
-  const replacementRead = await runtimeCall(replacement.id, { kind: 'dom_action', action: 'extract_text', args: { selector: '#parity-content' } }, 'replacement_tab_extract');
+  const replacementRead = await runtimeCall(replacement.id, { kind: 'dom_action', action: 'extract_text', args: { selector: '#parity-content' }, expectedUrlIncludes: 'parity-a.html?replacement=1' }, 'replacement_tab_extract');
   record('can_open_and_control_new_tab_after_close_restart', replacementRead?.ok === true && String(replacementRead?.text || '').includes('persistent browser control surface'), { replacementRead });
 
   const finalTabs = await extEval(async (ids) => Promise.all(ids.map(async (id) => {
