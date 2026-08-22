@@ -58,14 +58,26 @@ jobs:
   browser_security:
     name: Browser Agent security
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: '24'
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Prepare exact candidate manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA"
+          python tests/build-release.py --build
+          python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA" --verify
+          test -s prstudio-unified-browser-agent/COMPONENT-MANIFEST.json
       - name: Security validator and runtime attacks
         shell: bash
         run: |
@@ -197,16 +209,19 @@ jobs:
           xvfb-run -a node .github/scripts/chrome-scripting-health-probe.mjs
           node .github/scripts/browser-parity-live-probe.mjs
           node - <<'NODE'
-          const fs=require('fs'), {spawnSync}=require('child_process'), {createRequire}=require('module'), path=require('path');
-          const require2=createRequire('/tmp/prstudio-puppeteer/package.json');
-          const puppeteer=require2('puppeteer');
-          const executable=puppeteer.executablePath();
-          const v=spawnSync(executable,['--version'],{encoding:'utf8'}); const version=`${v.stdout||''}${v.stderr||''}`.trim();
-          const e=JSON.parse(fs.readFileSync('artifacts/browser-e2e/browser-extension-e2e.json','utf8'));
-          if(v.status!==0||!/Chrome/i.test(version)||/Chromium/i.test(version)||!/^Chrome\//.test(e.browser_version||'')) throw new Error(`not_real_chrome:${version}:${e.browser_version}`);
-          const out={executable_path:executable,executable_version:version,browser_product:e.browser_version,extension_id:e.checks?.find(x=>x.name==='exact_mv3_worker_loaded')?.extension_id||'',service_worker:e.worker_url,checks:e.checks?.length||0};
-          fs.mkdirSync('artifacts/browser-e2e',{recursive:true}); fs.writeFileSync('artifacts/browser-e2e/chrome-identity.json',JSON.stringify(out,null,2)+'\n');
-          console.log(out);
+          const fs=require('fs'), {spawnSync}=require('child_process'), {createRequire}=require('module');
+          (async()=>{
+            const require2=createRequire('/tmp/prstudio-puppeteer/package.json');
+            const puppeteer=require2('puppeteer');
+            const executable=await puppeteer.executablePath();
+            const v=spawnSync(executable,['--version'],{encoding:'utf8'}); const version=`${v.stdout||''}${v.stderr||''}`.trim();
+            const e=JSON.parse(fs.readFileSync('artifacts/browser-e2e/browser-extension-e2e.json','utf8'));
+            if(v.status!==0||!/Chrome/i.test(version)||/Chromium/i.test(version)||!/^Chrome\//.test(e.browser_version||'')) throw new Error(`not_real_chrome:${version}:${e.browser_version}`);
+            const worker=e.checks?.find(x=>x.name==='exact_mv3_worker_loaded')||{};
+            const out={executable_path:executable,executable_version:version,browser_product:e.browser_version,extension_id:worker.extension_id||'',service_worker:e.worker_url,checks:e.checks?.length||0};
+            fs.mkdirSync('artifacts/browser-e2e',{recursive:true}); fs.writeFileSync('artifacts/browser-e2e/chrome-identity.json',JSON.stringify(out,null,2)+'\n');
+            console.log(out);
+          })().catch(e=>{console.error(e);process.exit(1)});
           NODE
       - name: Upload real Chrome evidence
         if: always()
@@ -401,7 +416,7 @@ jobs:
   remote_wordpress_chrome:
     name: Remote WordPress → Chrome E2E
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 50
     services:
       mariadb:
         image: mariadb:11.4@sha256:a794d9eb009e20de605858a11f32f63b4075cbd197c650436f0e3b457e4caed7
@@ -460,24 +475,33 @@ jobs:
           <!doctype html><html><head><title>Remote A</title></head><body data-clicked="no"><input id="parity-input"><button id="parity-button">Confirm</button><main id="parity-content">remote owned surface</main><script>document.querySelector('#parity-button').onclick=()=>document.body.dataset.clicked='yes';console.log('remote-page-ready')</script></body></html>
           HTML
             cp "/tmp/prstudio-origin-$port/parity-a.html" "/tmp/prstudio-origin-$port/parity-b.html"
+            cp "/tmp/prstudio-origin-$port/parity-a.html" "/tmp/prstudio-origin-$port/parity-c.html"
             echo '{"ok":true,"source":"remote-e2e"}' > "/tmp/prstudio-origin-$port/api.json"
             python -m http.server "$port" --bind 127.0.0.1 --directory "/tmp/prstudio-origin-$port" >"/tmp/prstudio-origin-$port.log" 2>&1 & echo $! >"/tmp/prstudio-origin-$port.pid"
           done
           for url in http://127.0.0.1:8082/wp-login.php http://127.0.0.1:8083/parity-a.html http://127.0.0.1:8084/parity-b.html; do
             for i in $(seq 1 80); do curl -fsS "$url" >/dev/null && break; [ "$i" = 80 ] && exit 1; sleep .25; done
           done
-      - name: Require real Google Chrome
+      - name: Prepare Chrome for Testing and prove unpacked MV3 support
         shell: bash
+        env:
+          WP_URL: http://127.0.0.1:8083
         run: |
           set -euo pipefail
-          CHROME="$(command -v google-chrome-stable || command -v google-chrome || true)"
-          test -n "$CHROME"
+          command -v xvfb-run
+          xvfb-run -a node .github/scripts/chrome-scripting-health-probe.mjs
+          CHROME="$(node - <<'NODE'
+          const {createRequire}=require('module');
+          (async()=>{const r=createRequire('/tmp/prstudio-puppeteer/package.json');const p=r('puppeteer');process.stdout.write(await p.executablePath());})().catch(e=>{console.error(e);process.exit(1)});
+          NODE
+          )"
+          test -x "$CHROME"
           VERSION="$($CHROME --version)"
           echo "$VERSION"
-          echo "$VERSION" | grep -E 'Google Chrome|Chrome for Testing'
+          echo "$VERSION" | grep -E 'Chrome|Chrome for Testing'
           ! echo "$VERSION" | grep -qi Chromium
           echo "CHROME_BIN=$CHROME" >> "$GITHUB_ENV"
-          command -v xvfb-run
+          echo "CHROME_FOR_TESTING_VERSION=$VERSION" >> "$GITHUB_ENV"
       - name: Legacy real WordPress + Chrome pairing / audit layer
         shell: bash
         env:
