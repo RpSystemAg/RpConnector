@@ -250,7 +250,9 @@ try {
   evidence.extension_id = extensionId;
   pass('Browser Agent MV3 bootstrap extension loaded', { message: `extension ${extensionId.slice(0, 8)}…` });
 
-  const wpTarget = await cdp.send('Target.createTarget', { url: `${wpUrl}/wp-login.php` });
+  const adminUrl = `${wpUrl}/wp-admin/`;
+  const loginUrl = `${wpUrl}/wp-login.php?redirect_to=${encodeURIComponent(adminUrl)}&reauth=1`;
+  const wpTarget = await cdp.send('Target.createTarget', { url: loginUrl });
   wpTargetId = wpTarget.targetId;
   wpSessionId = await attachPage(cdp, wpTargetId);
   await waitForExpression(
@@ -270,22 +272,40 @@ try {
     const user = document.querySelector('#user_login');
     const pass = document.querySelector('#user_pass');
     const submit = document.querySelector('#wp-submit');
-    if (!user || !pass || !submit) return false;
+    const form = submit?.form;
+    if (!user || !pass || !submit || !form) return { submitted: false };
     user.value = ${JSON.stringify(adminUser)};
     pass.value = ${JSON.stringify(adminPassword)};
     user.dispatchEvent(new Event('input', { bubbles: true }));
     pass.dispatchEvent(new Event('input', { bubbles: true }));
-    submit.click();
-    return true;
+    const redirect = form.querySelector('input[name="redirect_to"]');
+    if (redirect) redirect.value = ${JSON.stringify(`${wpUrl}/wp-admin/`)};
+    if (typeof form.requestSubmit === 'function') form.requestSubmit(submit);
+    else form.submit();
+    return { submitted: true, redirect: redirect?.value || '' };
   })()`);
-  if (!loginResult) throw new Error('Could not submit WordPress login form');
+  if (!loginResult?.submitted) throw new Error('Could not submit WordPress login form');
+
+  // The POST may legally land outside wp-admin depending on WordPress redirect filters.
+  // Prove authentication by entering a protected admin route with the browser session
+  // created by the real login form. A failed login is redirected back to wp-login.php.
+  await sleep(750);
+  await navigate(cdp, wpSessionId, adminUrl);
   await waitForExpression(
     cdp,
     wpSessionId,
-    `location.pathname.startsWith('/wp-admin/') && !location.pathname.endsWith('/wp-login.php')`,
+    `location.pathname.startsWith('/wp-admin/')
+      && !location.pathname.endsWith('/wp-login.php')
+      && document.body?.classList?.contains('wp-admin')
+      && !document.querySelector('#loginform')`,
     'authenticated WordPress admin',
     20000,
   );
+  evidence.wordpress_login = {
+    form_submitted: true,
+    requested_redirect: loginResult.redirect || adminUrl,
+    protected_admin_verified: true,
+  };
   pass('WordPress admin login completed through Chrome');
 
   const pluginAdminUrl = `${wpUrl}/wp-admin/tools.php?page=prstudio-unified-browser`;
@@ -449,6 +469,19 @@ try {
     stack: error?.stack || '',
   };
   evidence.finished_at = new Date().toISOString();
+
+  if (cdp && wpSessionId) {
+    try {
+      evidence.wordpress_failure_state = await evaluate(cdp, wpSessionId, `(() => ({
+        href: location.href,
+        pathname: location.pathname,
+        title: document.title,
+        login_error: document.querySelector('#login_error')?.textContent?.replace(/\\s+/g, ' ').trim() || '',
+        has_login_form: Boolean(document.querySelector('#loginform')),
+        is_wp_admin: Boolean(document.body?.classList?.contains('wp-admin')),
+      }))()`);
+    } catch {}
+  }
 
   for (const [sessionId, name] of [
     [wpSessionId, 'failure-wordpress.png'],
