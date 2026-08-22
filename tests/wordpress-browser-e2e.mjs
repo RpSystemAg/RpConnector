@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -20,6 +20,35 @@ if (!adminPassword) {
 
 await mkdir(artifactDir, { recursive: true });
 
+let ciFixtureUrlNormalized = false;
+if (
+  process.env.CI === 'true'
+  && /^http:\/\/127\.0\.0\.1(?::\d+)?$/.test(wpUrl)
+  && existsSync('/tmp/wp-cli.phar')
+  && existsSync('/tmp/prstudio-wp/wp-config.php')
+) {
+  const wpPath = '/tmp/prstudio-wp';
+  const runWpCli = (args) => {
+    const result = spawnSync('php', ['/tmp/wp-cli.phar', ...args, `--path=${wpPath}`], { encoding: 'utf8' });
+    if (result.status !== 0) {
+      throw new Error(`WP-CLI fixture normalization failed: ${args.join(' ')}: ${result.stderr || result.stdout}`);
+    }
+    return String(result.stdout || '').trim();
+  };
+  runWpCli(['option', 'update', 'home', wpUrl]);
+  runWpCli(['option', 'update', 'siteurl', wpUrl]);
+  runWpCli(['config', 'set', 'WP_HOME', wpUrl, '--type=constant']);
+  runWpCli(['config', 'set', 'WP_SITEURL', wpUrl, '--type=constant']);
+  const home = runWpCli(['option', 'get', 'home']);
+  const siteurl = runWpCli(['option', 'get', 'siteurl']);
+  const configHome = JSON.parse(runWpCli(['config', 'get', 'WP_HOME', '--type=constant', '--format=json']));
+  const configSiteUrl = JSON.parse(runWpCli(['config', 'get', 'WP_SITEURL', '--type=constant', '--format=json']));
+  if (home !== wpUrl || siteurl !== wpUrl || configHome !== wpUrl || configSiteUrl !== wpUrl) {
+    throw new Error(`WordPress CI fixture URL mismatch: ${JSON.stringify({ home, siteurl, configHome, configSiteUrl, expected: wpUrl })}`);
+  }
+  ciFixtureUrlNormalized = true;
+}
+
 const chromeCandidates = process.platform === 'darwin'
   ? ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome']
   : process.platform === 'win32'
@@ -30,15 +59,19 @@ const chromeCandidates = process.platform === 'darwin'
       ]
     : [
         process.env.CHROME_BIN,
-        '/usr/bin/google-chrome',
         '/usr/bin/google-chrome-stable',
-        '/usr/bin/chromium',
-        '/usr/bin/chromium-browser',
+        '/usr/bin/google-chrome',
       ];
 
 const chrome = chromeCandidates.filter(Boolean).find((candidate) => existsSync(candidate));
 if (!chrome) {
-  console.error('FAIL real Chrome/Chromium binary not found');
+  console.error('FAIL real Google Chrome binary not found');
+  process.exit(2);
+}
+const versionProbe = spawnSync(chrome, ['--version'], { encoding: 'utf8' });
+const binaryVersion = `${versionProbe.stdout || ''}${versionProbe.stderr || ''}`.trim();
+if (versionProbe.status !== 0 || !/Google Chrome|Chrome for Testing/i.test(binaryVersion) || /Chromium/i.test(binaryVersion)) {
+  console.error(`FAIL certification requires Google Chrome/Chrome for Testing: ${binaryVersion}`);
   process.exit(2);
 }
 if (!existsSync(extensionDir)) {
@@ -204,13 +237,13 @@ async function findExtensionId(cdp) {
     const worker = lastTargets.find((target) =>
       target.type === 'service_worker'
       && String(target.url || '').startsWith('chrome-extension://')
-      && String(target.url || '').endsWith('/service-worker.js'));
+      && String(target.url || '').endsWith('/service-worker-bootstrap.js'));
     if (worker) {
       return String(worker.url).split('/')[2];
     }
     await sleep(200);
   }
-  throw new Error(`Browser Agent service worker not observed; targets=${JSON.stringify(lastTargets)}`);
+  throw new Error(`Browser Agent MV3 bootstrap service worker not observed; targets=${JSON.stringify(lastTargets)}`);
 }
 
 const evidence = {
@@ -219,6 +252,8 @@ const evidence = {
   wp_url: wpUrl,
   device_name: deviceName,
   chrome_binary: chrome,
+  chrome_binary_version: binaryVersion,
+  ci_fixture_url_normalized: ciFixtureUrlNormalized,
   steps: [],
 };
 
@@ -235,14 +270,19 @@ function pass(step, detail = {}) {
 try {
   const version = await waitForChromeVersion();
   evidence.chrome_version = version.Browser || '';
+  if (!/Chrome\//.test(evidence.chrome_version) || /Chromium/i.test(evidence.chrome_version)) {
+    throw new Error(`Certification browser is not Google Chrome: ${evidence.chrome_version}`);
+  }
   cdp = new Cdp(version.webSocketDebuggerUrl);
-  pass('real Chrome started', { message: evidence.chrome_version });
+  pass('real Google Chrome started', { message: `${binaryVersion} / ${evidence.chrome_version}` });
 
   const extensionId = await findExtensionId(cdp);
   evidence.extension_id = extensionId;
-  pass('Browser Agent extension loaded', { message: `extension ${extensionId.slice(0, 8)}…` });
+  pass('Browser Agent MV3 bootstrap extension loaded', { message: `extension ${extensionId.slice(0, 8)}…` });
 
-  const wpTarget = await cdp.send('Target.createTarget', { url: `${wpUrl}/wp-login.php` });
+  const adminUrl = `${wpUrl}/wp-admin/`;
+  const loginUrl = `${wpUrl}/wp-login.php?redirect_to=${encodeURIComponent(adminUrl)}&reauth=1`;
+  const wpTarget = await cdp.send('Target.createTarget', { url: loginUrl });
   wpTargetId = wpTarget.targetId;
   wpSessionId = await attachPage(cdp, wpTargetId);
   await waitForExpression(
@@ -262,22 +302,46 @@ try {
     const user = document.querySelector('#user_login');
     const pass = document.querySelector('#user_pass');
     const submit = document.querySelector('#wp-submit');
-    if (!user || !pass || !submit) return false;
+    const form = submit?.form;
+    if (!user || !pass || !submit || !form) return { submitted: false };
+    const originalAction = form.action;
+    form.action = ${JSON.stringify(`${wpUrl}/wp-login.php`)};
     user.value = ${JSON.stringify(adminUser)};
     pass.value = ${JSON.stringify(adminPassword)};
     user.dispatchEvent(new Event('input', { bubbles: true }));
     pass.dispatchEvent(new Event('input', { bubbles: true }));
-    submit.click();
-    return true;
+    const redirect = form.querySelector('input[name="redirect_to"]');
+    if (redirect) redirect.value = ${JSON.stringify(`${wpUrl}/wp-admin/`)};
+    if (typeof form.requestSubmit === 'function') form.requestSubmit(submit);
+    else form.submit();
+    return {
+      submitted: true,
+      original_action: originalAction,
+      effective_action: ${JSON.stringify(`${wpUrl}/wp-login.php`)},
+      redirect: redirect?.value || '',
+    };
   })()`);
-  if (!loginResult) throw new Error('Could not submit WordPress login form');
+  if (!loginResult?.submitted) throw new Error('Could not submit WordPress login form');
+
+  await sleep(750);
+  await navigate(cdp, wpSessionId, adminUrl);
   await waitForExpression(
     cdp,
     wpSessionId,
-    `location.pathname.startsWith('/wp-admin/') && !location.pathname.endsWith('/wp-login.php')`,
+    `location.pathname.startsWith('/wp-admin/')
+      && !location.pathname.endsWith('/wp-login.php')
+      && document.body?.classList?.contains('wp-admin')
+      && !document.querySelector('#loginform')`,
     'authenticated WordPress admin',
     20000,
   );
+  evidence.wordpress_login = {
+    form_submitted: true,
+    original_action: loginResult.original_action || '',
+    effective_action: loginResult.effective_action || '',
+    requested_redirect: loginResult.redirect || adminUrl,
+    protected_admin_verified: true,
+  };
   pass('WordPress admin login completed through Chrome');
 
   const pluginAdminUrl = `${wpUrl}/wp-admin/tools.php?page=prstudio-unified-browser`;
@@ -417,11 +481,13 @@ try {
   await screenshot(cdp, extensionSessionId, '04-browser-agent-audit.png');
   pass('Browser Agent executed a real audit against WordPress', { message: auditMessage });
 
-  // P32 intentionally does not expose device/session history in wp-admin. The
-  // workflow's independent WordPress oracle verifies the paired device in the
-  // Store after this script returns; here we prove the UI stays pairing-only.
   await cdp.send('Target.activateTarget', { targetId: wpTargetId });
-  await navigate(cdp, wpSessionId, pluginAdminUrl);
+  const currentAdminHref = await evaluate(cdp, wpSessionId, 'location.href');
+  if (currentAdminHref !== pluginAdminUrl) {
+    await navigate(cdp, wpSessionId, pluginAdminUrl);
+  } else {
+    await waitForExpression(cdp, wpSessionId, 'document.readyState === "complete"', 'paired WordPress admin remains loaded', 10000);
+  }
   const adminAfterPair = await evaluate(cdp, wpSessionId, `(() => ({
     title: document.querySelector('.prstudio-connect h1')?.textContent?.trim() || '',
     hasDeviceGrid: Boolean(document.querySelector('table.prstudio-grid')),
@@ -430,20 +496,37 @@ try {
   if (!adminAfterPair?.title?.startsWith('PR STUDIO — Collegamenti') || adminAfterPair.hasDeviceGrid || /Browser collegati|Cronologia dispositivi revocati|Attività recenti/.test(adminAfterPair.text || '')) {
     throw new Error(`P32 admin exposed operational history after pairing: ${JSON.stringify(adminAfterPair)}`);
   }
-  evidence.wordpress_admin_after_pair = { title: adminAfterPair.title, history_visible: false };
+  evidence.wordpress_admin_after_pair = {
+    title: adminAfterPair.title,
+    history_visible: false,
+    reused_existing_page: currentAdminHref === pluginAdminUrl,
+  };
   await screenshot(cdp, wpSessionId, '05-wordpress-pairing-only.png');
   pass('WordPress admin remains pairing-only after Chrome connection');
 
   evidence.ok = true;
   evidence.finished_at = new Date().toISOString();
   await writeFile(join(artifactDir, 'evidence.json'), JSON.stringify(evidence, null, 2));
-  console.log('PASS real WordPress + Chrome + Browser Agent end-to-end');
+  console.log('PASS real WordPress + Google Chrome + Browser Agent end-to-end');
 } catch (error) {
   evidence.error = {
     message: error?.message || String(error),
     stack: error?.stack || '',
   };
   evidence.finished_at = new Date().toISOString();
+
+  if (cdp && wpSessionId) {
+    try {
+      evidence.wordpress_failure_state = await evaluate(cdp, wpSessionId, `(() => ({
+        href: location.href,
+        pathname: location.pathname,
+        title: document.title,
+        login_error: document.querySelector('#login_error')?.textContent?.replace(/\\s+/g, ' ').trim() || '',
+        has_login_form: Boolean(document.querySelector('#loginform')),
+        is_wp_admin: Boolean(document.body?.classList?.contains('wp-admin')),
+      }))()`);
+    } catch {}
+  }
 
   for (const [sessionId, name] of [
     [wpSessionId, 'failure-wordpress.png'],

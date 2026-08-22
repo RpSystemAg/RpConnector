@@ -1,4 +1,5 @@
 const MAX_SEQUENCE_EVENTS = 200;
+const POINTER_SETTLE_MS = 16;
 
 const MODIFIER_BITS = Object.freeze({
   alt: 1,
@@ -91,6 +92,10 @@ function requiredDragPoint(value) {
   return { x, y };
 }
 
+function mouseParams(params = {}) {
+  return { ...params, pointerType: "mouse" };
+}
+
 export function modifierMask(input = []) {
   const values = Array.isArray(input) ? input : (typeof input === "string" ? input.split(/[+\s,]+/) : []);
   return values.reduce((mask, name) => {
@@ -145,35 +150,41 @@ export function pointerSequence(events = []) {
     const delayMs = boundedDelay(event.delayMs ?? event.delay_ms);
     if (type === "move" || type === "hover") {
       current = { ...current, x, y };
-      commands.push({ method: "Input.dispatchMouseEvent", params: { type: "mouseMoved", x, y, button: "none", buttons: current.buttons, modifiers }, delayMs });
+      commands.push({ method: "Input.dispatchMouseEvent", params: mouseParams({ type: "mouseMoved", x, y, button: "none", buttons: current.buttons, modifiers }), delayMs });
     } else if (type === "down") {
       if (current.buttons) throw new Error("pointer_event_invalid:button_state");
       const button = normalizedMouseButton(event.button);
       const buttons = MOUSE_BUTTON_BITS[button];
       const clickCount = normalizedClickCount(event.clickCount);
       current = { x, y, button, buttons };
-      commands.push({ method: "Input.dispatchMouseEvent", params: { type: "mousePressed", x, y, button, buttons, clickCount, modifiers }, delayMs });
+      commands.push({ method: "Input.dispatchMouseEvent", params: mouseParams({ type: "mousePressed", x, y, button, buttons, clickCount, modifiers }), delayMs });
     } else if (type === "up") {
       const button = normalizedMouseButton(event.button, current.button !== "none" ? current.button : "left");
       if (current.buttons && button !== current.button) throw new Error("pointer_event_invalid:button_state");
       const clickCount = normalizedClickCount(event.clickCount);
-      commands.push({ method: "Input.dispatchMouseEvent", params: { type: "mouseReleased", x, y, button, buttons: 0, clickCount, modifiers }, delayMs });
+      commands.push({ method: "Input.dispatchMouseEvent", params: mouseParams({ type: "mouseReleased", x, y, button, buttons: 0, clickCount, modifiers }), delayMs });
       current = { x, y, button: "none", buttons: 0 };
     } else if (type === "click" || type === "doubleclick") {
       if (current.buttons) throw new Error("pointer_event_invalid:button_state");
       const button = normalizedMouseButton(event.button);
       const clickCount = type === "click" ? normalizedClickCount(event.clickCount) : 2;
       const buttons = MOUSE_BUTTON_BITS[button];
-      commands.push({ method: "Input.dispatchMouseEvent", params: { type: "mouseMoved", x, y, button: "none", buttons: 0, modifiers }, delayMs: 0 });
-      commands.push({ method: "Input.dispatchMouseEvent", params: { type: "mousePressed", x, y, button, buttons, clickCount, modifiers }, delayMs: 0 });
-      commands.push({ method: "Input.dispatchMouseEvent", params: { type: "mouseReleased", x, y, button, buttons: 0, clickCount, modifiers }, delayMs });
+      // Chrome's Input domain is asynchronous with compositor hit-testing. A
+      // zero-gap move/press/release sequence can be acknowledged by CDP before
+      // the pointer has been committed to the target surface, especially on a
+      // newly created/background tab. Yield one frame between move and press,
+      // and between press and release. This preserves one physical click while
+      // making the browser engine, not a DOM fallback, authoritative.
+      commands.push({ method: "Input.dispatchMouseEvent", params: mouseParams({ type: "mouseMoved", x, y, button: "none", buttons: 0, modifiers }), delayMs: POINTER_SETTLE_MS });
+      commands.push({ method: "Input.dispatchMouseEvent", params: mouseParams({ type: "mousePressed", x, y, button, buttons, clickCount, modifiers }), delayMs: POINTER_SETTLE_MS });
+      commands.push({ method: "Input.dispatchMouseEvent", params: mouseParams({ type: "mouseReleased", x, y, button, buttons: 0, clickCount, modifiers }), delayMs });
     } else if (type === "wheel" || type === "scroll") {
       const deltaXSource = event.deltaX ?? event.delta_x;
       const deltaYSource = event.deltaY ?? event.delta_y;
       const deltaX = deltaXSource === undefined ? 0 : finite(deltaXSource, Number.NaN);
       const deltaY = deltaYSource === undefined ? 0 : finite(deltaYSource, Number.NaN);
       if (!Number.isFinite(deltaX) || !Number.isFinite(deltaY)) throw new Error("pointer_event_invalid:wheel_delta");
-      commands.push({ method: "Input.dispatchMouseEvent", params: { type: "mouseWheel", x, y, deltaX, deltaY, modifiers }, delayMs });
+      commands.push({ method: "Input.dispatchMouseEvent", params: mouseParams({ type: "mouseWheel", x, y, deltaX, deltaY, modifiers }), delayMs });
     } else if (["touchstart", "touchmove", "touchend"].includes(type)) {
       const cdpType = type === "touchstart" ? "touchStart" : type === "touchmove" ? "touchMove" : "touchEnd";
       const radiusX = finiteField(event, "radiusX", 1, "pointer_event_invalid:touch_radius");
@@ -244,4 +255,4 @@ export function keyboardSequence(events = []) {
   return commands;
 }
 
-export const NATIVE_INPUT_LIMITS = Object.freeze({ maxSequenceEvents: MAX_SEQUENCE_EVENTS });
+export const NATIVE_INPUT_LIMITS = Object.freeze({ maxSequenceEvents: MAX_SEQUENCE_EVENTS, pointerSettleMs: POINTER_SETTLE_MS });

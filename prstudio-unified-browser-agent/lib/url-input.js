@@ -54,6 +54,10 @@ const HOST_AND_PORT = /^[a-z][a-z0-9+.-]*:\d{1,5}(?:[/?#]|$)/i;
  */
 const BARE_AUTHORITY = /^(?:[^\s/?#@:]+(?:\.[^\s/?#@:]+)+|localhost|[^\s/?#@:]+:\d{1,5})(?::\d{1,5})?(?:[/?#]\S*)?$/i;
 
+/** A hostname must contain at least one letter or digit; punctuation-only
+ * authorities such as "." or "..." are not meaningful navigation targets. */
+const HOST_HAS_LABEL_DATA = /[a-z0-9]/i;
+
 /**
  * Turn user input into a parsed URL, supplying https:// when the scheme is the
  * only thing missing.
@@ -81,9 +85,10 @@ export function parseUserUrl(value) {
 
   try {
     const url = new URL(`https://${candidate}`);
-    // A host that survives the regex but produces an empty hostname is not a
-    // host. Cheap, and it keeps a malformed authority from becoming a URL.
-    return url.hostname ? { url, coerced: true } : null;
+    // A host that survives the regex but produces an empty or punctuation-only
+    // hostname is not a host. This closes values such as "..." which WHAT IT
+    // DELIBERATELY DOES NOT DO promises not to guess into a website.
+    return url.hostname && HOST_HAS_LABEL_DATA.test(url.hostname) ? { url, coerced: true } : null;
   } catch {
     return null;
   }

@@ -8,6 +8,9 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'PRSTUDIO_UC_TESTING' ) ) { exit; }
 final class PRSTUDIO_UC_Browser_Protocol {
     public const EXECUTOR_PROTOCOL = '3.0.0';
     public const ACCEPTED_EXECUTOR_PROTOCOLS = array('3.0.0','4.0.0');
+    public const REQUIRED_AGENT_PRODUCT_VERSION = '1.0.0';
+    public const REQUIRED_GSC_DIMENSION_SESSION_VERSION = '4.0.0';
+    public const REQUIRED_CAPABILITY_CONTRACT_SHA256 = '1358fb18e4e3b36cefbd4c0aca4f5a061f07b896f089f8a1962567c07b1157c5';
 
     private static function nonnegative_int( $value ): ?int {
         if ( is_int( $value ) ) {
@@ -42,6 +45,24 @@ final class PRSTUDIO_UC_Browser_Protocol {
         return null;
     }
 
+    private static function bound_build_identity( array $capabilities ): array {
+        $build = sanitize_text_field( (string) ( $capabilities['agentBuild'] ?? $capabilities['agent_build'] ?? '' ) );
+        $timestamp = sanitize_text_field( (string) ( $capabilities['buildTimestamp'] ?? $capabilities['build_timestamp'] ?? '' ) );
+        $suite = sanitize_text_field( (string) ( $capabilities['suiteVersion'] ?? $capabilities['suite_version'] ?? $capabilities['componentVersion'] ?? '' ) );
+        $build_ok = 1 === preg_match( '/^prstudio-browser-1\.0\.0\+git\.[0-9a-f]{12}$/', $build );
+        $timestamp_ok = '' !== $timestamp && 'UNSTAMPED' !== strtoupper( $timestamp ) && false !== strtotime( $timestamp );
+        $suite_ok = hash_equals( self::REQUIRED_AGENT_PRODUCT_VERSION, $suite );
+        return array(
+            'ok' => $build_ok && $timestamp_ok && $suite_ok,
+            'build_id' => $build,
+            'build_id_bound' => $build_ok,
+            'build_timestamp' => $timestamp,
+            'build_timestamp_bound' => $timestamp_ok,
+            'suite_version' => $suite,
+            'suite_version_match' => $suite_ok,
+        );
+    }
+
     public static function compatibility( array $capabilities ): array {
         $executor_value = $capabilities['executorProtocolVersion'] ?? $capabilities['executor_protocol_version'] ?? '';
         $executor = is_string( $executor_value ) ? sanitize_text_field( $executor_value ) : '';
@@ -55,18 +76,39 @@ final class PRSTUDIO_UC_Browser_Protocol {
             $catalog_exposed = self::boolean_flag( $catalog_value );
             $catalog_valid = ! $catalog_present || null !== $catalog_exposed;
             if ( null === $catalog_exposed ) { $catalog_exposed = false; }
+
+            $capability_hash = strtolower( sanitize_text_field( (string) ( $capabilities['capabilityHash'] ?? $capabilities['capability_hash'] ?? '' ) ) );
+            $capability_hash_match = '' !== $capability_hash && hash_equals( self::REQUIRED_CAPABILITY_CONTRACT_SHA256, $capability_hash );
+            $gsc_session = sanitize_text_field( (string) ( $capabilities['gscDimensionSessionVersion'] ?? $capabilities['gsc_dimension_session_version'] ?? '' ) );
+            $gsc_session_match = '' !== $gsc_session && hash_equals( self::REQUIRED_GSC_DIMENSION_SESSION_VERSION, $gsc_session );
+            $identity = self::bound_build_identity( $capabilities );
+
+            $compatible = $runtime_valid
+                && $runtime_count > 0
+                && $catalog_valid
+                && ! $catalog_exposed
+                && $capability_hash_match
+                && $gsc_session_match
+                && ! empty( $identity['ok'] );
             return array(
-                'compatible' => $runtime_valid && $runtime_count > 0 && $catalog_valid && ! $catalog_exposed,
+                'compatible' => $compatible,
                 'mode' => 'stable_executor_wire',
                 'executor_protocol' => $executor,
                 'preferred_executor_protocol' => self::EXECUTOR_PROTOCOL,
                 'accepted_executor_protocols' => self::ACCEPTED_EXECUTOR_PROTOCOLS,
                 'runtime_operation_count' => $runtime_count,
                 'wordpress_capability_catalog' => $catalog_exposed,
-                'pairing_compatible' => true,
-                'repair_required' => false,
+                'capability_hash_match' => $capability_hash_match,
+                'expected_capability_hash' => self::REQUIRED_CAPABILITY_CONTRACT_SHA256,
+                'received_capability_hash' => $capability_hash,
+                'gsc_dimension_session_match' => $gsc_session_match,
+                'expected_gsc_dimension_session_version' => self::REQUIRED_GSC_DIMENSION_SESSION_VERSION,
+                'received_gsc_dimension_session_version' => $gsc_session,
+                'build_identity' => $identity,
+                'pairing_compatible' => $compatible,
+                'repair_required' => ! $compatible,
                 'wire_protocol_stable' => true,
-                'upgrade_recommended' => false,
+                'upgrade_recommended' => ! $compatible,
             );
         }
         $legacy = PRSTUDIO_UC_Contract::extension_compatibility( $capabilities );

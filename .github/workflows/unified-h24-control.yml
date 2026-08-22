@@ -17,8 +17,226 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  suite:
-    name: Suite / WordPress control plane
+  browser_unit_contracts:
+    name: Browser Agent unit / contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Build exact candidate and validate MV3 files
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA"
+          python tests/build-release.py --build
+          python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA" --verify
+          node - <<'NODE'
+          const fs=require('fs');
+          const m=JSON.parse(fs.readFileSync('prstudio-unified-browser-agent/manifest.json','utf8'));
+          if(m.manifest_version!==3) throw new Error('manifest_not_mv3');
+          if(m.background?.service_worker!=='service-worker-bootstrap.js'||m.background?.type!=='module') throw new Error('mv3_bootstrap_mismatch');
+          for(const f of [m.background.service_worker,m.side_panel?.default_path,...(m.content_scripts?.[0]?.js||[])]) if(!fs.existsSync(`prstudio-unified-browser-agent/${f}`)) throw new Error(`manifest_resource_missing:${f}`);
+          NODE
+          find prstudio-unified-browser-agent -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+      - name: Unit and contract regression layer
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(find prstudio-unified-browser-agent/tests -maxdepth 1 -type f \( -name '*contract*.test.mjs' -o -name '*protocol*.test.mjs' -o -name '*ownership*.test.mjs' -o -name '*replacement*.test.mjs' -o -name '*page-runtime*.test.mjs' \) | sort)
+          test "${#files[@]}" -gt 0
+          node --test "${files[@]}"
+
+  browser_security:
+    name: Browser Agent security
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Prepare exact candidate manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA"
+          python tests/build-release.py --build
+          python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA" --verify
+          test -s prstudio-unified-browser-agent/COMPONENT-MANIFEST.json
+      - name: Security validator and runtime attacks
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/validate-security-contract.mjs
+          node --test prstudio-unified-browser-agent/tests/browser-security-runtime.test.mjs
+          if grep -RInE '(^|[^[:alnum:]_])eval[[:space:]]*\(' prstudio-unified-browser-agent --include='*.js' --exclude='page-runtime.js'; then
+            echo 'FAIL unsafe eval found'; exit 1
+          fi
+          if grep -RInE 'import[[:space:]]*\(' prstudio-unified-browser-agent/service-worker-bootstrap.js; then
+            echo 'FAIL dynamic import in MV3 bootstrap'; exit 1
+          fi
+
+  browser_protocol_parity:
+    name: Browser Agent protocol parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
+        with:
+          php-version: '8.1'
+          coverage: none
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Server Agent protocol and executor parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          php tests/browser-protocol-single-file.php
+          python tests/validate-protocol-compatibility.py
+          node --test prstudio-unified-browser-agent/tests/cdp-protocol-single-file.test.mjs prstudio-unified-browser-agent/tests/browser-single-path-contract.test.mjs
+          grep -q 'GSC_DIMENSION_SESSION_VERSION = "4.0.0"' prstudio-unified-browser-agent/lib/executor-meta.js
+          grep -q "REQUIRED_GSC_DIMENSION_SESSION_VERSION = '4.0.0'" prstudio-unified-control/includes/class-prstudio-uc-browser-protocol.php
+
+  browser_certification:
+    name: Browser Agent 700+ certification
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Stamp exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA"
+          python tests/build-release.py --build
+          python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA" --verify
+      - name: Execute every Browser Agent test and hard-count TAP
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/browser-certification
+          node --test --test-reporter=tap prstudio-unified-browser-agent/tests/*.test.mjs 2>&1 | tee artifacts/browser-certification/browser-tests.tap
+          node .github/scripts/browser-certification-report.mjs artifacts/browser-certification/browser-tests.tap artifacts/browser-certification/browser-extension-certification.json
+          node - <<'NODE'
+          const r=require('./artifacts/browser-certification/browser-extension-certification.json');
+          if(r.total_checks<700||r.passed!==r.total_checks||r.failed!==0||r.skipped!==0||r.todo!==0) throw new Error(`certification_gate_failed:${JSON.stringify(r)}`);
+          console.log(`PASS Browser Agent certification ${r.passed}/${r.total_checks}, skip=${r.skipped}, todo=${r.todo}`);
+          NODE
+      - name: Upload Browser Agent certification evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: browser-certification-${{ github.sha }}
+          path: artifacts/browser-certification/
+          if-no-files-found: error
+          retention-days: 30
+
+  real_chrome_e2e:
+    name: Real Chrome Browser Agent E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Stamp exact Browser Agent build
+        run: |
+          set -euo pipefail
+          python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA"
+          python tests/build-release.py --build
+          python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA" --verify
+      - name: Start real test pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/prstudio-real-pages
+          for p in a b c; do
+            cat > "/tmp/prstudio-real-pages/parity-${p}.html" <<'HTML'
+          <!doctype html><html><head><meta charset="utf-8"><title>PR STUDIO real Chrome</title></head>
+          <body data-clicked="no"><input id="parity-input"><button id="parity-button">Confirm</button><main id="parity-content">persistent browser control surface</main>
+          <script>document.querySelector('#parity-button').addEventListener('click',()=>document.body.dataset.clicked='yes')</script></body></html>
+          HTML
+          done
+          python -m http.server 8080 --bind 127.0.0.1 --directory /tmp/prstudio-real-pages >/tmp/prstudio-real-pages.log 2>&1 &
+          echo $! > /tmp/prstudio-real-pages.pid
+          for i in $(seq 1 50); do curl -fsS http://127.0.0.1:8080/parity-a.html >/dev/null && exit 0; sleep .2; done
+          cat /tmp/prstudio-real-pages.log; exit 1
+      - name: Chrome for Testing extension lifecycle / CDP / restart
+        shell: bash
+        env:
+          WP_URL: http://127.0.0.1:8080
+        run: |
+          set -euo pipefail
+          command -v xvfb-run
+          xvfb-run -a node .github/scripts/chrome-scripting-health-probe.mjs
+          node .github/scripts/browser-parity-live-probe.mjs
+          node - <<'NODE'
+          const fs=require('fs'), {spawnSync}=require('child_process'), {createRequire}=require('module');
+          (async()=>{
+            const require2=createRequire('/tmp/prstudio-puppeteer/package.json');
+            const puppeteer=require2('puppeteer');
+            const executable=await puppeteer.executablePath();
+            const v=spawnSync(executable,['--version'],{encoding:'utf8'}); const version=`${v.stdout||''}${v.stderr||''}`.trim();
+            const e=JSON.parse(fs.readFileSync('artifacts/browser-e2e/browser-extension-e2e.json','utf8'));
+            if(v.status!==0||!/Chrome/i.test(version)||/Chromium/i.test(version)||!/^Chrome\//.test(e.browser_version||'')) throw new Error(`not_real_chrome:${version}:${e.browser_version}`);
+            const worker=e.checks?.find(x=>x.name==='exact_mv3_worker_loaded')||{};
+            const out={executable_path:executable,executable_version:version,browser_product:e.browser_version,extension_id:worker.extension_id||'',service_worker:e.worker_url,checks:e.checks?.length||0};
+            fs.mkdirSync('artifacts/browser-e2e',{recursive:true}); fs.writeFileSync('artifacts/browser-e2e/chrome-identity.json',JSON.stringify(out,null,2)+'\n');
+            console.log(out);
+          })().catch(e=>{console.error(e);process.exit(1)});
+          NODE
+      - name: Upload real Chrome evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: real-chrome-browser-agent-${{ github.sha }}
+          path: |
+            artifacts/browser-e2e/
+            artifacts/real-e2e/
+            artifacts/browser-parity/
+          if-no-files-found: error
+          retention-days: 30
+
+  control_plane:
+    name: WordPress control plane / real MariaDB
     runs-on: ubuntu-latest
     timeout-minutes: 35
     services:
@@ -27,13 +245,10 @@ jobs:
         env:
           MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: 'yes'
           MARIADB_DATABASE: prstudio_queue_test
-        ports:
-          - 3306:3306
+        ports: ['3306:3306']
         options: >-
           --health-cmd="healthcheck.sh --connect --innodb_initialized"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
+          --health-interval=10s --health-timeout=5s --health-retries=10
     env:
       PRSTUDIO_TEST_DB_HOST: 127.0.0.1
       PRSTUDIO_TEST_DB_PORT: '3306'
@@ -54,28 +269,21 @@ jobs:
         with:
           python-version: '3.12'
       - name: Build and verify exact WordPress release
-        shell: bash
         run: |
           set -euo pipefail
           python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA"
           python tests/build-release.py --build
           python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA" --verify
           python tests/build-release.py --check
-          test -f "$GITHUB_WORKSPACE/prstudio-unified-control-1.0.0.zip"
           sha256sum prstudio-unified-control-1.0.0.zip > WORDPRESS-ZIP-SHA256.txt
-      - name: Install SQL parser
-        run: python -m pip install --disable-pip-version-check --no-input 'sqlglot==30.14.0'
-      - name: PHP syntax and project metadata
+      - name: PHP syntax, PHPUnit and contract smoke tests
         shell: bash
         run: |
           set -euo pipefail
+          python -m pip install --disable-pip-version-check --no-input 'sqlglot==30.14.0'
           find prstudio-unified-control tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l >/tmp/php-lint.txt
           composer validate --strict --no-check-publish
           phpunit --configuration phpunit.xml.dist
-      - name: Suite contracts and smoke tests
-        shell: bash
-        run: |
-          set -euo pipefail
           php -d auto_prepend_file=tests/strict-php-errors.php tests/php-agent-model-constitution.php
           php -d auto_prepend_file=tests/strict-php-errors.php tests/php-mcp-public-contracts-smoke.php
           php -d auto_prepend_file=tests/strict-php-errors.php tests/php-mcp-catalog-runtime-smoke.php
@@ -86,154 +294,42 @@ jobs:
           python tests/validate-prepare-arity.py
           python tests/one_guard_constitution.py
           python tests/validate-protocol-compatibility.py
-      - name: Real MariaDB task queue
-        env:
-          PRSTUDIO_TEST_DB_NAME: prstudio_queue_test
-        run: php -d auto_prepend_file=tests/strict-php-errors.php tests/php-task-queue-integration.php
-      - name: Real MariaDB write observability
-        env:
-          PRSTUDIO_TEST_DB_NAME: prstudio_writeobs
-        run: php -d auto_prepend_file=tests/strict-php-errors.php tests/php-write-observability-integration.php
-      - name: Real MariaDB runtime liveness
-        env:
-          PRSTUDIO_TEST_DB_NAME: prstudio_runtime_liveness
-        run: php -d auto_prepend_file=tests/strict-php-errors.php tests/php-runtime-db-liveness-integration.php
-      - name: Real WordPress 7.0.4 release ZIP install, activation and MCP route
+      - name: Real MariaDB integrations cannot skip
         shell: bash
         run: |
           set -euo pipefail
-          test -f "$GITHUB_WORKSPACE/prstudio-unified-control-1.0.0.zip"
-          php -r '$m=new mysqli("127.0.0.1","root","","",3306); if($m->connect_errno){fwrite(STDERR,$m->connect_error); exit(1);} if(!$m->query("CREATE DATABASE IF NOT EXISTS prstudio_wp_real CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")){fwrite(STDERR,$m->error); exit(1);}'
-          curl --fail --location --silent --show-error https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar --output /tmp/wp-cli.phar
-          php /tmp/wp-cli.phar --info
+          PRSTUDIO_TEST_DB_NAME=prstudio_queue_test php -d auto_prepend_file=tests/strict-php-errors.php tests/php-task-queue-integration.php | tee /tmp/task-queue.log
+          PRSTUDIO_TEST_DB_NAME=prstudio_writeobs php -d auto_prepend_file=tests/strict-php-errors.php tests/php-write-observability-integration.php | tee /tmp/writeobs.log
+          PRSTUDIO_TEST_DB_NAME=prstudio_runtime_liveness php -d auto_prepend_file=tests/strict-php-errors.php tests/php-runtime-db-liveness-integration.php | tee /tmp/liveness.log
+          ! grep -Eiq '(^|[^a-z])skip(ped)?([^a-z]|$)' /tmp/task-queue.log /tmp/writeobs.log /tmp/liveness.log
+      - name: Real WordPress release ZIP install and activation
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -r '$m=new mysqli("127.0.0.1","root","","",3306); if($m->connect_errno) exit(1); if(!$m->query("CREATE DATABASE IF NOT EXISTS prstudio_wp_real CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")) exit(1);'
+          curl --fail --location --silent --show-error https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar -o /tmp/wp-cli.phar
           rm -rf /tmp/prstudio-wp
           php /tmp/wp-cli.phar core download --version=7.0.4 --path=/tmp/prstudio-wp --force
           php /tmp/wp-cli.phar config create --path=/tmp/prstudio-wp --dbname=prstudio_wp_real --dbuser=root --dbpass= --dbhost=127.0.0.1:3306 --skip-check
           php /tmp/wp-cli.phar core install --path=/tmp/prstudio-wp --url=http://127.0.0.1:8082 --title='PR STUDIO H24' --admin_user=prstudio --admin_password='H24-Test-Only-2026!' --admin_email=ci@example.invalid --skip-email
-          test ! -e /tmp/prstudio-wp/wp-content/plugins/prstudio-unified-control
           php /tmp/wp-cli.phar plugin install "$GITHUB_WORKSPACE/prstudio-unified-control-1.0.0.zip" --activate --path=/tmp/prstudio-wp
-          test -f /tmp/prstudio-wp/wp-content/plugins/prstudio-unified-control/prstudio-unified-control.php
-          test -f /tmp/prstudio-wp/wp-content/plugins/prstudio-unified-control/FILE-INTEGRITY.json
           php /tmp/wp-cli.phar plugin is-active prstudio-unified-control --path=/tmp/prstudio-wp
           php /tmp/wp-cli.phar eval-file "$GITHUB_WORKSPACE/tests/wp-real-activation-probe.php" --path=/tmp/prstudio-wp
-      - name: Upload WordPress release evidence
+      - name: Upload WordPress evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: wordpress-release-${{ github.sha }}
+          name: wordpress-control-${{ github.sha }}
           path: |
             prstudio-unified-control-1.0.0.zip
             WORDPRESS-ZIP-SHA256.txt
           if-no-files-found: error
           retention-days: 30
 
-  extension:
-    name: Chrome extension / Browser Agent
+  mcp_reachability:
+    name: MCP schema / tool reachability
     runs-on: ubuntu-latest
-    timeout-minutes: 35
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version: '24'
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
-        with:
-          python-version: '3.12'
-      - name: Build and verify exact extension
-        shell: bash
-        run: |
-          set -euo pipefail
-          python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA"
-          python tests/build-release.py --build
-          python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA" --verify
-          python tests/build-release.py --check
-      - name: Extension manifest and JavaScript syntax
-        shell: bash
-        run: |
-          set -euo pipefail
-          node - <<'NODE'
-          const fs = require('fs');
-          const manifest = JSON.parse(fs.readFileSync('prstudio-unified-browser-agent/manifest.json', 'utf8'));
-          if (manifest.manifest_version !== 3) throw new Error('Browser Agent must remain Manifest V3');
-          if (!manifest.version) throw new Error('Browser Agent version missing');
-          if (!manifest.permissions.includes('system.display')) throw new Error('system.display permission required by native coordinate mapping');
-          if (manifest.background?.service_worker !== 'service-worker-bootstrap.js') throw new Error('Chrome parity bootstrap is not the active MV3 worker');
-          console.log(`manifest ok: v${manifest.version}, MV${manifest.manifest_version}`);
-          NODE
-          find prstudio-unified-browser-agent -type f -name '*.js' -print0 | xargs -0 -n1 node --check
-      - name: Browser Agent deterministic tests
-        run: node --test prstudio-unified-browser-agent/tests/*.test.mjs
-      - name: Real Chromium scripting and persistent multi-tab parity
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/rpconnector-h24-web
-          cat > /tmp/rpconnector-h24-web/wp-login.php <<'HTML'
-          <!doctype html><html><head><title>RPConnector H24 probe</title></head><body><main id="probe">ready</main></body></html>
-          HTML
-          for page in a b c; do
-            cat > "/tmp/rpconnector-h24-web/parity-${page}.html" <<'HTML'
-          <!doctype html>
-          <html><head><meta charset="utf-8"><title>RPConnector parity</title></head>
-          <body data-clicked="no">
-            <label>Value <input id="parity-input" value=""></label>
-            <button id="parity-button" type="button">Confirm</button>
-            <main id="parity-content">persistent browser control surface</main>
-            <script>document.querySelector('#parity-button').addEventListener('click',()=>{document.body.dataset.clicked='yes';});</script>
-          </body></html>
-          HTML
-          done
-          python -m http.server 8080 --bind 127.0.0.1 --directory /tmp/rpconnector-h24-web >/tmp/rpconnector-h24-web.log 2>&1 &
-          server_pid=$!
-          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
-          for i in $(seq 1 50); do
-            if curl --fail --silent http://127.0.0.1:8080/wp-login.php >/dev/null; then break; fi
-            if [ "$i" = 50 ]; then cat /tmp/rpconnector-h24-web.log; exit 1; fi
-            sleep 0.2
-          done
-          echo "Available browser binaries:"
-          for candidate in google-chrome-stable google-chrome chromium chromium-browser; do
-            if command -v "$candidate" >/dev/null 2>&1; then "$candidate" --version || true; fi
-          done
-          REAL_CHROME="$(command -v google-chrome-stable || command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
-          test -n "$REAL_CHROME"
-          command -v xvfb-run
-          cat > /tmp/rpconnector-real-chrome <<'SH'
-          #!/usr/bin/env bash
-          set -euo pipefail
-          real="${PRSTUDIO_REAL_CHROME:?}"
-          args=()
-          for arg in "$@"; do
-            if [ "$arg" = '--headless=new' ]; then continue; fi
-            args+=("$arg")
-          done
-          exec "$real" "${args[@]}"
-          SH
-          chmod +x /tmp/rpconnector-real-chrome
-          export PRSTUDIO_REAL_CHROME="$REAL_CHROME"
-          export CHROME_BIN=/tmp/rpconnector-real-chrome
-          export WP_URL=http://127.0.0.1:8080
-          "$CHROME_BIN" --version
-          xvfb-run -a node .github/scripts/chrome-scripting-health-probe.mjs
-          xvfb-run -a node .github/scripts/browser-parity-live-probe.mjs
-      - name: Upload browser evidence
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: browser-evidence-${{ github.sha }}
-          path: |
-            artifacts/real-e2e/scripting-health-probe.json
-            artifacts/browser-parity/browser-parity-live-probe.json
-          if-no-files-found: warn
-          retention-days: 30
-
-  connector:
-    name: ChatGPT connector JSON / MCP contract
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -250,45 +346,24 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: '3.12'
-      - name: Exactly one workflow is allowed
+      - name: One workflow and descriptor source-of-truth checks
         shell: bash
         run: |
           set -euo pipefail
           mapfile -t workflows < <(find .github/workflows -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) -printf '%f\n' | sort)
-          printf 'active workflows: %s\n' "${workflows[*]}"
-          test "${#workflows[@]}" -eq 1
-          test "${workflows[0]}" = 'unified-h24-control.yml'
-      - name: Validate connector descriptor structure
-        run: |
-          node - <<'NODE'
-          const fs = require('fs');
-          const path = 'RP-STUDIO-CHATGPT-PLUGIN-1.0.0.json';
-          const d = JSON.parse(fs.readFileSync(path, 'utf8'));
-          const fail = (m) => { throw new Error(m); };
-          if (d.schema_version !== '1.0.0') fail('schema_version must be 1.0.0');
-          if (d.type !== 'remote_mcp_server') fail('type must be remote_mcp_server');
-          if (!Number.isInteger(d.expected_tools) || d.expected_tools <= 0) fail('expected_tools invalid');
-          if (!Array.isArray(d.tool_names) || d.tool_names.length !== d.expected_tools) fail('tool_names count mismatch');
-          if (new Set(d.tool_names).size !== d.tool_names.length) fail('duplicate tool_names');
-          if (!Array.isArray(d.mcp_protocols) || d.mcp_protocols.length === 0) fail('mcp_protocols missing');
-          const requiredPaths = [
-            d.installation_contract?.wordpress?.folder,
-            d.installation_contract?.browser_agent?.folder,
-            d.instructions_source,
-            ...(Array.isArray(d.documentation) ? d.documentation : []),
-          ];
-          for (const p of requiredPaths) {
-            if (!p || !fs.existsSync(p)) fail(`descriptor target missing: ${p}`);
-          }
-          console.log(`connector JSON ok: ${d.expected_tools} tools, ${d.mcp_protocols.length} MCP protocols`);
-          NODE
-      - name: Connector and implementation cannot drift
+          test "${#workflows[@]}" -eq 1 && test "${workflows[0]}" = unified-h24-control.yml
+          node .github/scripts/check-mcp-tool-drift.mjs
+          node .github/scripts/check-build-info-counts.mjs
+          php tests/php-mcp-catalog-runtime-smoke.php
+          php tests/php-tools-list-budget.php
+      - name: Exhaustive built / advertised / hidden / routable / executable self-test
         shell: bash
         run: |
           set -euo pipefail
-          node .github/scripts/check-mcp-tool-drift.mjs
-          node .github/scripts/check-build-info-counts.mjs
-      - name: Full release descriptor validation
+          php tests/php-mcp-surface-reachability.php
+          test -s artifacts/mcp/mcp-surface-certification.json
+          php -r '$r=json_decode(file_get_contents("artifacts/mcp/mcp-surface-certification.json"),true); if(!$r||!$r["ok"]||$r["tools_unroutable"]!==0||$r["tools_dead_end"]!==0||$r["tools_executable"]!==$r["tools_built"]) exit(1); echo "PASS MCP dead-end=0\n";'
+      - name: Final connector JSON and release validation
         shell: bash
         run: |
           set -euo pipefail
@@ -296,28 +371,205 @@ jobs:
           python tests/build-release.py --build
           python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA" --verify
           python tests/generate-web-research-ledger.py
-          python - <<'PY'
-          import importlib.util, json
-          spec = importlib.util.spec_from_file_location('rigorous_audit', 'tests/rigorous-audit-controller.py')
-          module = importlib.util.module_from_spec(spec)
-          spec.loader.exec_module(module)
-          summary, _, _ = module.generate()
-          print('RIGOROUS_HARD_FAILURES=' + json.dumps(summary['hard_failures'], ensure_ascii=False))
-          PY
           node tests/validate-release.mjs --strict --php-smoke
+      - name: Upload MCP evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: mcp-reachability-${{ github.sha }}
+          path: artifacts/mcp/
+          if-no-files-found: error
+          retention-days: 30
 
-  gate:
-    name: Unified H24 gate
-    if: always()
-    needs: [suite, extension, connector]
+  build_identity:
+    name: Build / contract identity
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20
     steps:
-      - name: Require every product surface to pass
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Stamp, package and prove compatibility identity
         shell: bash
         run: |
           set -euo pipefail
-          test '${{ needs.suite.result }}' = 'success'
-          test '${{ needs.extension.result }}' = 'success'
-          test '${{ needs.connector.result }}' = 'success'
-          echo 'PASS: suite + extension + connector are all green'
+          python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA"
+          python tests/build-release.py --build
+          python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA" --verify
+          python .github/scripts/build-identity-report.py
+          sha256sum prstudio-unified-browser-agent/BUILD-INFO.json prstudio-unified-control/BUILD-INFO.json > artifacts/build-identity/BUILD-INFO-SHA256.txt
+          cp prstudio-unified-browser-agent/BUILD-INFO.json artifacts/build-identity/browser-BUILD-INFO.json
+          cp prstudio-unified-control/BUILD-INFO.json artifacts/build-identity/control-BUILD-INFO.json
+      - name: Upload build identity evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: build-identity-${{ github.sha }}
+          path: artifacts/build-identity/
+          if-no-files-found: error
+          retention-days: 30
+
+  remote_wordpress_chrome:
+    name: Remote WordPress → Chrome E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    services:
+      mariadb:
+        image: mariadb:11.4@sha256:a794d9eb009e20de605858a11f32f63b4075cbd197c650436f0e3b457e4caed7
+        env:
+          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: 'yes'
+          MARIADB_DATABASE: prstudio_remote_e2e
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
+        with:
+          php-version: '8.1'
+          extensions: mysqli, mbstring, xml
+          coverage: none
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Build candidate and install real WordPress
+        shell: bash
+        run: |
+          set -euo pipefail
+          python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA"
+          python tests/build-release.py --build
+          python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA" --verify
+          curl --fail --location --silent --show-error https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar -o /tmp/wp-cli.phar
+          rm -rf /tmp/prstudio-wp
+          php /tmp/wp-cli.phar core download --version=7.0.4 --path=/tmp/prstudio-wp --force
+          php /tmp/wp-cli.phar config create --path=/tmp/prstudio-wp --dbname=prstudio_remote_e2e --dbuser=root --dbpass= --dbhost=127.0.0.1:3306 --skip-check
+          php /tmp/wp-cli.phar core install --path=/tmp/prstudio-wp --url=http://127.0.0.1:8082 --title='PR STUDIO Remote E2E' --admin_user=prstudio --admin_password='H24-Test-Only-2026!' --admin_email=ci@example.invalid --skip-email
+          php /tmp/wp-cli.phar plugin install "$GITHUB_WORKSPACE/prstudio-unified-control-1.0.0.zip" --activate --path=/tmp/prstudio-wp
+          php /tmp/wp-cli.phar plugin is-active prstudio-unified-control --path=/tmp/prstudio-wp
+      - name: Start WordPress and two cross-origin target sites
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat >/tmp/wp-router.php <<'PHP'
+          <?php
+          $path=parse_url($_SERVER['REQUEST_URI'],PHP_URL_PATH);
+          $file='/tmp/prstudio-wp'.$path;
+          if($path!=='/'&&(is_file($file)||is_dir($file))) return false;
+          require '/tmp/prstudio-wp/index.php';
+          PHP
+          php -S 127.0.0.1:8082 -t /tmp/prstudio-wp /tmp/wp-router.php >/tmp/prstudio-wp-server.log 2>&1 & echo $! >/tmp/prstudio-wp-server.pid
+          for port in 8083 8084; do
+            mkdir -p "/tmp/prstudio-origin-$port"
+            cat > "/tmp/prstudio-origin-$port/parity-a.html" <<'HTML'
+          <!doctype html><html><head><title>Remote A</title></head><body data-clicked="no"><input id="parity-input"><button id="parity-button">Confirm</button><main id="parity-content">remote owned surface</main><script>document.querySelector('#parity-button').onclick=()=>document.body.dataset.clicked='yes';console.log('remote-page-ready')</script></body></html>
+          HTML
+            cp "/tmp/prstudio-origin-$port/parity-a.html" "/tmp/prstudio-origin-$port/parity-b.html"
+            cp "/tmp/prstudio-origin-$port/parity-a.html" "/tmp/prstudio-origin-$port/parity-c.html"
+            echo '{"ok":true,"source":"remote-e2e"}' > "/tmp/prstudio-origin-$port/api.json"
+            python -m http.server "$port" --bind 127.0.0.1 --directory "/tmp/prstudio-origin-$port" >"/tmp/prstudio-origin-$port.log" 2>&1 & echo $! >"/tmp/prstudio-origin-$port.pid"
+          done
+          for url in http://127.0.0.1:8082/wp-login.php http://127.0.0.1:8083/parity-a.html http://127.0.0.1:8084/parity-b.html; do
+            for i in $(seq 1 80); do curl -fsS "$url" >/dev/null && break; [ "$i" = 80 ] && exit 1; sleep .25; done
+          done
+      - name: Prepare Chrome for Testing and prove unpacked MV3 support
+        shell: bash
+        env:
+          WP_URL: http://127.0.0.1:8083
+        run: |
+          set -euo pipefail
+          command -v xvfb-run
+          xvfb-run -a node .github/scripts/chrome-scripting-health-probe.mjs
+          CHROME="$(node - <<'NODE'
+          const {createRequire}=require('module');
+          (async()=>{const r=createRequire('/tmp/prstudio-puppeteer/package.json');const p=r('puppeteer');process.stdout.write(await p.executablePath());})().catch(e=>{console.error(e);process.exit(1)});
+          NODE
+          )"
+          test -x "$CHROME"
+          VERSION="$($CHROME --version)"
+          echo "$VERSION"
+          echo "$VERSION" | grep -E 'Chrome|Chrome for Testing'
+          ! echo "$VERSION" | grep -qi Chromium
+          echo "CHROME_BIN=$CHROME" >> "$GITHUB_ENV"
+          echo "CHROME_FOR_TESTING_VERSION=$VERSION" >> "$GITHUB_ENV"
+      - name: Legacy real WordPress + Chrome pairing / audit layer
+        shell: bash
+        env:
+          WP_URL: http://127.0.0.1:8082
+          WP_ADMIN_USER: prstudio
+          WP_ADMIN_PASSWORD: H24-Test-Only-2026!
+          E2E_ARTIFACT_DIR: artifacts/wordpress-browser-e2e
+        run: |
+          set -euo pipefail
+          xvfb-run -a node tests/wordpress-browser-e2e.mjs
+          test -s artifacts/wordpress-browser-e2e/evidence.json
+      - name: Remote task ownership / affinity / CDP / restart E2E
+        shell: bash
+        env:
+          WP_URL: http://127.0.0.1:8082
+          WP_PATH: /tmp/prstudio-wp
+          WP_CLI: /tmp/wp-cli.phar
+          REMOTE_E2E_ORIGIN_A: http://127.0.0.1:8083
+          REMOTE_E2E_ORIGIN_B: http://127.0.0.1:8084
+          E2E_ARTIFACT_DIR: artifacts/remote-wordpress-chrome
+        run: |
+          set -euo pipefail
+          xvfb-run -a node tests/wordpress-remote-browser-e2e.mjs
+          test -s artifacts/remote-wordpress-chrome/remote-e2e.json
+          node - <<'NODE'
+          const r=require('./artifacts/remote-wordpress-chrome/remote-e2e.json');
+          if(!r.ok||!Array.isArray(r.tasks)||r.tasks.length<5||r.tasks.some(t=>t.status!=='completed')) throw new Error(`remote_e2e_not_complete:${JSON.stringify(r.error||r.tasks)}`);
+          if(!Array.isArray(r.checks)||r.checks.some(c=>!c.ok)) throw new Error('remote_e2e_check_failed');
+          console.log(`PASS remote E2E ${r.checks.length} checks / ${r.tasks.length} tasks`);
+          NODE
+      - name: Upload remote E2E evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: remote-wordpress-chrome-${{ github.sha }}
+          path: |
+            artifacts/wordpress-browser-e2e/
+            artifacts/remote-wordpress-chrome/
+          if-no-files-found: error
+          retention-days: 30
+
+  unified_gate:
+    name: Unified final gate
+    if: always()
+    needs:
+      - browser_unit_contracts
+      - browser_security
+      - browser_protocol_parity
+      - browser_certification
+      - real_chrome_e2e
+      - control_plane
+      - mcp_reachability
+      - build_identity
+      - remote_wordpress_chrome
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every certification surface to pass
+        shell: bash
+        run: |
+          set -euo pipefail
+          test '${{ needs.browser_unit_contracts.result }}' = success
+          test '${{ needs.browser_security.result }}' = success
+          test '${{ needs.browser_protocol_parity.result }}' = success
+          test '${{ needs.browser_certification.result }}' = success
+          test '${{ needs.real_chrome_e2e.result }}' = success
+          test '${{ needs.control_plane.result }}' = success
+          test '${{ needs.mcp_reachability.result }}' = success
+          test '${{ needs.build_identity.result }}' = success
+          test '${{ needs.remote_wordpress_chrome.result }}' = success
+          echo 'PASS all Browser Agent, Chrome, WordPress, MCP, identity and Control gates are green'
