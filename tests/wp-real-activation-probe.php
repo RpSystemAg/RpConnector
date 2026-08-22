@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 
 if (!defined('ABSPATH')) {
     fwrite(STDERR, "FAIL WordPress core is not bootstrapped\n");
