@@ -180,8 +180,33 @@ try {
   record('tab_go_forward_keeps_runtime', forwardPing?.pong === true, { forwardPing });
 
   await activate(tabC.id, 'activate_c_capture');
-  const capture = await extEval(async (windowId) => chrome.tabs.captureVisibleTab(windowId, { format: 'png' }), tabC.windowId, 'capture', 15000);
-  record('visible_tab_screenshot_real', typeof capture === 'string' && capture.startsWith('data:image/png;base64,') && capture.length > 1000, { bytes: capture?.length || 0 });
+  const capture = await extEval(async ({ tabId, windowId }) => {
+    const tab = await chrome.tabs.get(tabId);
+    if (!tab.active || tab.windowId !== windowId) throw new Error(`capture_target_not_active:${JSON.stringify({ tabId: tab.id, windowId: tab.windowId, active: tab.active })}`);
+    try {
+      const dataUrl = await chrome.tabs.captureVisibleTab(windowId, { format: 'png' });
+      return { dataUrl, transport: 'chrome.tabs.captureVisibleTab' };
+    } catch (error) {
+      const initialError = String(error?.message || error);
+      if (!/image readback failed/i.test(initialError)) throw error;
+      const debuggee = { tabId };
+      let attached = false;
+      try {
+        await chrome.debugger.attach(debuggee, '0.1');
+        attached = true;
+        await chrome.debugger.sendCommand(debuggee, 'Page.enable');
+        const result = await chrome.debugger.sendCommand(debuggee, 'Page.captureScreenshot', { format: 'png', fromSurface: false });
+        return {
+          dataUrl: `data:image/png;base64,${String(result?.data || '')}`,
+          transport: 'chrome.debugger/Page.captureScreenshot-renderer',
+          captureVisibleTabError: initialError,
+        };
+      } finally {
+        if (attached) await chrome.debugger.detach(debuggee);
+      }
+    }
+  }, { tabId: tabC.id, windowId: tabC.windowId }, 'capture', 15000);
+  record('visible_tab_screenshot_real', typeof capture?.dataUrl === 'string' && capture.dataUrl.startsWith('data:image/png;base64,') && capture.dataUrl.length > 1000, { bytes: capture?.dataUrl?.length || 0, transport: capture?.transport || '', captureVisibleTabError: capture?.captureVisibleTabError || '' });
 
   const focus = await extEval(async () => {
     const win = await chrome.windows.getLastFocused({ windowTypes: ['normal'] });
