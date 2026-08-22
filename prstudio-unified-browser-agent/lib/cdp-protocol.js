@@ -1,10 +1,10 @@
-// chrome.debugger.attach does NOT take the DevTools browser protocol version
-// (for example 1.3). Its requiredVersion contract is the Chrome Extensions
-// debugger API protocol version. Chrome documents "0.1": the major must match
-// and the browser minor must be >= the requested minor. Supplying 1.3 first
-// created a deterministic compatibility failure before every valid attach and
-// could leave the target in an ambiguous state on some Chrome builds.
-export const DEBUGGER_PROTOCOL_CANDIDATES = Object.freeze(["0.1"]);
+// chrome.debugger.attach negotiates the DevTools protocol version accepted by
+// the current browser. Chrome for Testing 152 rejects the legacy 0.1 value in
+// live extension sessions, while current Chromium extension tests and stable
+// examples attach with 1.3. Keep one exact candidate so a failed attach cannot
+// trigger protocol replay; post-failure state verification below still fails
+// closed if Chrome reports an ambiguous attachment state.
+export const DEBUGGER_PROTOCOL_CANDIDATES = Object.freeze(["1.3"]);
 
 export async function attachWithProtocolFallback(debuggerApi, target, isAttached = async () => false) {
   const errors = [];
@@ -39,7 +39,7 @@ export async function attachWithProtocolFallback(debuggerApi, target, isAttached
       errors.push({ protocolVersion, message: message.slice(0, 240) });
     }
   }
-  const error = new Error("Chrome extension debugger protocol 0.1 could not be attached to the target.");
+  const error = new Error("Chrome debugger protocol 1.3 could not be attached to the target.");
   error.code = "cdp_protocol_incompatible";
   error.details = { candidates: [...DEBUGGER_PROTOCOL_CANDIDATES], errors };
   throw error;

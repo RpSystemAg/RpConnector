@@ -1,4 +1,4 @@
-export const REMOTE_RECOVERY_POLICY_VERSION = "1.1.0";
+export const REMOTE_RECOVERY_POLICY_VERSION = "1.2.1";
 export const REMOTE_MAX_STEP_ATTEMPTS = 2;
 export const REMOTE_MAX_FRESH_RESTARTS = 1;
 export const HARD_TASK_WATCHDOG_ALARM = "prstudio-hard-task-watchdog";
@@ -17,6 +17,19 @@ const PRE_DISPATCH_CODES = [
   "keyboard_sequence_too_long",
   "keyboard_key_required",
   "native_input_mode_invalid",
+];
+// These failures are emitted by ownership/binding assertions before page input
+// or application mutation is dispatched. They are therefore safe to retry even
+// when the requested step itself is mutating. Treating safety by error phase,
+// rather than by the eventual action type, lets a lost provisional claim recover
+// without making click/fill/upload generally retryable.
+const PRE_EFFECT_OWNERSHIP_CODES = [
+  "technical_tab_not_controlled",
+  "controlled_tab_missing",
+  "tab_ownership_missing",
+  "tab_ownership_nonce_mismatch",
+  "tab_lane_mismatch",
+  "tab_affinity_mismatch",
 ];
 
 function isRecord(value) {
@@ -61,8 +74,14 @@ export function isPreDispatchInputError(error = {}) {
   return PRE_DISPATCH_CODES.some((code) => hasSemanticToken(text, code));
 }
 
+export function isPreEffectOwnershipError(error = {}) {
+  const text = errorText(error);
+  return PRE_EFFECT_OWNERSHIP_CODES.some((code) => hasSemanticToken(text, code));
+}
+
 export function isRetrySafeFailure(step = {}, error = {}) {
   const type = stepType(step);
+  if (isPreEffectOwnershipError(error)) return true;
   if (RETRY_SAFE_TYPES.has(type)) return true;
   if (type === "native_input" && isPreDispatchInputError(error)) return true;
   if (["STEP_STALLED_TIMEOUT", "STEP_NO_PROGRESS"].includes(String(error?.code || ""))) return RETRY_SAFE_TYPES.has(type);
@@ -97,7 +116,7 @@ export function stepWatchdogMs(step = {}) {
     reload: 50000,
     contract_action: 60000,
   };
-  const base = requested > 0 ? requested + 5000 : (defaults[type] || 60000);
+  const base = requested > 0 ? requested + 5000 : (defaults[type] || 90000);
   // Screenshot is an interactive operation: caller-provided timeouts may make
   // the internal attempt shorter, but can never expand the public envelope.
   if (type === "screenshot" || type === "screenshot_element") return Math.max(5000, Math.min(9500, base));
@@ -151,7 +170,9 @@ export function noProgressExceeded(state = {}, now = Date.now()) {
       ? 15000
       : type === "contract_action" && action === "playwright_responsive_matrix"
         ? 30000
-        : stepWatchdogMs({ type, action });
+        : ["wait_selector", "wait_url", "wait_load", "reload"].includes(type)
+          ? 120000
+          : stepWatchdogMs({ type, action });
   return now - activityAt > limit;
 }
 

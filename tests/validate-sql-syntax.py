@@ -97,13 +97,16 @@ def is_parseable_candidate(sql: str) -> bool:
     # Prose that merely opens with a SQL verb is not a statement. Error messages
     # and tool descriptions in this codebase legitimately begin with "delete ..."
     # or "Create ...", so require the verb's structural companion clause before
-    # handing the text to a parser.
+    # handing the text to a parser. UPDATE additionally requires an assignment
+    # after SET: this distinguishes a real statement from bilingual action-index
+    # prose such as "update edit modify set change configure" without weakening
+    # validation of executable UPDATE queries.
     shapes = (
         r"^SELECT\b.*\bFROM\b",
         r"^SELECT\s+(?:DISTINCT\s+)?(?:COUNT|SUM|MAX|MIN|AVG|VERSION|DATABASE)\s*\(",
         r"^INSERT\b.*\bINTO\b",
         r"^REPLACE\b.*\bINTO\b",
-        r"^UPDATE\b.*\bSET\b",
+        r"^UPDATE\b.*\bSET\b.*=",
         r"^DELETE\b.*\bFROM\b",
         r"^CREATE\s+(?:TABLE|INDEX|UNIQUE|DATABASE|VIEW)\b",
         r"^ALTER\s+TABLE\b",

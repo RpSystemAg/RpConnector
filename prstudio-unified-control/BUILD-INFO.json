@@ -16,7 +16,7 @@
     "2025-03-26"
   ],
   "mcp_2026_tasks_status": "optional_extension_client_opt_in_not_required_for_core_execution",
-  "mcp_tool_count": 124,
+  "mcp_tool_count": 120,
   "mcp_authentication": "OAuth Authorization Code + PKCE S256 with requested scopes only and optional offline_access refresh rotation",
   "oauth_persistence_contract": [
     "prstudio_mcp_v5_clients",
@@ -46,13 +46,5 @@
   "scheduler_topology": "single recurring PR STUDIO worker: Action Scheduler preferred when available, otherwise WP-Cron fallback; fast continuations are isolated from periodic maintenance",
   "crash_hardening": "17.0 removes duplicate Action Scheduler chains on topology migration, prevents parallel WP-Cron+Action Scheduler PR STUDIO workers, disables legacy Agency cron by default, and bounds one scheduled batch to a 4-second total runtime budget",
   "core_web_vitals": "LCP/CLS/INP collected from PerformanceObserver semantics based on Google web-vitals 6.x algorithms; Performance.getMetrics is not used as a CWV surrogate",
-  "upgrader_contract": "plugin/theme/core updates delegate to WordPress native Upgrader classes and inherit core temporary-backup/restore behavior; no parallel proprietary updater",
-  "browser_live_webrtc": {
-    "version": "1.1.0",
-    "transport": "webrtc",
-    "media": "video",
-    "persistent_media_storage": false,
-    "signaling_storage": "private_ephemeral_file",
-    "live_acceptance_required": true
-  }
+  "upgrader_contract": "plugin/theme/core updates delegate to WordPress native Upgrader classes and inherit core temporary-backup/restore behavior; no parallel proprietary updater"
 }

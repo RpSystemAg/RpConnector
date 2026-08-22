@@ -24,6 +24,7 @@ const controlIncludes = join(controlRoot, "includes");
 
 const read = (path) => readFileSync(path, "utf8");
 const browserSource = read(join(browserRoot, "service-worker.js"));
+const browserBootstrapSource = read(join(browserRoot, "service-worker-bootstrap.js"));
 const policySource = read(join(browserLib, "policy.js"));
 const protocolSource = read(join(browserLib, "protocol.js"));
 const observationSource = read(join(browserLib, "observation-security.js"));
@@ -100,7 +101,7 @@ await check("release identity and stable wire protocol", () => {
   assert.match(mcpSource, /public const VERSION = '1\.0\.0';/);
 });
 
-await check("Chrome manifest uses exact lowercase MV3 entrypoint", () => {
+await check("Chrome manifest uses exact lowercase MV3 parity bootstrap", () => {
   const names = readdirSync(browserRoot);
   assert.ok(names.includes("manifest.json"), "Chrome requires the exact lowercase manifest.json filename");
   assert.ok(!names.includes("MANIFEST.json"), "uppercase MANIFEST.json collision must not ship");
@@ -109,11 +110,28 @@ await check("Chrome manifest uses exact lowercase MV3 entrypoint", () => {
   const manifest = JSON.parse(read(manifestPath));
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.version, "1.0.0");
-  assert.deepEqual(manifest.background, { service_worker: "service-worker.js", type: "module" });
-  for (const permission of ["alarms", "debugger", "sidePanel", "storage", "tabs", "windows"]) {
-    assert.ok(manifest.permissions.includes(permission), `missing Chrome permission: ${permission}`);
-  }
-  assert.equal(manifest.content_security_policy.extension_pages, "script-src 'self'; object-src 'self'");
+  assert.deepEqual(manifest.background, { service_worker: "service-worker-bootstrap.js", type: "module" });
+  assert.ok(existsSync(join(browserRoot, manifest.background.service_worker)), "declared MV3 bootstrap worker must exist");
+  requireTokens(browserBootstrapSource, [
+    "installBrowserParityRuntime",
+    "installBrowserParityRuntime(globalThis.chrome)",
+    "globalThis.__PRSTUDIO_BROWSER_PARITY__ = parity",
+    "import './service-worker.js'",
+  ], "Browser parity bootstrap");
+  assert.ok(
+    !browserBootstrapSource.includes("await import('./service-worker.js')")
+      && !browserBootstrapSource.includes("import('./service-worker.js')"),
+    "MV3 wake listeners must not be delayed behind a dynamic service-worker import",
+  );
+  assert.deepEqual(manifest.permissions, [
+    "storage", "alarms", "tabs", "scripting", "debugger", "activeTab",
+    "downloads", "webNavigation", "sidePanel", "tabGroups", "system.display", "notifications",
+  ]);
+  const extensionCsp = manifest.content_security_policy?.extension_pages;
+  assert.ok(
+    extensionCsp === undefined || extensionCsp === "script-src 'self'; object-src 'self'",
+    `extension CSP must stay at Chrome's secure default or exact self-only policy, got ${extensionCsp}`,
+  );
 });
 
 await check("raw CDP policy is an exact read-only allowlist", () => {
@@ -496,7 +514,6 @@ await check("MCP tool catalog preserves the 81-tool 10.0 baseline and allows add
     "engineering_validate",
   ]) assert.ok(unique.has(name), `missing additive MCP tool: ${name}`);
 });
-
 
 await check("bounded browser runtime and public execution credentials", () => {
   requireTokens(browserSource, ["API_DEFAULT_TIMEOUT_MS", "CDP_DEFAULT_TIMEOUT_MS", "debuggerCommandWithTimeout", "captureExactVisibleTab", "chrome.tabs.onCreated.addListener", "RUNTIME_SESSIONS", "detectExternalAuthChallenge", "waitForExternalAuthChallenge"], "Browser Agent runtime hardening");

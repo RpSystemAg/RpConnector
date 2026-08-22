@@ -154,7 +154,13 @@ try {
     ok(4===count($gsc),'GSC capability registry contains the four Browser-backed read capabilities');
     ok(!array_filter($gsc,static fn($c)=>str_contains(strtolower((string)($c['description']??'')),'come fallback')||str_contains(strtolower((string)($c['description']??'')),'restano fallback')||str_contains(strtolower((string)($c['description']??'')),'provider indipendenti di fallback')),'GSC capability descriptions do not advertise removed API/cache live fallbacks');
     $providerSource=(string)file_get_contents($inc.'class-prstudio-uc-gsc-provider.php');
-    ok(str_contains($providerSource,'intentionally Browser-only for live Search Console work')&&!str_contains($providerSource,'private static function api('),'GSC provider runtime remains Browser-only without the removed API implementation');
+    ok(
+        str_contains($providerSource,'prstudio_gsc_api_provider_unavailable')
+        && str_contains($providerSource,'PRSTUDIO_UC_Search_Console_Browser')
+        && str_contains($providerSource,"'browser_agent_cdp'")
+        && !str_contains($providerSource,'private static function api('),
+        'GSC provider runtime remains Browser-only without the removed API implementation'
+    );
 
     fwrite(STDOUT,"PHP new capabilities smoke: all assertions passed\n");
 } finally { cleanup($test_root); }

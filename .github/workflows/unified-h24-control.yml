@@ -88,6 +88,20 @@ jobs:
         env:
           PRSTUDIO_TEST_DB_NAME: prstudio_runtime_liveness
         run: php -d auto_prepend_file=tests/strict-php-errors.php tests/php-runtime-db-liveness-integration.php
+      - name: Real WordPress 7.0.4 activation and MCP route
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -r '$m=new mysqli("127.0.0.1","root","","",3306); if($m->connect_errno){fwrite(STDERR,$m->connect_error); exit(1);} if(!$m->query("CREATE DATABASE IF NOT EXISTS prstudio_wp_real CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")){fwrite(STDERR,$m->error); exit(1);}'
+          curl --fail --location --silent --show-error https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar --output /tmp/wp-cli.phar
+          php /tmp/wp-cli.phar --info
+          rm -rf /tmp/prstudio-wp
+          php /tmp/wp-cli.phar core download --version=7.0.4 --path=/tmp/prstudio-wp --force
+          php /tmp/wp-cli.phar config create --path=/tmp/prstudio-wp --dbname=prstudio_wp_real --dbuser=root --dbpass= --dbhost=127.0.0.1:3306 --skip-check
+          php /tmp/wp-cli.phar core install --path=/tmp/prstudio-wp --url=http://127.0.0.1:8082 --title='PR STUDIO H24' --admin_user=prstudio --admin_password='H24-Test-Only-2026!' --admin_email=ci@example.invalid --skip-email
+          cp -a "$GITHUB_WORKSPACE/prstudio-unified-control" /tmp/prstudio-wp/wp-content/plugins/prstudio-unified-control
+          php /tmp/wp-cli.phar plugin activate prstudio-unified-control --path=/tmp/prstudio-wp
+          php /tmp/wp-cli.phar eval-file "$GITHUB_WORKSPACE/tests/wp-real-activation-probe.php" --path=/tmp/prstudio-wp
 
   extension:
     name: Chrome extension / Browser Agent
@@ -156,19 +170,39 @@ jobs:
             if [ "$i" = 50 ]; then cat /tmp/rpconnector-h24-web.log; exit 1; fi
             sleep 0.2
           done
-          CHROME_BIN="$(command -v chromium || command -v chromium-browser || command -v google-chrome || true)"
-          test -n "$CHROME_BIN"
-          export CHROME_BIN
+          echo "Available browser binaries:"
+          for candidate in google-chrome-stable google-chrome chromium chromium-browser; do
+            if command -v "$candidate" >/dev/null 2>&1; then "$candidate" --version || true; fi
+          done
+          REAL_CHROME="$(command -v google-chrome-stable || command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          test -n "$REAL_CHROME"
+          command -v xvfb-run
+          cat > /tmp/rpconnector-real-chrome <<'SH'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          real="${PRSTUDIO_REAL_CHROME:?}"
+          args=()
+          for arg in "$@"; do
+            if [ "$arg" = '--headless=new' ]; then continue; fi
+            args+=("$arg")
+          done
+          exec "$real" "${args[@]}"
+          SH
+          chmod +x /tmp/rpconnector-real-chrome
+          export PRSTUDIO_REAL_CHROME="$REAL_CHROME"
+          export CHROME_BIN=/tmp/rpconnector-real-chrome
           export WP_URL=http://127.0.0.1:8080
           "$CHROME_BIN" --version
-          node .github/scripts/chrome-scripting-health-probe.mjs
-          node .github/scripts/browser-parity-live-probe.mjs
-      - name: Upload browser parity evidence
+          xvfb-run -a node .github/scripts/chrome-scripting-health-probe.mjs
+          xvfb-run -a node .github/scripts/browser-parity-live-probe.mjs
+      - name: Upload browser evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: browser-parity-${{ github.sha }}
-          path: artifacts/browser-parity/browser-parity-live-probe.json
+          name: browser-evidence-${{ github.sha }}
+          path: |
+            artifacts/real-e2e/scripting-health-probe.json
+            artifacts/browser-parity/browser-parity-live-probe.json
           if-no-files-found: warn
           retention-days: 30
 
@@ -234,7 +268,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA"
           python tests/build-release.py --build
+          python .github/scripts/stamp-browser-build-identity.py --source-sha "$GITHUB_SHA" --verify
+          python tests/generate-web-research-ledger.py
+          python - <<'PY'
+          import importlib.util, json
+          spec = importlib.util.spec_from_file_location('rigorous_audit', 'tests/rigorous-audit-controller.py')
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          summary, _, _ = module.generate()
+          print('RIGOROUS_HARD_FAILURES=' + json.dumps(summary['hard_failures'], ensure_ascii=False))
+          PY
           node tests/validate-release.mjs --strict --php-smoke
 
   gate:

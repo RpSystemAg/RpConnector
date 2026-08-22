@@ -16,10 +16,10 @@ const rest = await read('prstudio-unified-control/includes/class-prstudio-uc-res
 const bridge = await read('prstudio-unified-control/includes/class-wpaib-rest.php');
 const browserBridge = await read('prstudio-unified-control/includes/class-prstudio-uc-bridge.php');
 
-const expectedPermissions = ['tabs','tabGroups','scripting','storage','debugger','sidePanel','notifications','alarms','windows','system.display','activeTab','tabCapture','offscreen','contextMenus'];
+const expectedPermissions = ['storage','alarms','tabs','scripting','debugger','activeTab','downloads','webNavigation','sidePanel','tabGroups','system.display','notifications'];
 assert.equal(manifest.version, '1.0.0', 'Chrome extension version must stay 1.0.0');
 assert.equal(manifest.manifest_version, 3, 'Manifest V3 must remain unchanged');
-assert.deepEqual(manifest.permissions, expectedPermissions, 'Local Studio permissions include system.display for explicit screenshot/CSS/screen transforms');
+assert.deepEqual(manifest.permissions, expectedPermissions, 'Local Studio permissions must match the current audited Chrome runtime surface exactly');
 assert.deepEqual(manifest.host_permissions, ['<all_urls>'], 'Existing host permission contract must remain unchanged');
 assert.match(meta, /EXECUTOR_PRODUCT_VERSION\s*=\s*["']1\.0\.0["']/);
 assert.match(meta, /EXECUTOR_PROTOCOL_VERSION\s*=\s*["']3\.0\.0["']/);
@@ -47,7 +47,7 @@ for (const token of [
 assert.doesNotMatch(worker, /local_remote_lane_busy/, 'local site scans are not vetoed merely because remote work exists');
 assert.match(worker, /validateCdpCommand\(method, params, "internal"\)/, 'Local debugger must use the existing CDP allowlist');
 assert.match(worker, /async function localDebugCapture[\s\S]{0,5000}let operationError = null;[\s\S]{0,5000}let cleanupError = null;/, 'Local debug capture must track operation and cleanup failures separately');
-assert.match(worker, /finally \{[\s\S]{0,500}if \(attached\) \{[\s\S]{0,500}await detachDebugger\(tab\.id, "local_debug_capture_complete"\)[\s\S]{0,500}catch \(error\) \{ cleanupError = error; \}/, 'Local debugger capture must attempt evidence-aware detach in finally and retain detach failure');
+assert.match(worker, /finally \{[\s\S]{0,500}if \(attached\) \{[\s\S]{0,500}await detachDebugger\(tab\.id, "local_debug_capture_complete"\)[\s\S]{0,500}catch \(error\) \{ cleanupError = error; \}/, 'Local debug capture must attempt evidence-aware detach in finally and retain detach failure');
 assert.match(worker, /if \(operationError && cleanupError\) throw codedError\("LOCAL_DEBUG_CAPTURE_CLEANUP_FAILED"[\s\S]{0,500}if \(cleanupError\) throw cleanupError;[\s\S]{0,500}if \(operationError\) throw operationError;/, 'Local debugger capture returns a typed technical error when operation or detach cleanup fails');
 assert.match(worker, /chrome\.debugger\.detach\(\{\s*tabId:\s*id\s*\}\)/, 'Debugger cleanup helper must detach the owned tab through the bounded helper');
 assert.match(worker, /function debuggerDetachWithTimeout[\s\S]{0,700}promiseWithTimeout[\s\S]{0,700}CDP_DETACH_TIMEOUT/, 'Debugger detach must remain timeout-bounded and fail with a typed error');
@@ -73,8 +73,8 @@ for (const token of [
 
 assert.ok(bridge.includes("'browser_extension' => class_exists( 'PRSTUDIO_UC_REST' ) ? PRSTUDIO_UC_REST::browser_extension_summary()"));
 assert.ok(bridge.includes("'integration_chain' => class_exists( 'PRSTUDIO_UC_REST' ) ? PRSTUDIO_UC_REST::integration_capabilities()"));
-assert.ok(browserBridge.includes("'extension_local_studio' => class_exists( 'PRSTUDIO_UC_REST' ) ? PRSTUDIO_UC_REST::browser_extension_summary( $include_history )"));
-assert.ok(browserBridge.includes("'integration_chain' => class_exists( 'PRSTUDIO_UC_REST' ) ? PRSTUDIO_UC_REST::integration_capabilities()"));
+assert.match(browserBridge, /'extension_local_studio'\s*=>\s*class_exists\(\s*'PRSTUDIO_UC_REST'\s*\)\s*\?\s*PRSTUDIO_UC_REST::browser_extension_summary\(\s*\$include_history\s*\)/);
+assert.match(browserBridge, /'integration_chain'\s*=>\s*class_exists\(\s*'PRSTUDIO_UC_REST'\s*\)\s*\?\s*PRSTUDIO_UC_REST::integration_capabilities\(\s*\)/);
 
 // Local Studio remains off the public REST surface but is now remotely invokable through the lane-isolated MCP→Browser gateway.
 assert.doesNotMatch(rest, /register_rest_route[\s\S]{0,120}local_studio/i);

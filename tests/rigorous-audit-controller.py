@@ -80,17 +80,23 @@ def static_semantic(path:Path):
     if ext not in {'.php','.js','.mjs','.py','.json','.md','.txt','.html','.css'} and path.name!='.htaccess': return True,findings
     try:text=path.read_text(encoding='utf-8')
     except Exception:return True,findings
+    # Dynamic execution and unfinished-code sentinels are release blockers for
+    # runtime/deployable code. Test harnesses are still syntax/reference/research
+    # audited below, but may intentionally construct code strings to exercise a
+    # runtime helper in isolation (for example xmlDecode via node:test).
+    runtime_semantics='/tests/' not in f'/{rel(path)}'
     forbidden=[
       (r'\beval\s*\(', 'eval_execution'),
       (r'\bassert\s*\(\s*\$', 'dynamic_assert_execution'),
       (r'\b(?:shell_exec|passthru)\s*\(', 'arbitrary_shell_surface'),
       (r'\bnew\s+Function\s*\(', 'dynamic_js_function'),
     ]
-    for pat,name in forbidden:
-        if re.search(pat,text):findings.append(name)
+    if runtime_semantics:
+        for pat,name in forbidden:
+            if re.search(pat,text):findings.append(name)
     # TODO/FIXME are not permitted in deployable executable code.
-    if ext in {'.php','.js','.mjs','.py'} and re.search(r'\b(?:TODO|FIXME|NotImplemented)\b',text):findings.append('unfinished_marker')
-    # Never ship obvious bearer/private key material.
+    if runtime_semantics and ext in {'.php','.js','.mjs','.py'} and re.search(r'\b(?:TODO|FIXME|NotImplemented)\b',text):findings.append('unfinished_marker')
+    # Never ship obvious bearer/private key material, including fixtures/tests.
     if re.search(r'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----',text):findings.append('private_key_material')
     if re.search(r'Bearer\s+[A-Za-z0-9._~-]{32,}',text):findings.append('literal_bearer_secret')
     return not findings,findings
@@ -186,9 +192,14 @@ def tool_rows():
     rows=[]; hard=[]
     mcp=(CTRL/'includes/class-prstudio-uc-mcp-v5.php').read_text(encoding='utf-8')
     tools_body=function_body(mcp,'build_tools') or mcp
-    names=re.findall(r"self::tool\(\s*['\"]([A-Za-z0-9_:-]+)['\"]",tools_body)
+    tool_matches=list(re.finditer(r"self::tool\(\s*['\"]([A-Za-z0-9_:-]+)['\"]",tools_body))
+    names=[m.group(1) for m in tool_matches]
     cases=Counter(re.findall(r"case\s+['\"]([A-Za-z0-9_:-]+)['\"]\s*:",mcp))
-    annotations=set(re.findall(r"self::tool\(\s*['\"]([A-Za-z0-9_:-]+)['\"].*?self::annotations\(",tools_body))
+    annotations=set()
+    for index,match in enumerate(tool_matches):
+        end=tool_matches[index+1].start() if index+1<len(tool_matches) else len(tools_body)
+        if 'self::annotations(' in tools_body[match.start():end]:
+            annotations.add(match.group(1))
     for n in names:
         checks={
           'unique_definition':names.count(n)==1,
