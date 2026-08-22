@@ -106,8 +106,7 @@ class Cdp {
 
 async function attachPage(cdp, targetId) {
   const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
-  await cdp.send('Page.enable', {}, sessionId);
-  await cdp.send('Runtime.enable', {}, sessionId);
+  if (!sessionId) throw new Error(`Target.attachToTarget returned no session for ${targetId}`);
   return sessionId;
 }
 
