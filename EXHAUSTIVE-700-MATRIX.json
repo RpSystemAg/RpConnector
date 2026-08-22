@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0.0",
+  "controls_per_scope": 700,
+  "static_controls_per_scope": 350,
+  "dynamic_controls_per_scope": 350,
+  "tests_per_scope": 700,
+  "fixed_scopes": [
+    "race",
+    "extension",
+    "wordpress_plugin",
+    "chatgpt_schemas",
+    "controller_meta",
+    "final_suite"
+  ],
+  "per_file_scope": true,
+  "tracked_files_source": "git ls-files -z",
+  "verbose_line_by_line": true,
+  "require_unique_control_variables": true,
+  "require_unique_test_variables": true,
+  "expected_scope_formula": "tracked_file_count + 6",
+  "expected_control_formula": "700 * (tracked_file_count + 6)",
+  "expected_test_formula": "700 * (tracked_file_count + 6)",
+  "expected_total_formula": "1400 * (tracked_file_count + 6)"
+}
