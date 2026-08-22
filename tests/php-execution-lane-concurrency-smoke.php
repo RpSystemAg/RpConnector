@@ -39,6 +39,23 @@ function get_option($k,$d=false){
 function update_option($k,$v,$autoload=null){return option_mutate(function(&$d)use($k,$v){$d[$k]=$v;return true;});}
 function add_option($k,$v='',$deprecated='',$autoload=null){return option_mutate(function(&$d)use($k,$v){if(array_key_exists($k,$d))return false;$d[$k]=$v;return true;});}
 function delete_option($k){return option_mutate(function(&$d)use($k){if(!array_key_exists($k,$d))return false;unset($d[$k]);return true;});}
+function maybe_serialize($data){return (is_array($data)||is_object($data))?serialize($data):(string)$data;}
+
+final class PRSTUDIO_Test_WPDB {
+    public string $options='wp_options';
+    public function prepare($query,...$args){return ['query'=>$query,'args'=>$args];}
+    public function query($prepared):int{
+        if(!is_array($prepared)||count($prepared['args']??[])<2)return 0;
+        [$option,$expectedSerialized]=$prepared['args'];
+        return (int)option_mutate(function(&$data)use($option,$expectedSerialized){
+            if(!array_key_exists($option,$data))return 0;
+            if(maybe_serialize($data[$option])!==$expectedSerialized)return 0;
+            unset($data[$option]);
+            return 1;
+        });
+    }
+}
+$GLOBALS['wpdb']=new PRSTUDIO_Test_WPDB();
 
 require dirname(__DIR__).'/prstudio-unified-control/includes/class-prstudio-uc-execution-lanes.php';
 
@@ -126,6 +143,9 @@ for($round=0;$round<$rounds;$round++){
 pass("$rounds simultaneous cross-chat lease races allow exactly one owner");
 
 // 3) A stale mutex must self-heal rather than wedge the connector forever.
+// This fixture implements the same serialized compare-and-delete primitive used
+// by production WordPress, so the stale-lock path is tested without replacing a
+// newer owner's lock.
 add_option('prstudio_uc_execution_lanes_mutex_v1',['owner'=>'crashed-worker','expires_at'=>microtime(true)-1],'',false);
 $r=PRSTUDIO_UC_Execution_Lanes::heartbeat(['lane_token'=>$l1['lane_token'],'ttl_seconds'=>900],['client_id'=>'oauth-client']);
 if(is_wp_error($r))fail('stale mutex did not self-heal: '.$r->get_error_code());
