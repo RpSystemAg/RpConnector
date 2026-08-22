@@ -192,7 +192,7 @@ try {
       const debuggee = { tabId };
       let attached = false;
       try {
-        await chrome.debugger.attach(debuggee, '0.1');
+        await chrome.debugger.attach(debuggee, '1.3');
         attached = true;
         await chrome.debugger.sendCommand(debuggee, 'Page.enable');
         const result = await chrome.debugger.sendCommand(debuggee, 'Page.captureScreenshot', { format: 'png', fromSurface: false });
